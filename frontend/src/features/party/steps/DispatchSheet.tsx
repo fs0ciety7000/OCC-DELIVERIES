@@ -40,7 +40,7 @@ export function DispatchSheet({ dispatch, party, phone, onClose }: { dispatch: D
       onClose={onClose}
       size="lg"
       title={method ? `Envoyer via ${DISPATCH_LABELS[method]}` : ''}
-      description={method === 'ubereats' || method === 'takeaway' ? 'Pas d’API publique pour remplir le panier : on te guide, ça prend 2 minutes.' : undefined}
+      description={method && method !== 'export' && method !== 'phone' ? 'Pas d’API publique pour remplir le panier : on te guide, ça prend 2 minutes.' : undefined}
       footer={
         dispatch?.url ? (
           <a

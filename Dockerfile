@@ -16,6 +16,7 @@ RUN go mod download
 COPY backend/ ./
 ARG VERSION=dev
 RUN CGO_ENABLED=0 go build -trimpath -tags timetzdata -ldflags "-s -w -X main.version=${VERSION}" -o /out/occ .
+RUN CGO_ENABLED=0 go build -trimpath -tags timetzdata -ldflags "-s -w" -o /out/menusync ./cmd/menusync
 
 # ---------- 3. Runtime ----------
 FROM alpine:3.24
@@ -25,6 +26,7 @@ RUN adduser -D -H -u 10001 occ \
  && mkdir -p /pb/pb_data && chown -R occ:occ /pb
 WORKDIR /pb
 COPY --from=api /out/occ /pb/occ
+COPY --from=api /out/menusync /pb/menusync
 COPY --from=web /web/dist /pb/pb_public
 ENV TZ=Europe/Brussels \
     OCC_PUBLIC_DIR=/pb/pb_public

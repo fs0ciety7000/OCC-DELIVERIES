@@ -49,7 +49,7 @@ export interface PayoutProfile extends BaseRecord {
 
 /* ------------------------------------------------------------ restaurants */
 
-export type ProviderId = 'ubereats' | 'takeaway'
+export type ProviderId = 'ubereats' | 'takeaway' | 'deliveroo' | 'weloveat'
 
 export interface RestaurantProviderLink {
   id: ProviderId
@@ -121,9 +121,9 @@ export interface MenuItem extends BaseRecord {
 /* ---------------------------------------------------------------- parties */
 
 export type PartyStatus = 'lobby' | 'voting' | 'ordering' | 'review' | 'paying' | 'closed' | 'cancelled'
-export type PartyProvider = 'ubereats' | 'takeaway' | 'manual'
+export type PartyProvider = 'ubereats' | 'takeaway' | 'deliveroo' | 'weloveat' | 'manual'
 export type SplitMode = 'equal' | 'proportional'
-export type DispatchMethod = 'ubereats' | 'takeaway' | 'export' | 'phone'
+export type DispatchMethod = 'ubereats' | 'takeaway' | 'deliveroo' | 'weloveat' | 'export' | 'phone'
 
 export interface PartyDispatch {
   method: DispatchMethod

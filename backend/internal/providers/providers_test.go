@@ -41,7 +41,11 @@ func TestCartText(t *testing.T) {
 func TestDispatch(t *testing.T) {
 	r := Restaurant{
 		ID: "r1", Name: "Chez Luigi", Phone: "065 12 34 56",
-		Providers: []Link{{ID: UberEats, URL: "https://www.ubereats.com/be/store/luigi"}},
+		Providers: []Link{
+			{ID: UberEats, URL: "https://www.ubereats.com/be/store/luigi"},
+			{ID: Deliveroo, URL: "https://deliveroo.be/fr/menu/Brussels/mons-center/luigi"},
+			{ID: Weloveat, URL: "https://weloveat.be/luigi"},
+		},
 	}
 	s := sampleSummary()
 
@@ -52,6 +56,8 @@ func TestDispatch(t *testing.T) {
 	}{
 		{UberEats, "https://www.ubereats.com/be/store/luigi", "commande groupée"},
 		{Takeaway, "https://www.takeaway.com/be-fr", "Takeaway.com"},
+		{Deliveroo, "https://deliveroo.be/fr/menu/Brussels/mons-center/luigi", "Deliveroo"},
+		{Weloveat, "https://weloveat.be/luigi", "weloveat.be"},
 		{Export, "/api/occ/parties/p1/export?format=txt", "Téléchargez"},
 		{Phone, "tel:065123456", "065 12 34 56"},
 	}
@@ -77,11 +83,18 @@ func TestDispatch(t *testing.T) {
 		})
 	}
 
-	if _, ok := Get("deliveroo"); ok {
+	if _, ok := Get("glovo"); ok {
 		t.Fatal("unexpected provider")
 	}
-	if len(IDs()) != 4 || !IsPlatform(UberEats) || IsPlatform(Export) {
+	if len(IDs()) != 6 || !IsPlatform(UberEats) || !IsPlatform(Deliveroo) || !IsPlatform(Weloveat) || IsPlatform(Export) {
 		t.Fatal("registry")
+	}
+	// without a restaurant link, the new platforms fall back to their home page
+	if d := (deliveroo{}).Dispatch(Restaurant{Name: "X"}, s); d.URL != "https://deliveroo.be/fr/" {
+		t.Fatalf("deliveroo fallback: %q", d.URL)
+	}
+	if d := (weloveat{}).Dispatch(Restaurant{Name: "X"}, s); d.URL != "https://weloveat.be/restaurants" {
+		t.Fatalf("weloveat fallback: %q", d.URL)
 	}
 	if d := (phone{}).Dispatch(Restaurant{Name: "X"}, s); d.URL != "" {
 		t.Fatalf("phone without number: %q", d.URL)

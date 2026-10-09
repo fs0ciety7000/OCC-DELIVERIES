@@ -1,0 +1,12 @@
+# Sites satellites officiels construits par Takeaway.com (Mons) — source : SOURCES.md
+# menusync -provider takeaway-site -urls backend/migrations/data/mons_takeaway_sites.txt
+https://www.ladriaticamons.be/
+https://www.o-sando-mons.be/
+https://www.tomomons.be/
+https://www.papoumons.be/
+https://www.cup-pasta-mons.be/
+https://www.sushi-lover.be/
+https://www.snack-alibaba.be/
+https://www.lebosphore-mons.be/
+https://www.baalbeckmons.be/
+https://www.lafritemayomons-mons.be/

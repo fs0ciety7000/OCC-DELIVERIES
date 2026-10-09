@@ -64,7 +64,7 @@ var testConfig = Config{
 	DefaultLat:   50.4542,
 	DefaultLng:   3.9567,
 	DefaultLabel: "Mons",
-	Providers:    []string{providers.UberEats, providers.Takeaway},
+	Providers:    []string{providers.UberEats, providers.Takeaway, providers.Deliveroo},
 }
 
 func newTestApp(t testing.TB) *tests.TestApp {

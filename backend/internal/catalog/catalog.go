@@ -84,7 +84,7 @@ func (in *RestaurantImport) Validate() error {
 		return domain.Errf("Les montants et durées ne peuvent pas être négatifs.")
 	}
 	for _, p := range in.Providers {
-		if p.ID != providers.UberEats && p.ID != providers.Takeaway {
+		if !providers.IsPlatform(p.ID) {
 			return domain.Errf("Fournisseur inconnu : %q.", p.ID)
 		}
 	}

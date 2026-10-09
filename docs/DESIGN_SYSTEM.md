@@ -43,7 +43,10 @@ les tokens (jamais de hex en dur).
 | `--color-info` | `#6AA8FF` | infos |
 | `--color-ubereats` | `#06C167` | marque fournisseur |
 | `--color-takeaway` | `#FF8000` | marque fournisseur |
-| `--color-ubereats-ink` / `--color-takeaway-ink` | = marque | texte des badges fournisseurs (AA sur leur teinte à 14 %) |
+| `--color-deliveroo` | `#00CCBC` | marque fournisseur (teal Deliveroo) |
+| `--color-weloveat` | `#113B3A` | marque fournisseur (teal profond, couleur *primary* du thème Material de weloveat.be ; leur `manifest.json` n'a pas de `theme_color`) |
+| `--color-ubereats-ink` / `--color-takeaway-ink` / `--color-deliveroo-ink` | = marque | texte des badges fournisseurs (AA sur leur teinte à 14 %) |
+| `--color-weloveat-ink` | `#6FD3C9` | teinte claire dérivée (le teal profond est illisible sur fond sombre) ; sert aussi de fond/bord du badge `weloveat` (8,0:1) |
 | `--color-wero` / `--color-wero-fg` | `#FFE500` / `#1A1A1A` | wallet Wero — aplat + texte (contraste ≈ 15:1) |
 | `--color-bancontact` / `--color-bancontact-fg` | `#005498` / `#FFFFFF` | Bancontact Pay — aplat + texte (contraste ≈ 7,6:1) |
 | `--color-qr-bg` / `--color-qr-fg` | `#FFFFFF` / `#000000` | QR codes, identiques dans les deux thèmes |
@@ -54,7 +57,8 @@ les tokens (jamais de hex en dur).
 `bg #FAF8F4`, `surface #FFFFFF`, `elevated #F3F0EA`, `border rgb(20 16 12 / 0.08)`,
 `fg #17151A`, `muted #5F5B66`, `subtle #6F6B77`, `brand #F2542D`, `brand-2 #F59E0B`,
 `brand-ink #B93A17`, `brand-ink-2 #9A5B00`, `success #0B7A4B`, `warning #94600F`,
-`danger #C03030`, `info #2560C0`, `ubereats-ink #036B4D`, `takeaway-ink #A84A00`.
+`danger #C03030`, `info #2560C0`, `ubereats-ink #036B4D`, `takeaway-ink #A84A00`, `deliveroo-ink #006B62` (5,1:1 sur elevated),
+`weloveat-ink #113B3A` (= marque, 8,4:1).
 En clair, `.text-brand` est redirigé vers `--color-brand-ink` (`styles/index.css`) :
 la braise vive (3,4:1 sur blanc) reste réservée aux aplats, dégradés et icônes.
 
@@ -126,7 +130,7 @@ un parcours critique, toutes interruptibles.
 |---|---|---|
 | `Button` | `primary` (dégradé braise + glow), `secondary` (surface + bordure), `ghost`, `danger`; tailles `sm` `md` `lg`, `icon` | état `loading` (spinner), `asChild` non requis |
 | `Card` | `default`, `interactive` (hover lift), `selected` (bordure braise) | |
-| `Badge` | `neutral`, `brand`, `success`, `warning`, `danger`, `info`, `ubereats`, `takeaway`, `wero`, `bancontact` | pill 12 px ; `wero`/`bancontact` en aplat de marque (wordmark, pas de logo officiel) |
+| `Badge` | `neutral`, `brand`, `success`, `warning`, `danger`, `info`, `ubereats`, `takeaway`, `deliveroo`, `weloveat`, `wero`, `bancontact` | pill 12 px ; `wero`/`bancontact` en aplat de marque (wordmark, pas de logo officiel) |
 | `Avatar` / `AvatarStack` | tailles 24/32/40/56 ; anneau `ready` vert | initiales sur `user.color` si pas d'image |
 | `Input`, `Textarea`, `Field` | label + aide + erreur | |
 | `Sheet` | bottom sheet mobile / dialog centré desktop | focus trap, Échap |

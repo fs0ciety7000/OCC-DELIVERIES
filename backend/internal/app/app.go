@@ -51,7 +51,7 @@ func ConfigFromEnv(version string) Config {
 		DefaultLng:   envFloat("OCC_DEFAULT_LNG", 3.9567),
 		DefaultLabel: envOr("OCC_DEFAULT_LABEL", "Mons"),
 	}
-	for _, p := range strings.Split(envOr("OCC_PROVIDERS", "ubereats,takeaway"), ",") {
+	for _, p := range strings.Split(envOr("OCC_PROVIDERS", "ubereats,takeaway,deliveroo,weloveat"), ",") {
 		p = strings.ToLower(strings.TrimSpace(p))
 		if providers.IsPlatform(p) && !slices.Contains(cfg.Providers, p) {
 			cfg.Providers = append(cfg.Providers, p)

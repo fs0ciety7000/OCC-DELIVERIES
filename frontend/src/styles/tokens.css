@@ -26,9 +26,14 @@
   --color-info: #6aa8ff;
   --color-ubereats: #06c167;
   --color-takeaway: #ff8000;
+  --color-deliveroo: #00ccbc;
+  --color-weloveat: #113b3a;
   /* Texte des badges fournisseurs (AA sur leur teinte à 14 %). */
   --color-ubereats-ink: #06c167;
   --color-takeaway-ink: #ff8000;
+  --color-deliveroo-ink: #00ccbc;
+  /* weloveat : teal profond illisible sur fond sombre → teinte claire dérivée (aussi fond/bord du badge). */
+  --color-weloveat-ink: #6fd3c9;
   /* Wallets belges : aplats de marque + texte dédié (contraste AA vérifié). */
   --color-wero: #ffe500;
   --color-wero-fg: #1a1a1a;
@@ -144,6 +149,8 @@
   --color-brand-ink-2: #9a5b00;
   --color-ubereats-ink: #036b4d;
   --color-takeaway-ink: #a84a00;
+  --color-deliveroo-ink: #006b62;
+  --color-weloveat-ink: #113b3a;
   /* États assombris : texte de badge AA (≥ 4.5:1) sur leur teinte à 12 %. */
   --color-success: #0b7a4b;
   --color-warning: #94600f;

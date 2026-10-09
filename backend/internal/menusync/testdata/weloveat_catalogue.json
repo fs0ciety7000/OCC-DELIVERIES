@@ -1,0 +1,88 @@
+{
+ "establishment": {
+  "name": "TOMO RAMEN",
+  "description": "Restaurant de Ramen 🍜",
+  "phone_number": "065352964",
+  "slug": "tomo-ramen",
+  "address": "Rue d'Enghien 11, 7000 Mons, Belgique",
+  "latitude": null,
+  "longitude": null,
+  "score_float": 4.8,
+  "nbr_evaluation": 123,
+  "minimum_per_order": 10,
+  "shipping_cost": null,
+  "estimated_delivery_time": 45,
+  "type": "restaurant",
+  "categories": [
+   {
+    "name": "Asiatique"
+   },
+   {
+    "name": "Nourriture saine"
+   },
+   {
+    "name": "Végétarien"
+   }
+  ],
+  "user": {
+   "email": "redacted@example.invalid",
+   "fcm_token": "redacted"
+  }
+ },
+ "packs": [],
+ "results": [
+  {
+   "category": {
+    "name": {
+     "fr": "SUGGESTIONS ❤️"
+    },
+    "display": 1
+   },
+   "products": []
+  },
+  {
+   "category": {
+    "name": {
+     "fr": "PLATS PRINCIPAUX 🍜"
+    },
+    "display": 1
+   },
+   "products": [
+    {
+     "name": "Classic Ramen",
+     "description": "Bouillon de porc signature riche et crémeux. Servis avec 2 tranches de porc tendres 🐷🐷",
+     "price": 13,
+     "slug": "classic-ramen-7615"
+    },
+    {
+     "name": "Classic chashu Ramen",
+     "description": "Bouillon de porc signature riche et crémeux. Servis avec 5 tranches de porc tendres 🐷🐷🐷🐷🐷",
+     "price": 16.5,
+     "slug": "classic-chashu-ramen"
+    }
+   ]
+  },
+  {
+   "category": {
+    "name": {
+     "fr": "SIDES 🌱"
+    },
+    "display": 1
+   },
+   "products": [
+    {
+     "name": "Karaage",
+     "description": "Beignets de poulet japonais par 6 pièces accompagnés d'une sauce.",
+     "price": 6,
+     "slug": "karaage"
+    },
+    {
+     "name": "Edamame",
+     "description": "",
+     "price": 4,
+     "slug": "edamame-5040"
+    }
+   ]
+  }
+ ]
+}

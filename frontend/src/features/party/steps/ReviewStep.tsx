@@ -145,9 +145,13 @@ function FeesEditor({ ctx, summary }: { ctx: PartyCtx; summary: Summary }) {
 const DISPATCH_TILES: { method: DispatchMethod; title: string; hint: string; className: string; icon?: React.ReactNode }[] = [
   { method: 'ubereats', title: 'Uber Eats', hint: 'Lien du resto + récap à saisir', className: 'border-ubereats/30 hover:border-ubereats/60 [&_[data-mark]]:bg-ubereats/15 [&_[data-mark]]:text-ubereats-ink' },
   { method: 'takeaway', title: 'Takeaway', hint: 'Lien Takeaway.com + récap', className: 'border-takeaway/30 hover:border-takeaway/60 [&_[data-mark]]:bg-takeaway/15 [&_[data-mark]]:text-takeaway-ink' },
+  { method: 'deliveroo', title: 'Deliveroo', hint: 'Lien Deliveroo + récap', className: 'border-deliveroo/30 hover:border-deliveroo/60 [&_[data-mark]]:bg-deliveroo/15 [&_[data-mark]]:text-deliveroo-ink' },
+  { method: 'weloveat', title: 'weloveat', hint: 'Lien weloveat.be + récap', className: 'border-weloveat-ink/30 hover:border-weloveat-ink/60 [&_[data-mark]]:bg-weloveat-ink/15 [&_[data-mark]]:text-weloveat-ink' },
   { method: 'export', title: 'Exporter', hint: 'CSV, TXT ou JSON', className: 'hover:border-border-strong', icon: <FileDown className="size-4" /> },
   { method: 'phone', title: 'Téléphone', hint: 'Script à dicter au resto', className: 'hover:border-border-strong', icon: <Phone className="size-4" /> },
 ]
+
+const isPlatform = (m: DispatchMethod) => m !== 'export' && m !== 'phone'
 
 function DispatchPanel({ ctx }: { ctx: PartyCtx }) {
   const { party } = ctx
@@ -155,7 +159,7 @@ function DispatchPanel({ ctx }: { ctx: PartyCtx }) {
   const dispatch = useDispatch(party.id)
   const [result, setResult] = useState<Dispatch | null>(null)
   const enabledProviders = new Set((config.data?.providers ?? []).filter((p) => p.enabled).map((p) => p.id))
-  const tiles = DISPATCH_TILES.filter((t) => (t.method === 'ubereats' || t.method === 'takeaway' ? !config.data || enabledProviders.has(t.method) : true))
+  const tiles = DISPATCH_TILES.filter((t) => (isPlatform(t.method) ? !config.data || enabledProviders.has(t.method) : true))
 
   return (
     <Card>
