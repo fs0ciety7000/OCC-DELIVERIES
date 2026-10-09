@@ -99,4 +99,8 @@ func TestDispatch(t *testing.T) {
 	if d := (phone{}).Dispatch(Restaurant{Name: "X"}, s); d.URL != "" {
 		t.Fatalf("phone without number: %q", d.URL)
 	}
+	// stored E.164: dialled as is, read out in groups
+	if d := (phone{}).Dispatch(Restaurant{Name: "X", Phone: "+3265352964"}, s); d.URL != "tel:+3265352964" || !strings.Contains(d.Instructions[0], "+32 65 35 29 64") {
+		t.Fatalf("e164 phone: %q %v", d.URL, d.Instructions)
+	}
 }

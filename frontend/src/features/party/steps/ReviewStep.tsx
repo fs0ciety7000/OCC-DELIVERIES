@@ -193,7 +193,7 @@ function DispatchPanel({ ctx }: { ctx: PartyCtx }) {
           ))}
         </div>
       </CardBody>
-      <DispatchSheet dispatch={result} party={party} phone={party.expand?.restaurant?.phone} onClose={() => setResult(null)} />
+      <DispatchSheet dispatch={result} party={party} phone={party.expand?.restaurant?.phone} restaurant={party.expand?.restaurant} onClose={() => setResult(null)} />
     </Card>
   )
 }

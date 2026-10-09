@@ -108,6 +108,9 @@ type Stats struct {
 	ItemsUpdated       int `json:"items_updated"`
 	ItemsPriceChanged  int `json:"items_price_changed"`
 	ItemsUnavailable   int `json:"items_unavailable"`
+	// RestaurantsEnriched: restaurants completed from OpenStreetMap
+	// (phone / address / position, internal/enrich) at the end of the run.
+	RestaurantsEnriched int `json:"restaurants_enriched"`
 }
 
 // Add sums two stats.
@@ -119,6 +122,7 @@ func (s *Stats) Add(o Stats) {
 	s.ItemsUpdated += o.ItemsUpdated
 	s.ItemsPriceChanged += o.ItemsPriceChanged
 	s.ItemsUnavailable += o.ItemsUnavailable
+	s.RestaurantsEnriched += o.RestaurantsEnriched
 }
 
 // RestaurantPlan is what to write for one restaurant (one transaction).

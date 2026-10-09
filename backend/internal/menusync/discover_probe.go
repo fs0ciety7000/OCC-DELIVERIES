@@ -297,7 +297,7 @@ func (p *Prober) probe(ctx context.Context, c *http.Client, host, page string) (
 		return try, nil
 	}
 	f := &DiscoverFound{
-		URL: pageURL, Host: host, Name: r.Name, Address: r.Address,
+		URL: pageURL, Host: host, Name: r.Name, Address: domain.NormalizeAddress(r.Address),
 		Items: r.ItemCount(), Categories: len(r.Categories), Lat: r.Lat, Lng: r.Lng,
 	}
 	if pu, err := url.Parse(pageURL); err == nil && p.URLFor == nil {

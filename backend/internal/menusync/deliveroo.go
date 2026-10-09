@@ -180,6 +180,7 @@ type drMenuPage struct {
 								Location     struct {
 									Address struct {
 										Address1 string `json:"address1"`
+										PostCode string `json:"postCode"`
 									} `json:"address"`
 								} `json:"location"`
 								Links struct {
@@ -291,6 +292,9 @@ func ParseDeliverooMenu(page []byte, pageURL string) (Restaurant, error) {
 	r.Name = name
 	r.CoverURL = meta.Metatags.Image
 	r.Address = cleanDeliverooAddress(meta.Restaurant.Location.Address.Address1)
+	if pc := CleanText(meta.Restaurant.Location.Address.PostCode); r.Address != "" && pc != "" && !strings.Contains(r.Address, pc) {
+		r.Address += ", " + pc
+	}
 	r.Providers = []providers.Link{{ID: providers.Deliveroo, URL: pageURL}}
 
 	// header tags: a cuisines line ("Libanais · Mezzes") and an info line
@@ -380,6 +384,14 @@ func ParseDeliverooMenu(page []byte, pageURL string) (Restaurant, error) {
 		}
 	}
 
+	// a phone published in the restaurant object itself (not always shown
+	// in the « Coordonnées » block)
+	if r.Phone == "" {
+		if m := jsonPhoneRe.FindSubmatch(deliverooRestaurantJSON(raw)); m != nil {
+			r.Phone = string(m[1])
+		}
+	}
+
 	// option groups
 	groups := map[string]domain.OptionGroup{}
 	for _, g := range meta.ModifierGroups {
@@ -432,6 +444,30 @@ func ParseDeliverooMenu(page []byte, pageURL string) (Restaurant, error) {
 	}
 	r.Categories = dropEmptyCategories(r.Categories)
 	return r, nil
+}
+
+// deliverooRestaurantJSON returns the raw restaurant object of a menu page
+// (nil when absent).
+func deliverooRestaurantJSON(raw []byte) []byte {
+	var root struct {
+		Props struct {
+			InitialState struct {
+				MenuPage struct {
+					Menu struct {
+						Metas struct {
+							Root struct {
+								Restaurant json.RawMessage `json:"restaurant"`
+							} `json:"root"`
+						} `json:"metas"`
+					} `json:"menu"`
+				} `json:"menuPage"`
+			} `json:"initialState"`
+		} `json:"props"`
+	}
+	if json.Unmarshal(raw, &root) != nil {
+		return nil
+	}
+	return root.Props.InitialState.MenuPage.Menu.Metas.Root.Restaurant
 }
 
 // normalizeGroup makes a platform option group valid for our model.

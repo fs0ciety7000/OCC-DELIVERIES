@@ -307,7 +307,7 @@ func TestAdminImportCSV(t *testing.T) {
 		t.Fatalf("pizza menu replaced: %d items", n)
 	}
 	pr, _ := e.app.FindRecordById(colRestaurants, pizza)
-	if pr.GetString("phone") != "065 00 00 00" || pr.GetFloat("lat") != 50.4542 {
+	if pr.GetString("phone") != "+3265000000" || pr.GetFloat("lat") != 50.4542 {
 		t.Fatalf("existing metadata kept: %v", pr.PublicExport())
 	}
 

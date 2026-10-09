@@ -5,7 +5,9 @@ import { toast } from 'sonner'
 import { Badge, Button, CopyButton, Sheet } from '@/components/ui'
 import { occ } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
-import type { Dispatch, ExportFormat, Party } from '@/lib/types'
+import { OsmAttribution } from '@/features/restaurants/OsmAttribution'
+import { formatPhone, telHref } from '@/lib/format'
+import type { Dispatch, ExportFormat, Party, Restaurant } from '@/lib/types'
 import { DISPATCH_LABELS } from '../labels'
 
 export function ExportButtons({ party }: { party: Party }) {
@@ -32,8 +34,21 @@ export function ExportButtons({ party }: { party: Party }) {
   )
 }
 
-export function DispatchSheet({ dispatch, party, phone, onClose }: { dispatch: Dispatch | null; party: Party; phone?: string; onClose: () => void }) {
+export function DispatchSheet({
+  dispatch,
+  party,
+  phone,
+  restaurant,
+  onClose,
+}: {
+  dispatch: Dispatch | null
+  party: Party
+  phone?: string
+  restaurant?: Pick<Restaurant, 'name' | 'enriched_from'>
+  onClose: () => void
+}) {
   const method = dispatch?.method
+  const shownPhone = formatPhone(phone)
   return (
     <Sheet
       open={!!dispatch}
@@ -42,7 +57,14 @@ export function DispatchSheet({ dispatch, party, phone, onClose }: { dispatch: D
       title={method ? `Envoyer via ${DISPATCH_LABELS[method]}` : ''}
       description={method && method !== 'export' && method !== 'phone' ? 'Pas d’API publique pour remplir le panier : on te guide, ça prend 2 minutes.' : undefined}
       footer={
-        dispatch?.url ? (
+        method === 'phone' && phone ? (
+          <a
+            href={telHref(phone)}
+            className="inline-flex min-h-13 w-full items-center justify-center gap-2 rounded-md bg-ember px-6 font-semibold text-brand-fg shadow-glow"
+          >
+            <Phone aria-hidden className="size-4" /> Appeler le {shownPhone}
+          </a>
+        ) : dispatch?.url ? (
           <a
             href={dispatch.url}
             target="_blank"
@@ -51,15 +73,29 @@ export function DispatchSheet({ dispatch, party, phone, onClose }: { dispatch: D
           >
             Ouvrir {method ? DISPATCH_LABELS[method] : ''} <ExternalLink className="size-4" />
           </a>
-        ) : method === 'phone' && phone ? (
-          <a href={`tel:${phone}`} className="inline-flex min-h-13 w-full items-center justify-center gap-2 rounded-md bg-ember px-6 font-semibold text-brand-fg shadow-glow">
-            <Phone className="size-4" /> Appeler {phone}
-          </a>
         ) : undefined
       }
     >
       {dispatch && (
         <div className="space-y-5">
+          {method === 'phone' && (
+            <div className="space-y-1 rounded-lg border border-border bg-surface p-4 text-center">
+              <p className="text-sm text-muted">{restaurant?.name ? `Numéro de ${restaurant.name}` : 'Numéro du restaurant'}</p>
+              {phone ? (
+                <>
+                  <a href={telHref(phone)} className="block font-display text-3xl font-bold text-fg tabular underline-offset-4 hover:underline">
+                    {shownPhone}
+                  </a>
+                  <div className="flex justify-center pt-1">
+                    <CopyButton value={shownPhone} label="Copier le numéro" toastMessage="Numéro copié" />
+                  </div>
+                  {restaurant && <OsmAttribution restaurant={restaurant} />}
+                </>
+              ) : (
+                <p className="font-semibold">Numéro inconnu : cherche-le sur la page du restaurant ou sa plateforme.</p>
+              )}
+            </div>
+          )}
           <Suspense fallback={<div className="h-24" />}>
             <DispatchScooter />
           </Suspense>

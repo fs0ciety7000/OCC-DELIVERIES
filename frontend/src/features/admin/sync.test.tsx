@@ -33,6 +33,7 @@ describe('syncFormat', () => {
       '1 autre plat modifié',
       '1 plat indisponible',
     ])
+    expect(statsSummary({ ...zero, restaurants_enriched: 3 })).toEqual(['3 restaurants complétés (OpenStreetMap)'])
   })
 })
 

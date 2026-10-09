@@ -139,6 +139,7 @@ journal) et liste des **sources**.
 | `OCC_SYNC_CRON` | `30 3 * * *` | planification (cron 5 champs) lue à l'**heure de Bruxelles** (le cron interne de PocketBase est en UTC : le serveur convertit) |
 | `OCC_SYNC_ON_START` | `true` | ~60 s après le démarrage, lance une synchronisation si aucune n'a encore réussi (premier déploiement) |
 | `OCC_SYNC_START_DELAY` | `60s` | délai de ce premier lancement (durée Go : `30s`, `5m`) |
+| `OCC_ENRICH_ENABLED` | `true` | à la fin de chaque exécution, complète téléphone / adresse / position manquants depuis OpenStreetMap (voir ci-dessous) ; `false` = aucune requête vers Nominatim |
 
 * **Durée** : quelques minutes (≈ 150 requêtes espacées d'au moins 2,5 s). Une seule
   exécution à la fois ; une relance le même jour lit le cache (`pb_data/menusync-cache`, 20 h)
@@ -191,6 +192,24 @@ journal) et liste des **sources**.
   contourner ; si cela dure, désactiver la source), *Échec*.
 * **Désactiver** : `OCC_SYNC_ENABLED=false` puis redéployer (ou désactiver les sources une à
   une, effet immédiat). Les données déjà synchronisées restent.
+* **Coordonnées (téléphone, adresse, position)** : lues dans chaque source quand elle les publie,
+  puis normalisées (téléphone `+3265352964`, affiché `+32 65 35 29 64` ; adresse
+  `Rue de la Clef 24, 7000 Mons`, localité déduite du code postal). Les restaurants actifs non
+  verrouillés à qui il manque encore un téléphone, une adresse ou une vraie position (aperçus Uber
+  Eats) sont ensuite cherchés dans **OpenStreetMap** (Nominatim) : au plus 60 requêtes par nuit,
+  ≥ 1,1 s entre deux, User-Agent identifié, réponses gardées 30 jours en cache
+  (`pb_data/menusync-cache/nominatim`), arrêt immédiat si Nominatim refuse ou limite (429/403).
+  Un résultat n'est retenu que s'il s'agit d'un lieu de restauration du même nom, à ≤ 12 km du lieu
+  par défaut (≤ 1,5 km de la position connue, dans la même rue que l'adresse connue) ; deux
+  homonymes éloignés (deux Pizza Hut) sans position connue = rien n'est écrit. Seuls les champs
+  **vides** sont remplis. Changements « Pizza Hut — téléphone ajouté (OpenStreetMap) » et compteur
+  « restaurants complétés » dans l'historique. La liste *Admin → Restaurants* signale « sans tél. »
+  et « sans adresse ».
+* **Attribution OpenStreetMap (ODbL, obligatoire)** : un restaurant complété par OSM garde la
+  provenance (`enriched_from`) et sa fiche affiche « Coordonnées : © contributeurs OpenStreetMap »
+  (lien vers `openstreetmap.org/copyright`), comme l'envoi « Téléphone ». Ne pas retirer ce crédit.
+  Corriger un champ à la main retire son crédit. Respecter la politique d'usage de Nominatim
+  (pas de requêtes en masse, pas de relance en boucle) ; en cas d'abus signalé : `OCC_ENRICH_ENABLED=false`.
 
 ### Instantané Uber Eats (restaurants à carte partielle)
 Uber Eats n'est lisible que par le **connecteur Uber Eats d'une session Claude** (très limité :

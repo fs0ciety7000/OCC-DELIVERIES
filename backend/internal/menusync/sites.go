@@ -40,6 +40,7 @@ func ParseTakeawaySite(page []byte, pageURL string) (Restaurant, error) {
 	if r.Name == "" {
 		return Restaurant{}, errors.New("nom du restaurant introuvable")
 	}
+	fillContactFromDoc(&r, doc)
 	r.Slug = Slugify(r.Name)
 
 	if u := takeawayLink(doc); u != "" {
@@ -99,6 +100,7 @@ func ParseJSONLD(page []byte, pageURL string) (Restaurant, error) {
 	if r.Name == "" {
 		return Restaurant{}, errors.New("aucune entité schema.org Restaurant trouvée")
 	}
+	fillContactFromDoc(&r, doc)
 	r.Slug = Slugify(r.Name)
 	if u := takeawayLink(doc); u != "" {
 		r.Providers = []providers.Link{{ID: providers.Takeaway, URL: u}}

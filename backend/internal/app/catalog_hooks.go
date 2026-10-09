@@ -8,6 +8,7 @@ import (
 
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/catalog"
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/domain"
+	"github.com/fs0ciety7000/occ-deliveries/backend/internal/enrich"
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/providers"
 )
 
@@ -71,6 +72,10 @@ func onRestaurantUpsert(e *core.RecordRequestEvent) error {
 	if r.GetInt("eta_min") > 0 && r.GetInt("eta_max") > 0 && r.GetInt("eta_min") > r.GetInt("eta_max") {
 		return badRequest("Le délai minimum dépasse le délai maximum.")
 	}
+	if err := normalizeContact(r); err != nil {
+		return err
+	}
+	keepAttribution(r)
 	// items_count is computed by the server (never trusted from the client)
 	n := 0
 	if !r.IsNew() {
@@ -87,6 +92,56 @@ func onRestaurantUpsert(e *core.RecordRequestEvent) error {
 		}
 	}
 	return e.Next()
+}
+
+// normalizeContact stores the phone in E.164 and the address as « Rue X 12,
+// 7000 Mons ». A new or changed phone that cannot be read is refused; an
+// unreadable phone already stored does not block other edits.
+func normalizeContact(r *core.Record) error {
+	raw := strings.TrimSpace(r.GetString("phone"))
+	switch p, ok := domain.NormalizeRestaurantPhone(raw); {
+	case raw == "":
+		r.Set("phone", "")
+	case ok:
+		r.Set("phone", p)
+	case r.IsNew() || raw != strings.TrimSpace(r.Original().GetString("phone")):
+		return badRequest("Numéro de téléphone invalide (ex. 065 12 34 56 ou +32 65 12 34 56).")
+	}
+	r.Set("address", domain.NormalizeAddress(r.GetString("address")))
+	return nil
+}
+
+// keepAttribution keeps restaurants.enriched_from server-side: never taken
+// from the client, and a field the admin changes is no longer credited to
+// OpenStreetMap.
+func keepAttribution(r *core.Record) {
+	if r.IsNew() {
+		r.Set("enriched_from", nil)
+		return
+	}
+	orig := r.Original()
+	var a enrich.Attribution
+	if raw := strings.TrimSpace(orig.GetString("enriched_from")); raw == "" || raw == "null" || orig.UnmarshalJSONField("enriched_from", &a) != nil || a.Provider == "" {
+		r.Set("enriched_from", nil)
+		return
+	}
+	changed := map[string]bool{
+		enrich.FieldPhone:   r.GetString("phone") != orig.GetString("phone"),
+		enrich.FieldAddress: r.GetString("address") != orig.GetString("address"),
+		enrich.FieldGeo:     r.GetFloat("lat") != orig.GetFloat("lat") || r.GetFloat("lng") != orig.GetFloat("lng"),
+	}
+	kept := []string{}
+	for _, f := range a.Fields {
+		if !changed[f] {
+			kept = append(kept, f)
+		}
+	}
+	if len(kept) == 0 {
+		r.Set("enriched_from", nil)
+		return
+	}
+	a.Fields = kept
+	r.Set("enriched_from", a)
 }
 
 func onRestaurantDelete(e *core.RecordRequestEvent) error {

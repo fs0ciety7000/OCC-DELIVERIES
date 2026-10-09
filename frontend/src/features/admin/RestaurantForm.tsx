@@ -6,6 +6,7 @@ import { Button, Field, Input, Segmented, Sheet, Textarea } from '@/components/u
 import { adminApi } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
 import { centsToEuros, parseDecimal, parseEuros } from '@/lib/euros'
+import { formatPhone } from '@/lib/format'
 import { qk } from '@/lib/queryKeys'
 import type { Restaurant, RestaurantProviderLink } from '@/lib/types'
 import { geocode, slugify } from './geocode'
@@ -55,7 +56,7 @@ function initial(r: Restaurant | null): FormState {
     address: r?.address ?? '',
     lat: num(r?.lat),
     lng: num(r?.lng),
-    phone: r?.phone ?? '',
+    phone: formatPhone(r?.phone ?? ''),
     rating: num(r?.rating),
     rating_count: r?.rating_count ? String(r.rating_count) : '',
     price_level: String(r?.price_level || 2) as FormState['price_level'],

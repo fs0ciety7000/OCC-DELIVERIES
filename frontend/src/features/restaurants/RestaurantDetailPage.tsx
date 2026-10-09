@@ -5,10 +5,12 @@ import { Button, EmptyState, Money, Skeleton } from '@/components/ui'
 import { CreatePartySheet } from '@/features/party/CreatePartySheet'
 import { useAuth } from '@/lib/auth'
 import { errorMessage, isNotFound } from '@/lib/errors'
+import { formatPhone, mapHref, telHref } from '@/lib/format'
 import type { MenuItem } from '@/lib/types'
 import { useMenu, useRestaurant } from './hooks'
 import { ItemSheet } from './ItemSheet'
 import { MenuSkeleton, MenuView } from './MenuView'
+import { OsmAttribution } from './OsmAttribution'
 import { PartialMenuBadge, PartialMenuBanner } from './PartialMenu'
 import { ProviderBadges, RestaurantMeta } from './RestaurantCard'
 import { RestaurantCover } from './RestaurantCover'
@@ -86,13 +88,23 @@ export function RestaurantDetailPage() {
           <PartialMenuBadge restaurant={r} />
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted">
             {r.address && (
-              <span className="inline-flex items-center gap-1.5">
-                <MapPin aria-hidden className="size-4" /> {r.address}
-              </span>
+              <a
+                href={mapHref(r)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-11 items-center gap-1.5 underline-offset-4 hover:text-fg hover:underline"
+                aria-label={`Adresse : ${r.address} (ouvrir la carte dans un nouvel onglet)`}
+              >
+                <MapPin aria-hidden className="size-4 shrink-0" /> {r.address}
+              </a>
             )}
             {r.phone && (
-              <a href={`tel:${r.phone}`} className="inline-flex min-h-11 items-center gap-1.5 hover:text-fg">
-                <Phone aria-hidden className="size-4" /> {r.phone}
+              <a
+                href={telHref(r.phone)}
+                className="inline-flex min-h-11 items-center gap-1.5 font-medium text-fg tabular underline-offset-4 hover:underline"
+                aria-label={`Appeler ${r.name} au ${formatPhone(r.phone)}`}
+              >
+                <Phone aria-hidden className="size-4 shrink-0" /> {formatPhone(r.phone)}
               </a>
             )}
             {r.min_order > 0 && (
@@ -101,6 +113,7 @@ export function RestaurantDetailPage() {
               </span>
             )}
           </div>
+          <OsmAttribution restaurant={r} />
           <ProviderBadges restaurant={r} />
         </header>
       ) : (

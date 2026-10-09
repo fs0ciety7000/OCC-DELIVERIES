@@ -78,6 +78,8 @@ func WeloveatPageURL(slug string) string { return WeloveatSite + "/" + slug }
 var piiKeys = map[string]bool{
 	"user": true, "email": true, "fcm_token": true, "first_name": true, "last_name": true,
 	"connected_account_id": true, "invitation_redirect_url": true, "iban": true, "vat_number": true,
+	"owner": true, "manager": true, "users": true, "password": true, "api_token": true, "remember_token": true,
+	"stripe_account_id": true, "birth_date": true, "personal_phone": true,
 }
 
 // SanitizeWeloveat removes personal data keys (recursively) from a JSON answer.
@@ -156,7 +158,14 @@ type wlEstablishment struct {
 	Description      i18nText   `json:"description"`
 	Slug             string     `json:"slug"`
 	Phone            string     `json:"phone_number"`
+	PhoneAlt         string     `json:"phone"`
+	Telephone        string     `json:"telephone"`
 	Address          string     `json:"address"`
+	Street           string     `json:"street"`
+	StreetNumber     string     `json:"street_number"`
+	PostalCode       string     `json:"postal_code"`
+	Locality         string     `json:"locality"`
+	City             string     `json:"city"`
 	Latitude         flexNumber `json:"latitude"`
 	Longitude        flexNumber `json:"longitude"`
 	ScoreFloat       flexNumber `json:"score_float"`
@@ -171,12 +180,30 @@ type wlEstablishment struct {
 	} `json:"categories"`
 }
 
+// phone returns the business phone of the establishment (the owner's
+// personal data is stripped by SanitizeWeloveat before parsing).
+func (e wlEstablishment) phone() string {
+	return CleanText(firstNonEmpty(e.Phone, e.PhoneAlt, e.Telephone))
+}
+
+// address returns the postal address, composed from its parts when the
+// API gives no one-line address.
+func (e wlEstablishment) address() string {
+	if a := trimCountry(e.Address); a != "" {
+		return a
+	}
+	street := CleanText(strings.TrimSpace(e.Street + " " + e.StreetNumber))
+	place := CleanText(strings.TrimSpace(e.PostalCode + " " + firstNonEmpty(e.Locality, e.City)))
+	return strings.Trim(street+", "+place, ", ")
+}
+
 // WeloveatShop is an establishment of a search result.
 type WeloveatShop struct {
 	Slug     string
 	Name     string
 	Lat, Lng float64
 	Address  string
+	Phone    string
 }
 
 // ParseWeloveatSearch returns the restaurants of a search answer.
@@ -194,7 +221,7 @@ func ParseWeloveatSearch(b []byte) ([]WeloveatShop, error) {
 		if e.Slug == "" || (e.Type != "" && e.Type != "restaurant") {
 			continue
 		}
-		out = append(out, WeloveatShop{Slug: e.Slug, Name: CleanText(string(e.Name)), Lat: e.Latitude.V, Lng: e.Longitude.V, Address: trimCountry(e.Address)})
+		out = append(out, WeloveatShop{Slug: e.Slug, Name: CleanText(string(e.Name)), Lat: e.Latitude.V, Lng: e.Longitude.V, Address: e.address(), Phone: e.phone()})
 	}
 	return out, nil
 }
@@ -234,9 +261,9 @@ func ParseWeloveatCatalogue(b []byte, pageURL string) (Restaurant, []WeloveatPro
 	r.Name = CleanText(string(e.Name))
 	r.Slug = Slugify(r.Name)
 	r.Description = CleanText(string(e.Description))
-	r.Address = trimCountry(e.Address)
+	r.Address = e.address()
 	r.Lat, r.Lng = e.Latitude.V, e.Longitude.V
-	r.Phone = CleanText(e.Phone)
+	r.Phone = e.phone()
 	if e.ScoreFloat.V > 0 && e.NbrEvaluation > 0 {
 		r.Rating, r.RatingCount = e.ScoreFloat.V, e.NbrEvaluation
 	}

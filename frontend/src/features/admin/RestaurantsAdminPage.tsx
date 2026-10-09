@@ -1,12 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { EyeOff, Lock, MapPinOff, Pencil, Plus, Search, TriangleAlert, UtensilsCrossed } from 'lucide-react'
+import { EyeOff, Lock, MapPinOff, Pencil, PhoneOff, Plus, Search, TriangleAlert, UtensilsCrossed } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { Badge, Button, buttonClass, Card, EmptyState, Input, Segmented, Skeleton } from '@/components/ui'
 import { adminApi } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
-import { plural } from '@/lib/format'
+import { formatPhone, plural } from '@/lib/format'
 import { qk } from '@/lib/queryKeys'
 import type { Restaurant } from '@/lib/types'
 import { AdminHeader } from './AdminLayout'
@@ -192,10 +192,21 @@ export function RestaurantsAdminPage() {
                       <MapPinOff className="size-3" aria-hidden /> Sans coordonnées
                     </Badge>
                   )}
+                  {!r.phone?.trim() && (
+                    <Badge title="Aucun numéro : la synchronisation tentera de le trouver (sources, OpenStreetMap).">
+                      <PhoneOff className="size-3" aria-hidden /> sans tél.
+                    </Badge>
+                  )}
+                  {!r.address?.trim() && (
+                    <Badge title="Aucune adresse : la synchronisation tentera de la trouver (sources, OpenStreetMap).">
+                      <MapPinOff className="size-3" aria-hidden /> sans adresse
+                    </Badge>
+                  )}
                 </div>
                 <p className="truncate text-xs text-subtle">
                   {r.slug}
                   {r.address ? ` · ${r.address}` : ''}
+                  {r.phone ? ` · ${formatPhone(r.phone)}` : ''}
                   {r.cuisines?.length ? ` · ${r.cuisines.join(', ')}` : ''}
                 </p>
               </div>

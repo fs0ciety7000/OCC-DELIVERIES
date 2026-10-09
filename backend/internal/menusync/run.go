@@ -243,6 +243,9 @@ func runWeloveat(ctx context.Context, f *Fetcher, o Options) ([]Restaurant, erro
 		if r.Address == "" {
 			r.Address = s.Address
 		}
+		if r.Phone == "" {
+			r.Phone = s.Phone
+		}
 		if o.Details {
 			for _, ref := range refs {
 				pb, err := f.Do(ctx, Request{URL: api + weloveatProductPath + ref.Slug, Accept: "application/json", Sanitize: SanitizeWeloveat})

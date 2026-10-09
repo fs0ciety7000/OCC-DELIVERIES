@@ -102,3 +102,47 @@ export function priceLevel(level?: number): string {
 export function isoInMinutes(minutes: number, from: number = Date.now()): string {
   return new Date(from + minutes * 60_000).toISOString()
 }
+
+/**
+ * Téléphone stocké en E.164 (« +3265352964 ») → « +32 65 35 29 64 ».
+ * Jumeau de `domain.FormatPhone` (Go) : mobiles « +32 475 12 34 56 », zones à
+ * un chiffre (Bruxelles, Anvers, Liège, Gand) « +32 2 123 45 67 », numéros
+ * spéciaux « +32 800 12 345 ». Tout autre format est rendu tel quel.
+ */
+export function formatPhone(phone: string | null | undefined): string {
+  const p = (phone ?? '').trim()
+  const n = /^\+32(\d{8,9})$/.exec(p)?.[1]
+  if (!n) return p
+  const group = (prefix: string, rest: string, sizes: number[]) => {
+    const parts = ['+32', prefix]
+    for (const s of sizes) {
+      if (rest.length < s) break
+      parts.push(rest.slice(0, s))
+      rest = rest.slice(s)
+    }
+    if (rest) parts.push(rest)
+    return parts.join(' ')
+  }
+  if (n.length === 9 && n.startsWith('4')) return group(n.slice(0, 3), n.slice(3), [2, 2, 2])
+  if (n.length === 9) return p
+  if (/^(800|90|70|78)/.test(n)) return group(n.slice(0, 3), n.slice(3), [2, 3])
+  if ('2349'.includes(n.charAt(0))) return group(n.slice(0, 1), n.slice(1), [3, 2, 2])
+  return group(n.slice(0, 2), n.slice(2), [2, 2, 2])
+}
+
+/** Lien `tel:` d'un numéro (espaces, points, barres retirés). */
+export function telHref(phone: string): string {
+  return `tel:${phone.replace(/[\s./()-]/g, '')}`
+}
+
+/**
+ * Lien carte d'un restaurant : la position exacte quand elle est connue,
+ * sinon une recherche OpenStreetMap sur l'adresse.
+ */
+export function mapHref(r: { address?: string; lat?: number; lng?: number; geo_approx?: boolean; name?: string }): string {
+  if (r.lat && r.lng && !r.geo_approx) {
+    return `https://www.openstreetmap.org/?mlat=${r.lat}&mlon=${r.lng}#map=18/${r.lat}/${r.lng}`
+  }
+  const query = r.address?.trim() || r.name?.trim() || ''
+  return `https://www.openstreetmap.org/search?query=${encodeURIComponent(query)}`
+}

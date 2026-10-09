@@ -201,7 +201,7 @@ func TestSyncReconcilesIntoDatabase(t *testing.T) {
 		t.Fatalf("%d Tomo", n)
 	}
 	tomo, _ := e.app.FindRecordById(colRestaurants, tomoID)
-	if tomo.GetString("emoji") != "🍜" || tomo.GetString("phone") != "065 35 29 64" || tomo.GetFloat("lat") != 50.45436 ||
+	if tomo.GetString("emoji") != "🍜" || tomo.GetString("phone") != "+3265352964" || tomo.GetFloat("lat") != 50.45436 ||
 		!strings.HasPrefix(tomo.GetString("source_key"), "takeaway-site:") || tomo.GetString("sources") == "[]" {
 		t.Fatalf("curated fields / provenance: %v", tomo.FieldsData())
 	}

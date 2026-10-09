@@ -276,7 +276,7 @@ func (p phone) Dispatch(r Restaurant, s domain.Summary) Dispatch {
 	}
 	steps := []string{}
 	if r.Phone != "" {
-		steps = append(steps, fmt.Sprintf("Appelez « %s » au %s.", r.Name, r.Phone))
+		steps = append(steps, fmt.Sprintf("Appelez « %s » au %s.", r.Name, domain.FormatPhone(r.Phone)))
 	} else {
 		steps = append(steps, fmt.Sprintf("Appelez « %s ».", r.Name))
 	}

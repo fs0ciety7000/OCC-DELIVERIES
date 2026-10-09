@@ -448,7 +448,7 @@ func TestMerge(t *testing.T) {
 	if tomo.Source != SourceTakeawaySite || tomo.ItemCount() != 2 || tomo.MenuCheckedAt != "2026-10-09" {
 		t.Fatalf("menu from %s, %d items", tomo.Source, tomo.ItemCount())
 	}
-	if tomo.Rating != 4.8 || tomo.RatingCount != 123 || tomo.MinOrder != 1000 || tomo.EtaMin != 45 || tomo.Phone != "065352964" || tomo.Lat != 50.4543472 {
+	if tomo.Rating != 4.8 || tomo.RatingCount != 123 || tomo.MinOrder != 1000 || tomo.EtaMin != 45 || tomo.Phone != "+3265352964" || tomo.Lat != 50.4543472 {
 		t.Fatalf("fields: %+v", tomo.RestaurantImport)
 	}
 	if len(tomo.Providers) != 2 || len(tomo.SourceURLs) != 2 || strings.Join(tomo.Cuisines, ",") != "ramen,asiatique" {

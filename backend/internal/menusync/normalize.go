@@ -304,6 +304,7 @@ func (r *Restaurant) Clean(city string) {
 	r.Address = CleanText(r.Address)
 	r.Description = CleanText(r.Description)
 	r.Phone = CleanText(r.Phone)
+	r.normalizeContact()
 	// a cover must be an absolute web URL ("?width=1200…" without host is a
 	// platform placeholder)
 	if c := strings.TrimSpace(r.CoverURL); !strings.HasPrefix(c, "https://") && !strings.HasPrefix(c, "http://") {

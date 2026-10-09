@@ -95,6 +95,17 @@ export interface Restaurant extends BaseRecord {
   geo_approx?: boolean
   /** Serveur : nombre de plats disponibles (cartes incomplètes masquées sous `minMenuItems`). */
   items_count?: number
+  /** Serveur : champs complétés depuis OpenStreetMap (attribution ODbL), `null` sinon. */
+  enriched_from?: EnrichedFrom | null
+}
+
+/** Provenance des coordonnées complétées automatiquement (`restaurants.enriched_from`). */
+export interface EnrichedFrom {
+  provider: 'osm' | (string & {})
+  /** Page OpenStreetMap de l'établissement reconnu. */
+  url: string
+  fields: ('phone' | 'address' | 'geo' | (string & {}))[]
+  checked_at: string
 }
 
 export type NearbyRestaurant = Restaurant & { distanceKm: number }
@@ -178,6 +189,8 @@ export interface SyncStats {
   items_updated: number
   items_price_changed: number
   items_unavailable: number
+  /** Restaurants complétés depuis OpenStreetMap (téléphone, adresse, position). */
+  restaurants_enriched?: number
 }
 
 export interface SyncSourceResult {

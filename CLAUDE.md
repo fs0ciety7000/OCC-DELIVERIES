@@ -73,6 +73,12 @@ docker compose up --build         # http://localhost:8090
 Les apprentissages importants (pièges PocketBase, décisions d'UX) sont ajoutés
 ci-dessous, du plus récent au plus ancien.
 
+* 2026-10-09 — **Coordonnées des restos** : téléphone E.164 / adresse « Rue X 12, 7000 Mons » normalisés
+  partout (`domain/contact.go`, migration `1760000012`) ; enrichissement OpenStreetMap (`internal/enrich`,
+  Nominatim : UA identifié, ≥ 1,1 s, cache 30 j y compris les absences, ≤ 60 requêtes/exécution, arrêt sur
+  429/403), champs vides seulement, homonymes éloignés rejetés ; attribution ODbL via
+  `restaurants.enriched_from` (pas dans `sources`, qui sert à la provenance/obsolescence). `OCC_ENRICH_ENABLED`.
+  Footer « Développé par OCC MONS Studios » + logo (`public/brand/`).
 * 2026-10-09 — **Cartes incomplètes masquées** (demande : « masquer les restos avec moins de 10 plats,
   mais possible de les ré-afficher »). Seuil global `app_settings.min_menu_items` (0–100, 0 = off ;
   migration `1760000010` : 10 si données réelles, 0 en démo) + `restaurants.items_count` (plats

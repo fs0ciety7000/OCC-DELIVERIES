@@ -79,6 +79,7 @@ export function statsSummary(s: SyncStats): string[] {
     [s.restaurants_created, 'restaurant créé', 'restaurants créés'],
     [s.restaurants_updated, 'restaurant mis à jour', 'restaurants mis à jour'],
     [s.restaurants_stale, 'restaurant obsolète', 'restaurants obsolètes'],
+    [s.restaurants_enriched ?? 0, 'restaurant complété (OpenStreetMap)', 'restaurants complétés (OpenStreetMap)'],
     [s.items_created, 'plat ajouté', 'plats ajoutés'],
     [s.items_price_changed, 'prix modifié', 'prix modifiés'],
     [Math.max(0, s.items_updated - s.items_price_changed - s.items_unavailable), 'autre plat modifié', 'autres plats modifiés'],

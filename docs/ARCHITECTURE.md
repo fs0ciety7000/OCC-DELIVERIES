@@ -39,9 +39,11 @@ backend/
     code.go                  génération code de party
     epc.go / iban.go         payload QR EPC (SEPA), validation IBAN
     geo.go                   haversine
+    contact.go               téléphones (E.164, affichage) et adresses (« Rue X 12, 7000 Mons ») des restaurants
   internal/providers/        adaptateurs Uber Eats / Takeaway / Deliveroo / weloveat / manuel + tests
   internal/menusync/         lecture des flux restaurants + menus (Deliveroo, weloveat, sites), normalisation, fusion + tests
   internal/feedsync/         synchronisation : lecture des sources + réconciliation pure avec la base + tests
+  internal/enrich/           enrichissement OpenStreetMap (Nominatim) : téléphone / adresse / position manquants + tests
   cmd/menusync/              outil CLI `menusync` (binaire séparé, /pb/menusync dans l'image)
   internal/app/              hooks PocketBase + routes /api/occ (glue) ; sync.go = planification / exécution de la synchronisation
   internal/catalog/           import / export des menus (JSON, CSV, rapport de validation)
@@ -105,9 +107,9 @@ membres de la party concernée. Hook : `wero_id` / `bancontact_phone` normalisé
 | cover | file | optionnel |
 | cover_url | url | optionnel (image distante) |
 | cuisines | json `string[]` | ex. `["pizza","italien"]` |
-| address | text | |
+| address | text | normalisée `Rue X 12, 7000 Mons` (`domain.NormalizeAddress` : pays retiré, numéro en tête déplacé après la rue, casse corrigée, localité déduite du code postal autour de Mons et inversement) |
 | lat, lng | number | |
-| phone | text | |
+| phone | text | **E.164** (`+3265352964`, `domain.NormalizeRestaurantPhone` : `0…` → `+32…`, `00` → `+`, `+32 (0)` corrigé, premier numéro valide d'une liste, déchets refusés) ; affiché groupé `+32 65 35 29 64` (`formatPhone` côté front, `domain.FormatPhone` côté Go) |
 | rating | number | 0–5 |
 | rating_count | number int | |
 | price_level | number int | 1–4 |
@@ -122,6 +124,7 @@ membres de la party concernée. Hook : `wero_id` / `bancontact_phone` normalisé
 | stale_since | date | obsolète : plus proposé par aucune source activée depuis cette date (vide sinon) ; reste actif |
 | partial_menu | bool | **carte partielle** : seuls quelques plats sont connus (catégorie « Aperçu », instantané Uber Eats) ; badge « Aperçu du menu » + bandeau vers Uber Eats — migration `1760000006` |
 | geo_approx | bool | **position approximative** (lieu par défaut `OCC_DEFAULT_LAT/LNG`) : distance masquée dans l'UI, classé après les autres dans `/nearby` |
+| enriched_from | json \| null | **serveur** (migration `1760000012`) : provenance des champs complétés depuis OpenStreetMap `{ "provider": "osm", "url": "https://www.openstreetmap.org/node/…", "fields": ["phone","address","geo"], "checked_at": "2026-10-09" }` — affiche le crédit ODbL « Coordonnées : © contributeurs OpenStreetMap » ; jamais pris du client, un champ modifié par un admin n'est plus crédité |
 | items_count | number int ≥ 0 | **serveur** : nombre de plats **disponibles** (migration `1760000010`, rétro-calculé). Recalculé après chaque création / modification / suppression d'article via la collection, à la fin de `catalog.Import` et après chaque restaurant écrit par la synchronisation (`catalog.RefreshItemsCount`, simple `UPDATE … COUNT(*)`, sans hook ni `updated`) ; toute valeur envoyée par un client est remplacée par le compte réel |
 
 Rules : list/view `active = true || @request.auth.role = "admin"` ;
@@ -129,6 +132,9 @@ create/update/delete `@request.auth.role = "admin"` (superusers : toujours).
 Hooks (écritures via la collection) : slug/nom normalisés, slug unique (message clair),
 `cuisines` nettoyées (minuscules, sans doublon), `providers` limités aux plateformes
 (`ubereats`, `takeaway`, `deliveroo`, `weloveat`) en `https://` (liens vides retirés), `eta_min ≤ eta_max` ;
+`phone` normalisé en E.164 (400 « Numéro de téléphone invalide… » si un numéro **nouveau ou modifié** est illisible ;
+un numéro illisible déjà stocké ne bloque pas les autres modifications), `address` normalisée, `enriched_from` géré
+par le serveur (voir ci-dessus) ;
 **suppression refusée** si le restaurant apparaît dans une party (le désactiver).
 **Verrouillage** : uniquement explicite (interrupteur « Verrouillé »). Une modification admin ne
 verrouille pas : la synchronisation peut ensuite remettre à jour la fiche (migration `1760000007`
@@ -143,7 +149,10 @@ utilisable dans les parties existantes (candidats / restaurant retenu : les tran
 plateforme identique (hôte + chemin, liens génériques type page ville ignorés), sinon par le nom
 normalisé (casse, accents, « (Mons) », « - Mons ») — dans les deux derniers cas seulement si un seul
 restaurant correspond ; le slug existant est conservé, les liens fusionnés et les champs absents du
-fichier (note, délai, frais, cuisines, description…) gardent leur valeur.
+fichier (note, délai, frais, cuisines, description…) gardent leur valeur. Téléphone (E.164 si lisible,
+sinon tel quel) et adresse normalisés.
+**Normalisation existante** : la migration `1760000012` réécrit une fois tous les téléphones / adresses
+stockés (idempotente, verrouillés compris : seule la forme change ; un téléphone illisible est conservé).
 
 ### `menu_categories` (lecture publique)
 `restaurant` R(restaurants, cascade) · `name` · `position` int.
@@ -218,8 +227,8 @@ seed (`1760000006`) : « Uber Eats (instantané connecteur) » (`ubereats-snapsh
 | started_at, finished_at | date | |
 | status | select | `running`, `success`, `partial`, `failed`, `blocked` |
 | trigger | select | `cron`, `manual`, `startup` |
-| stats | json | `SyncStats` : `{ restaurants_created, restaurants_updated, restaurants_stale, items_created, items_updated, items_price_changed, items_unavailable }` |
-| changes | json | ≤ 500 diffs lisibles (`"Tomo — Miso ramen : 14,50 € → 15,00 €"`, `"X : nouveau restaurant (52 plats)"`, `"… : retiré de la carte (indisponible)"`) |
+| stats | json | `SyncStats` : `{ restaurants_created, restaurants_updated, restaurants_stale, items_created, items_updated, items_price_changed, items_unavailable, restaurants_enriched }` (`restaurants_enriched` : complétés depuis OpenStreetMap ; absent des exécutions antérieures) |
+| changes | json | ≤ 500 diffs lisibles (`"Tomo — Miso ramen : 14,50 € → 15,00 €"`, `"X : nouveau restaurant (52 plats)"`, `"… : retiré de la carte (indisponible)"`, `"Pizza Hut — téléphone ajouté, adresse ajoutée, position précisée (OpenStreetMap)"`) |
 | sources | json | `SyncSourceResult[]` : `{ id, label, provider, url, status: "ok"\|"blocked"\|"failed", message, restaurants, network, cached, durationMs }` |
 | log | text | journal (≤ 150 000 car., mis à jour toutes les 5 s pendant l'exécution) |
 | error | text | |
@@ -274,11 +283,36 @@ Une exécution `running` trouvée au démarrage passe `failed` (« interrompue �
        pour toute source ; fichier illisible → source `failed`, rien n'est marqué obsolète.
 3. Écriture **par restaurant dans une transaction** (`RunInTransaction`) ; un enregistrement
    verrouillé entre-temps est laissé tel quel.
-4. Planification : job `app.Cron()` chaque minute qui vérifie `OCC_SYNC_CRON` à l'heure de
+4. **Enrichissement OpenStreetMap** (`internal/enrich` + `app/enrich.go`, `OCC_ENRICH_ENABLED`, défaut `true`) à la
+   fin de l'exécution : restaurants **actifs, non verrouillés** sans téléphone, sans adresse ou sans vraie position
+   (`geo_approx` ou 0) — en exécution ciblée, seulement ceux qu'elle a écrits. Requête Nominatim
+   `search?format=jsonv2&addressdetails=1&extratags=1&namedetails=1&countrycodes=be&q=<nom nettoyé>, <localité de
+   l'adresse ou OCC_DEFAULT_LABEL>`. **Politique Nominatim stricte** : User-Agent identifié
+   `OCC-Deliveries-enrich/1.0 (+https://eat.fs0ciety.org)`, une requête à la fois, ≥ 1,1 s entre deux, cache disque
+   `pb_data/menusync-cache/nominatim` de **30 jours** (réponses vides comprises), au plus **60 requêtes réseau par
+   exécution** (les suivantes à la prochaine ; le cache ne compte pas), aucun nouvel essai, 429 / 403 / 5xx = arrêt de
+   l'enrichissement pour l'exécution. Résultat accepté (`enrich.Pick`, pur et testé) seulement si : `amenity` =
+   restaurant, fast_food, cafe, ice_cream, food_court (bar, pub, biergarten : même nom ou nom contenu) ou `shop` =
+   bakery, pastry, deli, confectionery, ice_cream ; nom reconnu (`menusync.NameMatch` sur tous les noms OSM : name,
+   brand, official_name, alt_name…) ; ≤ 12 km du lieu par défaut ; ≤ 1,5 km des coordonnées réelles s'il en a ; même
+   rue que l'adresse connue ; deux homonymes à plus de 300 m sans position connue = ambigu, rien n'est écrit.
+   Écriture (transaction, re-vérifiée) des **seuls champs vides** : téléphone (`phone` / `contact:phone`, E.164),
+   adresse (`addressdetails`, normalisée), position (et `geo_approx = false`) ; `enriched_from` mis à jour ; jamais de
+   valeur remplacée. Données © contributeurs OpenStreetMap (ODbL) : crédit affiché sur la fiche restaurant et dans
+   l'envoi « Téléphone ».
+5. Planification : job `app.Cron()` chaque minute qui vérifie `OCC_SYNC_CRON` à l'heure de
    **Europe/Brussels** (le cron PocketBase est en UTC ; `time/tzdata` embarqué). Une seule
    exécution à la fois (verrou en mémoire ; manuel → 409, tick cron ignoré). Exécution en
    goroutine (jamais dans une requête), annulée proprement à l'arrêt. Cache disque
-   `pb_data/menusync-cache`, TTL 20 h.
+   `pb_data/menusync-cache`, TTL 20 h (30 jours pour Nominatim).
+
+**Coordonnées lues par les flux** (`menusync`, normalisées par `Restaurant.Clean`) : sites Takeaway et JSON-LD —
+entité schema.org (Restaurant, LocalBusiness…) en microdonnées ou JSON-LD (`telephone`, `address`, `geo`), puis liens
+`tel:`, bloc « Contact » du pied de page, JSON embarqué dans les scripts ; Deliveroo — `__NEXT_DATA__` (adresse +
+`postCode`, épingle de carte, bloc « Coordonnées », téléphone de l'objet restaurant) ; weloveat — `phone_number` /
+`phone` / `telephone`, `address` ou ses parties (rue, numéro, code postal, localité), coordonnées de la recherche ;
+seules les coordonnées **professionnelles** de l'établissement sont gardées (`user`, `owner`, `manager`, e-mails,
+jetons… retirés avant le cache).
 
 ### `parties` — une commande groupée
 | champ | type | notes |
@@ -681,3 +715,4 @@ proche à la même adresse. Voir `docs/DEPLOYMENT.md`.
 | `OCC_SYNC_CRON` | `30 3 * * *` | planification (cron 5 champs) lue à l'heure de **Europe/Brussels** |
 | `OCC_SYNC_ON_START` | `true` | lance une synchronisation après le démarrage si aucune n'a encore réussi |
 | `OCC_SYNC_START_DELAY` | `60s` | délai de cette première synchronisation (durée Go) |
+| `OCC_ENRICH_ENABLED` | `true` | complète téléphone / adresse / position manquants depuis OpenStreetMap (Nominatim) à la fin de chaque synchronisation ; `false` = aucune requête vers Nominatim (sans effet si `OCC_SYNC_ENABLED=false`) |

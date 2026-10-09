@@ -39,8 +39,8 @@ l'import remplace tout le menu (il écrase les retouches admin et recrée les ar
 
 **Décision.** Le serveur relit lui-même les sources publiques (`internal/feedsync`, au-dessus
 de `menusync`) et **réconcilie** au lieu d'importer :
-* sources configurées en base (`sync_sources`, admin) — par défaut : les 10 sites satellites
-  Takeaway de Mons, la page liste Deliveroo Mons, l'API anonyme de weloveat (Mons) ;
+* sources configurées en base (`sync_sources`, admin) — par défaut : les sites satellites
+  Takeaway de Mons (10 au départ, 75 depuis la migration `1760000009`, voir `SOURCES_menusync.md`), la page liste Deliveroo Mons, l'API anonyme de weloveat (Mons) ;
 * exécution **planifiée** (`OCC_SYNC_CRON`, défaut 03:30 heure de Bruxelles, heure creuse),
   **au démarrage** si aucune n'a encore réussi, ou **manuelle** depuis `/admin/synchronisation` ;
 * rapprochement par clé de source, lien plateforme, puis nom + position (les fiches curées
@@ -97,3 +97,19 @@ fois. Un clic ajoute la source puis lance une exécution **ciblée** sur elle se
 
 **Conséquences.** Quelques requêtes vers des domaines tiers devinés (en pratique 4 à 8 par recherche) ; un
 domaine homonyme sans le modèle Takeaway est simplement ignoré (« Autre site »).
+
+## Mise à jour — 2026-10-09 (5) : coordonnées des restaurants (OpenStreetMap)
+**Contexte.** Téléphones et adresses étaient hétérogènes (« 0495466512 » / « +32484158003 », « 24 Rue de la Clef,
+7000 » sans ville) et les aperçus Uber Eats n'avaient ni téléphone, ni adresse, ni vraie position.
+
+**Décision.** Toutes les écritures (flux, import, admin, migration `1760000012`) normalisent : téléphone en E.164,
+adresse « Rue X 12, 7000 Mons » (`internal/domain/contact.go`). Les parseurs lisent les coordonnées publiées (schema.org,
+liens `tel:`, bloc contact, `__NEXT_DATA__`, API weloveat — coordonnées professionnelles seulement). À la fin de chaque
+synchronisation, ce qui manque encore est cherché dans **OpenStreetMap via Nominatim** (`internal/enrich`) dans le
+strict respect de sa politique d'usage (User-Agent identifié, ≤ 1 requête/s, cache 30 jours y compris les absences,
+≤ 60 requêtes par exécution, arrêt sur 429/403), avec un rapprochement prudent (type de lieu, nom, distance, rue,
+homonymes ambigus rejetés) et **uniquement pour les champs vides** des fiches non verrouillées.
+
+**Conséquences.** Nouvelles requêtes sortantes vers `nominatim.openstreetmap.org` (coupure : `OCC_ENRICH_ENABLED=false`).
+Les données OSM sont sous **ODbL** : la provenance est stockée (`restaurants.enriched_from`) et l'UI affiche
+« Coordonnées : © contributeurs OpenStreetMap ». Un champ corrigé par un admin perd ce crédit.

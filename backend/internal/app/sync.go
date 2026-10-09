@@ -19,6 +19,7 @@ import (
 
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/catalog"
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/domain"
+	"github.com/fs0ciety7000/occ-deliveries/backend/internal/enrich"
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/feedsync"
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/menusync"
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/providers"
@@ -71,8 +72,25 @@ type SyncConfig struct {
 	// sources (default: the embedded migrations/data/mons_ubereats.json).
 	Snapshot func() ([]byte, error)
 	// DefaultLat / DefaultLng place the snapshot restaurants without
-	// coordinates (OCC_DEFAULT_LAT / LNG).
+	// coordinates (OCC_DEFAULT_LAT / LNG); also the centre of the
+	// OpenStreetMap enrichment area.
 	DefaultLat, DefaultLng float64
+	// DefaultLabel is the locality used in OpenStreetMap queries when the
+	// address has none (OCC_DEFAULT_LABEL).
+	DefaultLabel string
+	// Enrich completes phones / addresses / positions from OpenStreetMap at
+	// the end of each run (OCC_ENRICH_ENABLED).
+	Enrich EnrichConfig
+}
+
+// EnrichConfig drives the OpenStreetMap enrichment (internal/enrich).
+type EnrichConfig struct {
+	Enabled bool // OCC_ENRICH_ENABLED (default true; the zero value is off)
+	// MaxLookups caps the network lookups of a run (0 = enrich.DefaultMaxLookups).
+	MaxLookups int
+	// NewClient builds the Nominatim client (tests point it at a fake
+	// server and replace the clock; default enrich.NewClient).
+	NewClient func(cacheDir string) *enrich.Client
 }
 
 func syncConfigFromEnv() SyncConfig {
@@ -82,6 +100,7 @@ func syncConfigFromEnv() SyncConfig {
 		OnStart:    envBool("OCC_SYNC_ON_START", true),
 		StartDelay: 60 * time.Second,
 		CacheTTL:   20 * time.Hour,
+		Enrich:     EnrichConfig{Enabled: envBool("OCC_ENRICH_ENABLED", true)},
 	}
 	if d, err := time.ParseDuration(strings.TrimSpace(envOr("OCC_SYNC_START_DELAY", ""))); err == nil && d >= 0 {
 		c.StartDelay = d
@@ -522,8 +541,23 @@ func (s *syncer) execute(ctx context.Context, rec *core.Record, only string) {
 	if len(snapshot) > 0 {
 		lg.logf("Uber Eats (instantané) : %d restaurants, %d reconnus", len(snapshot), plan.SnapshotMatched)
 	}
-	lg.logf("Restaurants : %d reconnus (%d verrouillés), %d créés, %d mis à jour, %d obsolètes ; plats : %d créés, %d mis à jour (%d prix), %d indisponibles",
-		plan.Matched, plan.Locked, stats.RestaurantsCreated, stats.RestaurantsUpdated, stats.RestaurantsStale,
+	if s.cfg.Enrich.Enabled && ctx.Err() == nil {
+		// a scoped run only completes the restaurants it wrote
+		var scope map[string]bool
+		if only != "" {
+			scope = map[string]bool{}
+			for _, rp := range plan.Restaurants {
+				if rp.Restaurant.ID != "" {
+					scope[rp.Restaurant.ID] = true
+				}
+			}
+		}
+		n, ch := s.enrichRun(ctx, lg, city, scope)
+		stats.RestaurantsEnriched += n
+		changes = append(changes, ch...)
+	}
+	lg.logf("Restaurants : %d reconnus (%d verrouillés), %d créés, %d mis à jour, %d obsolètes, %d complétés (OpenStreetMap) ; plats : %d créés, %d mis à jour (%d prix), %d indisponibles",
+		plan.Matched, plan.Locked, stats.RestaurantsCreated, stats.RestaurantsUpdated, stats.RestaurantsStale, stats.RestaurantsEnriched,
 		stats.ItemsCreated, stats.ItemsUpdated, stats.ItemsPriceChanged, stats.ItemsUnavailable)
 
 	switch {
@@ -720,6 +754,7 @@ func applyRestaurantPlan(app core.App, rp *feedsync.RestaurantPlan) error {
 			if err := tx.Save(rec); err != nil {
 				return err
 			}
+			r.ID = rec.Id // created: the enrichment of a scoped run finds it
 		}
 
 		catIDs := map[string]string{}
