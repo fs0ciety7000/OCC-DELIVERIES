@@ -160,24 +160,28 @@ Rules : list/view `active = true` ; écriture superuser uniquement.
 | closed_at | date | |
 
 Rules :
-* list/view : `members ?= @request.auth.id`
+* list/view : `members.id ?= @request.auth.id`
+  (⚠ PocketBase v0.36 : sur une relation multiple, `members ?= x` compare la
+  valeur JSON brute et ne matche jamais → toujours écrire `members.id ?= …`)
 * create : `@request.auth.id != ""` → le hook force `host`, `members=[host]`, `code`, `status=lobby`.
 * update : `host = @request.auth.id` → le hook **refuse** toute modification de
   `code, host, members, status, restaurant, payer, dispatch, closed_at`
   (passent par `/api/occ/*`). `candidates` modifiable seulement en `lobby`.
+  `delivery_fee`, `service_fee`, `tip`, `split_mode` figés à partir de `paying` ;
+  plus aucune modification en `closed` / `cancelled`.
 * delete : `host = @request.auth.id && status = "lobby"`.
 
 ### `party_members`
 `party` R(parties, cascade) · `user` R(users) · `role` select(`host`,`member`) ·
 `ready` bool. Index unique `(party, user)`.
-Rules : list/view `party.members ?= @request.auth.id` ; écriture serveur uniquement.
+Rules : list/view `party.members.id ?= @request.auth.id` ; écriture serveur uniquement.
 
 ### `votes` — vote par approbation (on peut liker plusieurs restaurants)
 `party` R(parties, cascade) · `user` R(users) · `restaurant` R(restaurants).
 Index unique `(party, user, restaurant)`.
 Rules :
-* list/view `party.members ?= @request.auth.id`
-* create `user = @request.auth.id && party.members ?= @request.auth.id && party.status = "voting"`
+* list/view `party.members.id ?= @request.auth.id`
+* create `user = @request.auth.id && party.members.id ?= @request.auth.id && party.status = "voting"`
   (+ hook : `restaurant` doit être dans `party.candidates`)
 * delete `user = @request.auth.id && party.status = "voting"` ; update interdit.
 
@@ -186,7 +190,7 @@ Rules :
 |---|---|---|
 | party | R(parties) cascade | |
 | user | R(users) | propriétaire de la ligne |
-| menu_item | R(menu_items) | doit appartenir à `party.restaurant` et être `available` |
+| menu_item | R(menu_items) | doit appartenir à `party.restaurant` et être `available` (requis par le hook ; non requis au niveau schéma pour qu'un ré-import de menu ne bloque pas sur l'historique) |
 | quantity | number int | 1–20 |
 | selected_options | json | `[{ "group": "size", "choices": ["l"] }]` |
 | note | text | ≤ 200 car. |
@@ -195,7 +199,7 @@ Rules :
 | unit_price | number int | **serveur** : base + options |
 | total | number int | **serveur** : unit_price × quantity |
 
-Rules : list/view membres ; create `user = @request.auth.id && party.members ?= @request.auth.id && party.status = "ordering"` ;
+Rules : list/view membres ; create `user = @request.auth.id && party.members.id ?= @request.auth.id && party.status = "ordering"` ;
 update/delete `user = @request.auth.id && party.status = "ordering"`.
 Hooks : valide options (min/max, ids), recalcule prix ; toute écriture remet
 `party_members.ready = false` pour cet utilisateur.
@@ -212,7 +216,7 @@ Hooks : valide options (min/max, ids), recalcule prix ; toute écriture remet
 | reference | text | communication, ex. `OCC K7M2QX Alice` |
 | declared_at, confirmed_at | date | |
 
-Rules : list/view `party.members ?= @request.auth.id` ; écriture serveur uniquement.
+Rules : list/view `party.members.id ?= @request.auth.id` ; écriture serveur uniquement.
 
 ## 4. Cycle de vie d'une party (state machine)
 
@@ -245,7 +249,7 @@ PocketBase `{ "status": 400, "message": "…", "data": {} }`, messages en franç
 | `GET /api/occ/health` | — | | `{ "status": "ok", "version": "x.y.z" }` |
 | `GET /api/occ/config` | — | | `{ "currency":"EUR", "defaultLocation":{lat,lng,label}, "providers":[{id,name,color,enabled}] }` |
 | `GET /api/occ/restaurants/nearby` | — | `lat,lng,radiusKm(=5),q,cuisine` | `{ "items": [Restaurant & { "distanceKm": number }] }` triés par distance |
-| `POST /api/occ/parties/join` | ✔ | `{ "code": "K7M2QX" }` | `{ "party": Party }` (idempotent) |
+| `POST /api/occ/parties/join` | ✔ | `{ "code": "K7M2QX" }` | `{ "party": Party }` (idempotent ; statuts lobby/voting/ordering/review) |
 | `POST /api/occ/parties/{id}/leave` | membre (≠ hôte) | | `{ "ok": true }` — seulement en lobby/voting/ordering ; supprime ses votes/items |
 | `POST /api/occ/parties/{id}/transition` | hôte | `{ "to": Status, "restaurant"?: id }` | `{ "party": Party }` |
 | `POST /api/occ/parties/{id}/ready` | membre | `{ "ready": bool }` | `{ "member": PartyMember }` (status `ordering` uniquement) |
@@ -253,7 +257,7 @@ PocketBase `{ "status": 400, "message": "…", "data": {} }`, messages en franç
 | `POST /api/occ/parties/{id}/dispatch` | hôte | `{ "method": "ubereats"\|"takeaway"\|"export"\|"phone" }` | `{ "party": Party, "dispatch": Dispatch }` (status review/paying) |
 | `POST /api/occ/parties/{id}/payer` | hôte | `{ "payer": userId }` | `{ "party": Party, "payments": Payment[] }` (review → paying ; en paying : recalcule si aucun paiement tiers confirmé) |
 | `GET /api/occ/parties/{id}/export` | membre | `format=csv\|txt\|json` | fichier (`Content-Disposition: attachment`) |
-| `POST /api/occ/payments/{id}/action` | voir | `{ "action": "declare"\|"confirm"\|"reset", "method"?: "qr"\|"cash"\|"later" }` | `{ "payment": Payment }` |
+| `POST /api/occ/payments/{id}/action` | voir | `{ "action": "declare"\|"confirm"\|"reset", "method"?: "qr"\|"wero"\|"bancontact"\|"link"\|"cash"\|"later" }` | `{ "payment": Payment }` |
 | `GET /api/occ/payments/{id}/qr` | membre | | `PaymentQR` |
 | `GET /api/occ/payments/{id}/wallet-qr/{kind}` | membre | `kind=wero\|bancontact` | image QR du payeur (stream, `Cache-Control: private`) ou 404 |
 | `POST /api/occ/admin/import` | superuser | `RestaurantImport` | `{ "restaurant": id, "items": n }` (upsert par slug) |
@@ -282,6 +286,9 @@ Règles `payments/{id}/action` :
   "minOrderReached": true, "allReady": true, "splitMode": "equal"
 }
 ```
+`deliveryFee` : en lobby/voting/ordering, estimation = frais du restaurant ;
+à partir de `review`, snapshot de la party. `allReady` = au moins un participant
+avec article et tous ceux qui ont un article sont prêts.
 Seuls les participants **ayant au moins un article** reçoivent une part des frais
 partagés (`deliveryFee + serviceFee + tip`). `equal` : parts égales ;
 `proportional` : au prorata du sous-total. Arrondi au centime par la méthode du

@@ -18,7 +18,7 @@ Production : `https://eat.fs0ciety.org` (Coolify, Docker).
 | Feuille de route | `docs/ROADMAP.md` |
 
 ## Stack
-* **backend/** — Go 1.24, PocketBase **v0.36.x** utilisé comme framework
+* **backend/** — Go 1.24, PocketBase **v0.36.6** utilisé comme framework
   (SQLite WAL, auth, realtime SSE, admin `/_/`). Migrations Go dans `backend/migrations`.
 * **frontend/** — React 19, Vite, TypeScript strict, Tailwind CSS v4, TanStack
   Query, React Router, `pocketbase` JS SDK, `motion`, `lucide-react`, `sonner`,
@@ -70,6 +70,14 @@ docker compose up --build         # http://localhost:8090
 Les apprentissages importants (pièges PocketBase, décisions d'UX) sont ajoutés
 ci-dessous, du plus récent au plus ancien.
 
-* 2026-10-09 — Bootstrap : PocketBase v0.36.9 (v0.37+ exige Go ≥ 1.25).
+* 2026-10-09 — Pièges PocketBase v0.36 découverts au bootstrap :
+  - relations multiples dans les rules : `members.id ?= @request.auth.id`, **jamais** `members ?= …` (compare le JSON brut → personne ne matche) ;
+  - une update rule ne voit que l'enregistrement stocké : bloquer les champs immuables dans le hook en comparant à `e.Record.Original()` ;
+  - les create rules s'exécutent avant `OnRecordCreateRequest` → le hook peut écraser ce que le client envoie ;
+  - effets de bord atomiques : `e.App.RunInTransaction(func(tx){ e.App = tx; e.Next() … })` puis restaurer `e.App` ;
+  - `BoolField{Required:true}` exige `true`, `NumberField{Required:true}` refuse 0 ;
+  - `apis.Static(…, true)` sur `/{path...}` répond aussi aux `/api/*` inconnus → garde dans `backend/spa.go` ;
+  - tests d'intégration : un `pb_data` migré dans `TestMain`, cloné par test avec `tests.NewTestApp(dir)`.
+* 2026-10-09 — Bootstrap : PocketBase **v0.36.6** (v0.36.7+ et v0.37+ exigent Go ≥ 1.25 ; monter Go avant de monter PocketBase).
   Le connecteur MCP Uber Eats n'était pas joignable pendant le bootstrap :
   l'intégration passe par l'adaptateur deep link (ADR 0002).
