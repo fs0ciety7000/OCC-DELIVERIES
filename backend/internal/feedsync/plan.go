@@ -165,6 +165,28 @@ type Options struct {
 	// DefaultLat / DefaultLng locate the snapshot restaurants without
 	// coordinates (OCC_DEFAULT_LAT / LNG; the city centre when 0).
 	DefaultLat, DefaultLng float64
+	// Scoped marks a run limited to some sources (one source run from the
+	// admin): nothing is marked stale, the provenance of a matched
+	// restaurant is extended (never replaced), and a restaurant whose
+	// stored sources include a provider ranked before the feed one (in
+	// Priority) keeps its menu.
+	Scoped   bool
+	Priority []string
+}
+
+// outranked reports whether a stored restaurant has a source preferred to
+// provider in a scoped run.
+func (o Options) outranked(cur *Restaurant, provider string) bool {
+	if !o.Scoped || len(o.Priority) == 0 {
+		return false
+	}
+	rank := func(p string) int {
+		if i := slices.Index(o.Priority, p); i >= 0 {
+			return i
+		}
+		return len(o.Priority)
+	}
+	return slices.ContainsFunc(cur.Sources, func(s SourceRef) bool { return rank(s.Provider) < rank(provider) })
 }
 
 func (o Options) today() string { return o.Now.Format(time.DateOnly) }
@@ -238,6 +260,9 @@ func Reconcile(existing []*Restaurant, feed []menusync.Restaurant, o Options) Pl
 	seen := reconcileSnapshot(&plan, existing, o, slugs)
 
 	for _, r := range existing {
+		if o.Scoped {
+			break // a partial run cannot tell what disappeared
+		}
 		if claimed[r.ID] || seen[r.ID] || r.Locked || r.StaleSince != "" || len(r.Sources) == 0 {
 			continue
 		}
@@ -520,13 +545,17 @@ func updateRestaurant(cur *Restaurant, in menusync.Restaurant, o Options) *Resta
 	fromSnapshot := in.Source == ProviderUberEatsSnapshot
 	takeover := cur.PartialMenu && !fromSnapshot && in.ItemCount() >= FullMenuMinItems
 	keepMenu := cur.PartialMenu && !fromSnapshot && !takeover
+	if !fromSnapshot && o.outranked(cur, in.Source) {
+		// scoped run of a less preferred source: the menu stays
+		takeover, keepMenu = false, true
+	}
 
 	// provenance: always refreshed (checked_at), not counted as a change
 	srcs := origins(in, o)
-	if keepMenu || fromSnapshot {
+	if keepMenu || fromSnapshot || o.Scoped {
 		// the menu still comes from the snapshot: snapshot key, the refs of
 		// both the snapshot and the feeds listing the restaurant
-		if k := in.SourceKey(); fromSnapshot && k != "" && r.SourceKey != k {
+		if k := in.SourceKey(); (fromSnapshot || (o.Scoped && !keepMenu)) && k != "" && r.SourceKey != k {
 			r.SourceKey = k
 			p.Save = true
 		}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -63,6 +64,9 @@ type SyncConfig struct {
 	CacheTTL   time.Duration // default 20h
 	// NewFetcher builds the HTTP fetcher of a run (tests replace the pauses).
 	NewFetcher func(cacheDir string) *menusync.Fetcher
+	// NewProber builds the prober of a "Découvrir" request (tests replace
+	// the resolver, the base URLs and the pauses; default menusync.NewProber).
+	NewProber func() *menusync.Prober
 	// Snapshot returns the Uber Eats snapshot read by the "ubereats-snapshot"
 	// sources (default: the embedded migrations/data/mons_ubereats.json).
 	Snapshot func() ([]byte, error)
@@ -109,6 +113,9 @@ type syncer struct {
 
 	mu        sync.Mutex
 	runningID string
+
+	// discovering: one "Découvrir" request at a time
+	discovering sync.Mutex
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -254,6 +261,12 @@ func (s *syncer) begin(trigger string) (*core.Record, error) {
 
 // start launches a run in the background.
 func (s *syncer) start(trigger string) (*core.Record, error) {
+	return s.startSource(trigger, "")
+}
+
+// startSource launches a run in the background, limited to one source when
+// sourceID is set (scoped run: see execute).
+func (s *syncer) startSource(trigger, sourceID string) (*core.Record, error) {
 	rec, err := s.begin(trigger)
 	if err != nil {
 		return nil, err
@@ -261,7 +274,7 @@ func (s *syncer) start(trigger string) (*core.Record, error) {
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
-		s.execute(s.ctx, rec)
+		s.execute(s.ctx, rec, sourceID)
 	}()
 	return rec, nil
 }
@@ -294,6 +307,13 @@ func (l *runLog) String() string {
 	return l.b.String()
 }
 
+func (s *syncer) newProber() *menusync.Prober {
+	if s.cfg.NewProber != nil {
+		return s.cfg.NewProber()
+	}
+	return menusync.NewProber()
+}
+
 func (s *syncer) newFetcher() *menusync.Fetcher {
 	dir := s.cfg.CacheDir
 	if dir == "" {
@@ -312,7 +332,10 @@ func (s *syncer) newFetcher() *menusync.Fetcher {
 }
 
 // execute performs a run and records its outcome. It always releases the lock.
-func (s *syncer) execute(ctx context.Context, rec *core.Record) {
+// With only set, just that source is read (even if disabled) and the
+// reconciliation is scoped: nothing is marked stale, provenance is extended,
+// and the menu priority still follows every enabled source.
+func (s *syncer) execute(ctx context.Context, rec *core.Record, only string) {
 	app := s.app
 	start := time.Now()
 	lg := &runLog{}
@@ -374,6 +397,27 @@ func (s *syncer) execute(ctx context.Context, rec *core.Record) {
 		errMsg = err.Error()
 		return
 	}
+	toSource := func(r *core.Record) feedsync.Source {
+		return feedsync.Source{
+			ID: r.Id, Provider: r.GetString("provider"), Label: cmpOr(r.GetString("label"), r.GetString("provider")),
+			URL: r.GetString("url"), City: r.GetString("city"), Priority: r.GetInt("priority"), Options: r.GetBool("options"),
+		}
+	}
+	var all []feedsync.Source // every enabled source: the menu priority
+	for _, r := range srcRecs {
+		all = append(all, toSource(r))
+	}
+	if only != "" {
+		one, err := app.FindRecordById(colSyncSources, only)
+		if err != nil {
+			errMsg = "Source introuvable (supprimée entre-temps ?)."
+			return
+		}
+		srcRecs = []*core.Record{one}
+		if !slices.ContainsFunc(all, func(x feedsync.Source) bool { return x.ID == one.Id }) {
+			all = append(all, toSource(one))
+		}
+	}
 	if len(srcRecs) == 0 {
 		errMsg = "Aucune source activée."
 		return
@@ -381,16 +425,17 @@ func (s *syncer) execute(ctx context.Context, rec *core.Record) {
 	var sources []feedsync.Source
 	city := ""
 	for _, r := range srcRecs {
-		sources = append(sources, feedsync.Source{
-			ID: r.Id, Provider: r.GetString("provider"), Label: cmpOr(r.GetString("label"), r.GetString("provider")),
-			URL: r.GetString("url"), City: r.GetString("city"), Priority: r.GetInt("priority"), Options: r.GetBool("options"),
-		})
+		sources = append(sources, toSource(r))
 		if city == "" {
 			city = strings.ToLower(strings.TrimSpace(r.GetString("city")))
 		}
 	}
 	city = cmpOr(city, "mons")
-	lg.logf("Synchronisation (%s) : %d sources", rec.GetString("trigger"), len(sources))
+	if only != "" {
+		lg.logf("Synchronisation ciblée (%s) : %s", rec.GetString("trigger"), sources[0].Label)
+	} else {
+		lg.logf("Synchronisation (%s) : %d sources", rec.GetString("trigger"), len(sources))
+	}
 
 	netSources, snapSources := feedsync.SplitSources(sources)
 	f := s.newFetcher()
@@ -422,7 +467,12 @@ func (s *syncer) execute(ctx context.Context, rec *core.Record) {
 		return
 	}
 
-	merged, mstats := menusync.MergeIn(feed, feedsync.Priority(netSources), city)
+	priority := feedsync.Priority(netSources)
+	if only != "" {
+		allNet, _ := feedsync.SplitSources(all)
+		priority = feedsync.Priority(allNet)
+	}
+	merged, mstats := menusync.MergeIn(feed, priority, city)
 	for _, g := range mstats.Merged {
 		lg.logf("fusionné : %s", strings.Join(g.Sources, " | "))
 	}
@@ -450,6 +500,7 @@ func (s *syncer) execute(ctx context.Context, rec *core.Record) {
 	plan := feedsync.Reconcile(stored, merged, feedsync.Options{
 		Now: time.Now(), City: city, Incomplete: incomplete,
 		Snapshot: snapshot, DefaultLat: s.cfg.DefaultLat, DefaultLng: s.cfg.DefaultLng,
+		Scoped: only != "", Priority: priority,
 	})
 	for _, l := range plan.Log {
 		lg.logf("%s", l)

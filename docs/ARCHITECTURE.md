@@ -421,7 +421,9 @@ PocketBase `{ "status": 400, "message": "…", "data": {} }`, messages en franç
 | `GET /api/occ/admin/sync/runs/{id}` | admin | | `{ "run": SyncRun }` complet (`changes`, `log`) ; 404 sinon |
 | `GET /api/occ/admin/settings` | admin | | `AdminSettings` |
 | `PATCH /api/occ/admin/settings` | admin | `{ "minMenuItems": 0–100 }` (entier ; 0 = tout afficher) | `AdminSettings` à jour ; 400 si absent, décimal ou hors bornes |
-| `POST /api/occ/admin/sync/run` | admin | | **202** `{ "run": SyncRun }` (status `running`, exécution en arrière-plan) ; **409** si une exécution tourne ; 400 si `OCC_SYNC_ENABLED=false` |
+| `POST /api/occ/admin/sync/run` | admin | facultatif : `{ "sourceId": id }` | **202** `{ "run": SyncRun }` (status `running`, exécution en arrière-plan) ; sans corps : toutes les sources activées ; avec `sourceId` : **cette source seule** (même désactivée, exécution « ciblée », voir §3) ; **404** source inconnue ; **409** si une exécution tourne (ciblée ou non) ; 400 si `OCC_SYNC_ENABLED=false` |
+| `POST /api/occ/admin/sync/discover` | admin | `{ "query": string }` (≤ 300 car.) : lien takeaway.com / just-eat (`…/menu/<slug>`), nom libre, ou adresse directe d'un site | `SyncDiscoverResult` (ci-dessous) — 10 à 20 s ; **400** requête vide / illisible / lien Takeaway sans `/menu/` ou `OCC_SYNC_ENABLED=false` ; **409** si une découverte tourne déjà (une à la fois) |
+| `POST /api/occ/admin/sync/sources` | admin | `{ "url": "https://www.site.be/", "label"?: string }` | **201** `{ "source": SyncSource, "created": true }` ; **200** `{ source, created: false }` si une source `takeaway-site` / `jsonld` lit déjà ce site (même hôte sans `www.`, même chemin : idempotent) ; 400 URL invalide ou takeaway.com. Crée `takeaway-site`, activée, ville `mons`, priorité = première libre entre 10 et 39 (39 si tout est pris), libellé = `label` ou l'hôte |
 
 « admin » = utilisateur `role = "admin"` **ou** superuser (401 sans auth, 403 sinon).
 
@@ -545,7 +547,43 @@ dans l'éditeur de menu ou en JSON.
                 "network": 2, "cached": 0, "durationMs": 3100 }],
   "changesCount": 50, "changes": ["Tomo — Miso ramen : 14,50 € → 15,00 €"], "log": "…", "error": "" }
 ```
-Les sources (`sync_sources`) se gèrent par la collection (rules admin).
+Les sources (`sync_sources`) se gèrent par la collection (rules admin) ; `POST /admin/sync/sources`
+ajoute un site Takeaway trouvé par « Découvrir » (mêmes validations que le hook de la collection).
+
+### `SyncDiscoverResult`
+```json
+{ "query": "https://www.takeaway.com/be-fr/menu/snack-a-la-gare", "kind": "takeaway", "slug": "snack-a-la-gare",
+  "tried": [{ "host": "www.snack-a-la-gare.be", "status": "found", "message": "Snack à la Gare : 196 plats" },
+            { "host": "snack-a-la-gare.be", "status": "skipped", "message": "même site que la variante déjà trouvée" },
+            { "host": "www.snackalagare.be", "status": "absent", "message": "nom de domaine inexistant" }],
+  "found": [{ "url": "https://www.snack-a-la-gare.be/", "host": "www.snack-a-la-gare.be", "name": "Snack à la Gare",
+              "address": "7 Rue Léopold II, 7000 Mons", "items": 196, "categories": 13,
+              "takeawayUrl": "https://www.takeaway.com/be/menu/snack-a-la-gare", "lat": 50.45, "lng": 3.94,
+              "distanceKm": 0.9, "alreadySource": false }],
+  "network": 4, "durationMs": 6667, "interrupted": false }
+```
+`kind` : `takeaway` (slug lu dans `/menu/<slug>` ; `/be/`, `/be-fr/`, `/be-nl/`, just-eat, thuisbezorgd…), `name`
+(nom libre, slugifié) ou `site` (adresse directe : seule cette page est vérifiée). `tried[].status` :
+`found`, `absent` (DNS : aucune requête), `unreachable`, `http`, `robots` (interdit : page non demandée),
+`blocked` (403 / page anti-robot : hôte abandonné), `other` (site sans le modèle Takeaway), `invalid`
+(modèle reconnu, carte illisible), `skipped` (variante `www.` / nue d'un domaine déjà vérifié).
+`distanceKm` (vs `OCC_DEFAULT_LAT/LNG`) seulement si la page publie ses coordonnées (pas de géocodage).
+`alreadySource` / `sourceId` : une source lit déjà ce site.
+
+**Découverte (`menusync.PlanDiscovery` + `menusync.Prober`).** Candidats purs et testés
+(`DiscoverHosts`) : le slug tel quel, sans tirets, puis avec la ville (`-mons`, `mons`, `…-mons` doublé
+pour les slugs qui portent déjà la ville), en `.be` puis `.com`, et en dernier les formes sans articles
+ni mots génériques (`le/la/les/l'`, `snack`, `restaurant`, `pizzeria`…) ; ≤ 16 domaines, chacun essayé
+en `www.` puis nu. **takeaway.com n'est jamais demandé** (défi Cloudflare) et une redirection vers la
+plateforme n'est jamais suivie. Politesse : User-Agent identifié, robots.txt avant toute page, une
+requête à la fois et ≥ 1 s entre deux, délai 6 s, aucun nouvel essai, 403 / anti-robot = hôte abandonné.
+Modèle reconnu (`LooksLikeTakeawaySite`) : classes `menucat` + `menucard__meals-group` / `meal-wrapper`,
+microdonnées `itemprop` name/price, référence Takeaway ; la carte est lue par `ParseTakeawaySite`.
+
+**Exécution ciblée** (`sourceId`). Seule cette source est lue ; la réconciliation est « ciblée »
+(`feedsync.Options.Scoped`) : aucun restaurant n'est marqué obsolète, la provenance (`sources`) d'un
+restaurant reconnu est complétée (jamais remplacée), et le menu n'est appliqué que si aucune source
+déjà liée au restaurant n'est prioritaire (priorité calculée sur toutes les sources activées).
 
 ### `AdminSettings`
 ```json

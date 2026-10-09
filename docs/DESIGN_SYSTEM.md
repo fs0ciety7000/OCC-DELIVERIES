@@ -215,7 +215,16 @@ un parcours critique, toutes interruptibles.
      interrupteur d'activation, nom, badge plateforme (couleurs Deliveroo / weloveat / Takeaway),
      priorité en `tabular-nums`, URL tronquée, dernier statut ; ajout / modification en `Sheet`
      (type, nom, URL avec aide propre au type, priorité, activée, options) ; suppression
-     confirmée en `Sheet` avec bouton `danger`.
+     confirmée en `Sheet` avec bouton `danger`. **Carte « Découvrir un site Takeaway »** (en tête
+     des sources, `DiscoverCard`) : champ « Lien takeaway.com ou nom du resto » + bouton
+     « Découvrir » (`Search`, état `loading`) ; pendant la recherche (10–20 s) `Spinner` + texte
+     de progression qui avance avec les secondes, dans une zone `aria-live="polite"`. Chaque site
+     trouvé = bloc `bg-elevated` bordé : nom (gras), adresse (`muted`), « N plats · N catégories ·
+     à 900 m » (`subtle`), lien externe `text-brand` vers le site (`sr-only` « nouvel onglet »),
+     puis bouton `sm` primaire « Ajouter et synchroniser » **ou** badge `success` « Déjà suivi » ;
+     après l'ajout, ligne `role="status"` : `Spinner` puis badge de statut + résumé des compteurs.
+     Rien trouvé : encadré « Aucun site Takeaway trouvé. », renvoi vers « Ajouter une source » et
+     `details` « N adresses vérifiées » (badges de statut neutres / `warning` / `danger`).
    * *Commandes* : chips de statut, lignes cliquables vers le détail, annulation forcée
      (icône `Ban`, confirmation). *Utilisateurs* : recherche, filtre de rôle, bouton
      « Promouvoir / Retirer admin » (désactivé pour soi-même).

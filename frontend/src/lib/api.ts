@@ -29,6 +29,7 @@ import type {
   RestaurantImport,
   SelectedOption,
   SplitMode,
+  SyncDiscoverResult,
   SyncRun,
   SyncRunList,
   SyncSource,
@@ -182,7 +183,12 @@ export const adminApi = {
   syncStatus: () => pb.send<SyncStatus>('/api/occ/admin/sync/status', { method: 'GET' }),
   syncRuns: (page = 1) => pb.send<SyncRunList>('/api/occ/admin/sync/runs', { method: 'GET', query: { page, perPage: 20 } }),
   syncRun: (id: string) => pb.send<{ run: SyncRun }>(`/api/occ/admin/sync/runs/${id}`, { method: 'GET' }),
-  startSync: () => pb.send<{ run: SyncRun }>('/api/occ/admin/sync/run', json({})),
+  /** Sans argument : toutes les sources activées ; avec `sourceId` : cette source seule. */
+  startSync: (sourceId?: string) => pb.send<{ run: SyncRun }>('/api/occ/admin/sync/run', json(sourceId ? { sourceId } : {})),
+  /** Cherche le site satellite Takeaway d'un restaurant (10 à 20 s). */
+  discoverSync: (query: string) => pb.send<SyncDiscoverResult>('/api/occ/admin/sync/discover', json({ query })),
+  /** Ajoute un site Takeaway comme source (idempotent : `created=false` si déjà suivi). */
+  addSyncSite: (url: string, label?: string) => pb.send<{ source: SyncSource; created: boolean }>('/api/occ/admin/sync/sources', json({ url, label })),
   syncSources: () => pb.collection('sync_sources').getFullList<SyncSource>({ sort: 'priority,label' }),
   saveSyncSource: (id: string | null, data: Partial<SyncSource>) =>
     id ? pb.collection('sync_sources').update<SyncSource>(id, data) : pb.collection('sync_sources').create<SyncSource>(data),

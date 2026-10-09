@@ -144,13 +144,31 @@ journal) et liste des **sources**.
   exécution à la fois ; une relance le même jour lit le cache (`pb_data/menusync-cache`, 20 h)
   et ne refait presque aucune requête.
 * **Sources** (*Admin → Synchronisation → Sources*) : activer / désactiver, priorité (la plus
-  petite fournit le menu quand un restaurant est sur plusieurs sources : sites Takeaway 10–19,
+  petite fournit le menu quand un restaurant est sur plusieurs sources : sites Takeaway 10–39,
   Deliveroo 50, weloveat 60, instantané Uber Eats 70 par défaut), *options* (weloveat : suppléments, 1 requête par plat —
   plusieurs heures, désactivé par défaut ; Deliveroo fournit les siennes sans coût).
   **Ajouter une source** : *Site Takeaway* = URL du site satellite d'un restaurant
   (`https://www.tomomons.be/`), *Site (schema.org)* = page carte d'un restaurant publiant un
   menu JSON-LD, *Deliveroo* = URL d'une page liste de ville (avec `?geohash=`), *weloveat* =
   racine de l'API (vide = défaut). Villes gérées : `mons` (rayon 8 km).
+* **Découvrir un site Takeaway** (carte en tête des *Sources*) : takeaway.com est protégé par un
+  défi Cloudflare (jamais contourné), mais beaucoup de restos ont un **site satellite** officiel au
+  même modèle (`https://www.snack-a-la-gare.be/`, `https://www.tomomons.be/`…), lisible poliment.
+  1. Colle le lien de la page du resto sur takeaway.com (ex.
+     `https://www.takeaway.com/be-fr/menu/snack-a-la-gare`, `/be/`, `/be-nl/` ou just-eat), **ou**
+     tape son nom (« Snack à la Gare »), **ou** colle directement l'adresse du site pour la vérifier.
+  2. **Découvrir** : le serveur essaie une à une ≤ 16 adresses probables (`<slug>.be`, sans tirets,
+     avec `-mons`/`mons`, `.com`, en `www.` puis sans) — 10 à 20 s ; les noms de domaine
+     inexistants ne coûtent aucune requête, robots.txt est respecté, ≥ 1 s entre deux requêtes,
+     takeaway.com n'est jamais appelé. Chaque site trouvé montre nom, adresse, nombre de plats et
+     de catégories, distance (si le site publie ses coordonnées) et un lien pour le vérifier.
+  3. **Ajouter et synchroniser** : crée la source *Site Takeaway* (activée, priorité libre entre 10
+     et 39, nom du resto) puis lit **cette source seule** tout de suite (exécution « ciblée » :
+     rien ne devient obsolète, le menu n'écrase pas celui d'une source prioritaire). Le résultat
+     s'affiche sous le site et dans l'historique. « Déjà suivi » = une source lit déjà ce site.
+     Si une synchronisation tourne déjà, la source est ajoutée et sera lue à la suivante.
+  4. Rien trouvé : la liste des adresses vérifiées s'affiche ; si tu connais le site, ajoute-le à la
+     main (**Ajouter une source** → *Site Takeaway*). Refusé si `OCC_SYNC_ENABLED=false`.
 * **Ce que fait une exécution** : les restaurants sont reconnus (même source, même lien
   plateforme, ou même nom au même endroit) — les fiches existantes ne sont jamais dupliquées ;
   prix, descriptions, options et disponibilité des plats suivent la source ; nouveaux plats et

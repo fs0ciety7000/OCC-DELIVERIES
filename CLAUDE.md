@@ -84,6 +84,15 @@ ci-dessous, du plus récent au plus ancien.
   avant ses plats réécrit l'ancien `items_count` → toujours recompter **après** (fin de transaction).
   Admin : carte « Cartes incomplètes » (`/admin/restaurants`, `?filtre=incompletes`),
   `GET/PATCH /api/occ/admin/settings` ; `/api/occ/config` expose `minMenuItems`.
+* 2026-10-09 — **« Découvrir un site Takeaway »** (`/admin/synchronisation`, `POST /api/occ/admin/sync/discover`,
+  `POST /admin/sync/sources`, `POST /admin/sync/run {sourceId}`). Candidats purs `menusync.DiscoverHosts`
+  (slug / sans tirets / `-mons` / `.com` / sans mots génériques, ≤ 16 domaines × `www.`/nu), `menusync.Prober`
+  dédié (pas le `Fetcher` : 2,5 s + 1 nouvel essai sur erreur réseau = minutes pour des domaines inexistants) :
+  DNS d'abord (absent = 0 requête), robots.txt, ≥ 1 s, 6 s, 403/anti-robot = hôte abandonné, redirection vers
+  takeaway.com jamais suivie, variante nue sautée si `www.` a répondu. Exécution ciblée = `feedsync.Options.Scoped`
+  (pas d'obsolètes, provenance complétée, menu gardé si une source liée est prioritaire). Le bac à sable n'a pas
+  de DNS (proxy HTTPS seul) : smoke test réel fait avec un `Lookup` DoH injecté → snack-a-la-gare.be 196 plats
+  (4 requêtes), « Tomo » → tomomons.be 67 plats (6 requêtes).
 * 2026-10-09 — **Verrouillage explicite uniquement** (retour utilisateur : le formulaire admin
   verrouillait par défaut et empêchait la resynchronisation). `autoLock` supprimé, interrupteur
   initialisé sur l'état réel, migration `1760000007` qui lève tous les verrous existants.

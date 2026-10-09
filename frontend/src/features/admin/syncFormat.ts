@@ -1,5 +1,5 @@
 import type { BadgeVariant } from '@/components/ui'
-import type { SyncProvider, SyncRunStatus, SyncSourceStatus, SyncStats, SyncTrigger } from '@/lib/types'
+import type { SyncDiscoverStatus, SyncProvider, SyncRunStatus, SyncSourceStatus, SyncStats, SyncTrigger } from '@/lib/types'
 
 export const RUN_STATUS_LABEL: Record<SyncRunStatus, string> = {
   running: 'En cours',
@@ -85,4 +85,29 @@ export function statsSummary(s: SyncStats): string[] {
     [s.items_unavailable, 'plat indisponible', 'plats indisponibles'],
   ]
   return parts.filter(([n]) => n > 0).map(([n, one, many]) => `${n.toLocaleString('fr-BE')} ${n > 1 ? many : one}`)
+}
+
+/* « Découvrir un site Takeaway » : statut de chaque adresse vérifiée. */
+export const DISCOVER_STATUS_LABEL: Record<SyncDiscoverStatus, string> = {
+  found: 'Trouvé',
+  absent: 'Inexistant',
+  unreachable: 'Injoignable',
+  http: 'Erreur HTTP',
+  robots: 'Interdit (robots.txt)',
+  blocked: 'Accès refusé',
+  other: 'Autre site',
+  invalid: 'Carte illisible',
+  skipped: 'Variante ignorée',
+}
+
+export const DISCOVER_STATUS_VARIANT: Record<SyncDiscoverStatus, BadgeVariant> = {
+  found: 'success',
+  absent: 'neutral',
+  unreachable: 'warning',
+  http: 'neutral',
+  robots: 'warning',
+  blocked: 'danger',
+  other: 'neutral',
+  invalid: 'warning',
+  skipped: 'neutral',
 }

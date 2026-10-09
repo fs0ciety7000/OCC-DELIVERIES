@@ -159,6 +159,8 @@ func (h *handlers) routes(r *router.Router[*core.RequestEvent]) {
 	admin.GET("/sync/runs", h.adminSyncRuns)
 	admin.GET("/sync/runs/{id}", h.adminSyncRun)
 	admin.POST("/sync/run", h.adminSyncStart)
+	admin.POST("/sync/discover", h.adminSyncDiscover)
+	admin.POST("/sync/sources", h.adminSyncAddSource)
 	admin.GET("/settings", h.adminSettings)
 	admin.PATCH("/settings", h.adminSetSettings)
 }

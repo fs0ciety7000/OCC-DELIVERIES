@@ -395,3 +395,50 @@ func TestReconcileSummarizesBulkChanges(t *testing.T) {
 		t.Fatalf("changes:\n%s", got)
 	}
 }
+
+func TestReconcileScoped(t *testing.T) {
+	// Tomo is known from Deliveroo (preferred here) and its site; another
+	// restaurant only from Deliveroo.
+	cur := curatedTomo()
+	cur.Sources = []SourceRef{
+		{Provider: menusync.SourceDeliveroo, URL: "https://deliveroo.be/fr/menu/mons/tomo", CheckedAt: "2026-10-08"},
+		{Provider: menusync.SourceTakeawaySite, URL: "https://www.tomomons.be/", CheckedAt: "2026-10-08"},
+	}
+	other := &Restaurant{ID: "r_other", Slug: "autre", Name: "Autre", Active: true, Lat: 50.46, Lng: 3.95,
+		Sources: []SourceRef{{Provider: menusync.SourceDeliveroo, URL: "https://deliveroo.be/fr/menu/mons/autre"}}}
+	feed := []menusync.Restaurant{feedTomo(item("Miso ramen", 1600), item("Tonkotsu", 1500))}
+
+	o := opts()
+	o.Scoped = true
+	o.Priority = []string{menusync.SourceDeliveroo, menusync.SourceTakeawaySite}
+	p := Reconcile([]*Restaurant{cur, other}, feed, o)
+	if st := total(p); st.RestaurantsStale != 0 || st.ItemsCreated != 0 || st.ItemsPriceChanged != 0 {
+		t.Fatalf("source moins prioritaire : menu intact, rien d'obsolète : %+v\n%s", st, changes(p))
+	}
+	for _, rp := range p.Restaurants {
+		if rp.Restaurant.ID == "r_tomo" && len(rp.Restaurant.Sources) != 2 {
+			t.Fatalf("provenance étendue, jamais remplacée : %+v", rp.Restaurant.Sources)
+		}
+	}
+
+	// the site is now preferred: its menu applies, provenance kept
+	o.Priority = []string{menusync.SourceTakeawaySite, menusync.SourceDeliveroo}
+	p = Reconcile([]*Restaurant{cur, other}, feed, o)
+	st := total(p)
+	if st.RestaurantsStale != 0 || st.ItemsCreated != 1 || st.ItemsPriceChanged != 1 {
+		t.Fatalf("source préférée : %+v\n%s", st, changes(p))
+	}
+	for _, rp := range p.Restaurants {
+		if rp.Restaurant.ID == "r_other" {
+			t.Fatal("une exécution ciblée ne touche pas aux autres restaurants")
+		}
+		if rp.Restaurant.ID == "r_tomo" && len(rp.Restaurant.Sources) != 2 {
+			t.Fatalf("provenance : %+v", rp.Restaurant.Sources)
+		}
+	}
+
+	// the same feed in a full run marks the other one stale
+	if st := total(Reconcile([]*Restaurant{cur, other}, feed, opts())); st.RestaurantsStale != 1 {
+		t.Fatalf("exécution complète : %+v", st)
+	}
+}

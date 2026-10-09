@@ -123,9 +123,22 @@ func (h *handlers) adminSyncRun(e *core.RequestEvent) error {
 	return ok(e, map[string]any{"run": toSyncRun(r, true)})
 }
 
-// POST /api/occ/admin/sync/run
+// POST /api/occ/admin/sync/run — body optional: {"sourceId": "…"} runs
+// only that source (scoped run).
 func (h *handlers) adminSyncStart(e *core.RequestEvent) error {
-	rec, err := h.sync.start(triggerManual)
+	var body struct {
+		SourceID string `json:"sourceId"`
+	}
+	if err := bindJSON(e, &body); err != nil {
+		return err
+	}
+	body.SourceID = strings.TrimSpace(body.SourceID)
+	if body.SourceID != "" {
+		if _, err := e.App.FindRecordById(colSyncSources, body.SourceID); err != nil {
+			return notFound("Source introuvable.")
+		}
+	}
+	rec, err := h.sync.startSource(triggerManual, body.SourceID)
 	if err != nil {
 		return syncError(err)
 	}
@@ -142,7 +155,14 @@ func bindSyncHooks(app core.App) {
 // onSyncSourceUpsert validates a source written by an admin. last_run_at /
 // last_status are written by the server only.
 func onSyncSourceUpsert(e *core.RecordRequestEvent) error {
-	r := e.Record
+	if err := normalizeSyncSource(e.Record); err != nil {
+		return err
+	}
+	return e.Next()
+}
+
+// normalizeSyncSource validates and normalizes a sync_sources record.
+func normalizeSyncSource(r *core.Record) error {
 	provider := r.GetString("provider")
 	if !slices.Contains(feedsync.Providers, provider) && provider != feedsync.ProviderUberEatsSnapshot {
 		return badRequest("Fournisseur inconnu (deliveroo, weloveat, takeaway-site, jsonld, ubereats-snapshot).")
@@ -180,5 +200,5 @@ func onSyncSourceUpsert(e *core.RecordRequestEvent) error {
 		r.Set("last_run_at", r.Original().Get("last_run_at"))
 		r.Set("last_status", r.Original().Get("last_status"))
 	}
-	return e.Next()
+	return nil
 }

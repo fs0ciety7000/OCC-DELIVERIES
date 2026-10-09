@@ -70,6 +70,12 @@ type syncEnv struct {
 
 func newSyncEnv(t *testing.T) *syncEnv {
 	t.Helper()
+	return newSyncEnvWith(t, nil)
+}
+
+// newSyncEnvWith is newSyncEnv with a hook on the sync configuration.
+func newSyncEnvWith(t *testing.T, tweak func(*SyncConfig)) *syncEnv {
+	t.Helper()
 	cfg := testConfig
 	cfg.Sync = SyncConfig{
 		Enabled: true, Cron: "30 3 * * *", CacheDir: t.TempDir(),
@@ -78,6 +84,9 @@ func newSyncEnv(t *testing.T) *syncEnv {
 			f.Sleep = func(ctx context.Context, d time.Duration) error { return ctx.Err() }
 			return f
 		},
+	}
+	if tweak != nil {
+		tweak(&cfg.Sync)
 	}
 	ta := newTestAppNoRegister(t)
 	h := register(ta, cfg)
@@ -115,7 +124,7 @@ func (e *syncEnv) runSync(trigger string) syncRun {
 	if err != nil {
 		e.t.Fatal(err)
 	}
-	e.h.sync.execute(context.Background(), rec)
+	e.h.sync.execute(context.Background(), rec, "")
 	rec, err = e.app.FindRecordById(colSyncRuns, rec.Id)
 	if err != nil {
 		e.t.Fatal(err)

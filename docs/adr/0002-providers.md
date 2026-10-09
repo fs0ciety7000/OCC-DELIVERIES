@@ -82,3 +82,18 @@ les note / avis / délai manquants — jamais de changement de menu. Une source 
 dépend des mises à jour du fichier (manuelles, `docs/DEPLOYMENT.md`). La commande sur ces restaurants
 se fait via l'envoi « Uber Eats » (deep link + commande groupée Uber Eats), la carte de l'app n'étant
 qu'un aperçu aux prix indicatifs.
+
+## Mise à jour — 2026-10-09 (4) : « Découvrir » les sites satellites Takeaway
+**Contexte.** takeaway.com est derrière un défi Cloudflare (jamais contourné), mais beaucoup de restaurants
+ont un site satellite officiel au modèle Takeaway (`www.<slug>.be`, robots.txt `Allow: /`), déjà lu par la
+source `takeaway-site`. Trouver ces sites à la main était le goulot d'étranglement.
+
+**Décision.** Depuis l'admin, le serveur devine l'adresse à partir du lien takeaway.com (slug), d'un nom ou
+d'une adresse (`menusync.DiscoverHosts`, ≤ 16 domaines) et vérifie les candidats avec un sondeur dédié
+(`menusync.Prober`) aux garde-fous propres : DNS d'abord (domaine inexistant = aucune requête), User-Agent
+identifié, robots.txt, une requête à la fois et ≥ 1 s entre deux, délai 6 s, aucun nouvel essai, 403 / page
+anti-robot = hôte abandonné, **aucune requête ni redirection suivie vers takeaway.com**, une découverte à la
+fois. Un clic ajoute la source puis lance une exécution **ciblée** sur elle seule.
+
+**Conséquences.** Quelques requêtes vers des domaines tiers devinés (en pratique 4 à 8 par recherche) ; un
+domaine homonyme sans le modèle Takeaway est simplement ignoré (« Autre site »).

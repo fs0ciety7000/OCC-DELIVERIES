@@ -10,6 +10,7 @@ import { formatRelativeTime, parseDate, plural } from '@/lib/format'
 import { qk } from '@/lib/queryKeys'
 import type { SyncProvider, SyncRun, SyncSource, SyncStatus } from '@/lib/types'
 import { AdminHeader } from './AdminLayout'
+import { DiscoverCard } from './DiscoverCard'
 import {
   formatDuration,
   parseLastStatus,
@@ -56,7 +57,7 @@ export function SyncPage() {
   }, [running, qc, status.data?.lastRun])
 
   const start = useMutation({
-    mutationFn: adminApi.startSync,
+    mutationFn: () => adminApi.startSync(),
     onSuccess: () => {
       toast.success('Synchronisation lancée', { description: 'Les sources sont lues une par une, poliment : comptez quelques minutes.' })
       void qc.invalidateQueries({ queryKey: qk.admin.syncStatus })
@@ -311,6 +312,7 @@ function SourcesSection() {
           Ajouter une source
         </Button>
       </div>
+      <DiscoverCard />
       {sources.isPending && <Skeleton className="h-40 rounded-lg" />}
       {sources.isError && <EmptyState tone="danger" emoji="⚠️" title="Sources indisponibles" description={errorMessage(sources.error)} />}
       {sources.data?.length === 0 && <EmptyState emoji="🔌" title="Aucune source" description="Ajoute une page Deliveroo, weloveat ou le site d'un restaurant." />}

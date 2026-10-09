@@ -219,6 +219,44 @@ export interface SyncStatus {
   nextRunAt: ISODate | null
 }
 
+/** Statut d'un hôte vérifié par « Découvrir ». */
+export type SyncDiscoverStatus = 'found' | 'absent' | 'unreachable' | 'http' | 'robots' | 'blocked' | 'other' | 'invalid' | 'skipped'
+
+export interface SyncDiscoverTry {
+  host: string
+  status: SyncDiscoverStatus
+  message?: string
+}
+
+/** Site satellite Takeaway trouvé par `POST /api/occ/admin/sync/discover`. */
+export interface SyncDiscoverFound {
+  url: string
+  host: string
+  name: string
+  address: string
+  items: number
+  categories: number
+  takeawayUrl?: string
+  lat?: number
+  lng?: number
+  /** Distance au lieu par défaut (km, une décimale) ; absente sans coordonnées. */
+  distanceKm?: number
+  /** Une source `takeaway-site` / `jsonld` lit déjà ce site. */
+  alreadySource: boolean
+  sourceId?: string
+}
+
+export interface SyncDiscoverResult {
+  query: string
+  kind: 'takeaway' | 'name' | 'site'
+  slug: string
+  tried: SyncDiscoverTry[]
+  found: SyncDiscoverFound[]
+  network: number
+  durationMs: number
+  interrupted: boolean
+}
+
 export interface SyncRunList {
   page: number
   perPage: number
