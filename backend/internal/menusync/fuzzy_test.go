@@ -14,7 +14,7 @@ func TestCleanStoreName(t *testing.T) {
 		{"Donroll’s (Mons)", "Donroll’s"},
 		{"Tomo - Mons", "Tomo"},
 		{"BAGEL CITY (Indépendant) (Mons)", "Bagel City"},
-		{"Pizza Mons (Independant)", "Pizza"},
+		{"Pizza Mons (Independant)", "Pizza Mons"}, // a generic word alone is not a name
 		{"(Independant)", "(Independant)"},
 		{"  Le   Comptoir  ", "Le Comptoir"},
 	}

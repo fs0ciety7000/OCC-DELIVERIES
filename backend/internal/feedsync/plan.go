@@ -590,6 +590,13 @@ func updateRestaurant(cur *Restaurant, in menusync.Restaurant, o Options) *Resta
 		note(true, "réapparu")
 	}
 
+	// a name truncated by an older cleaning rule is repaired from the source
+	if menusync.TruncatedName(r.Name, in.Name) {
+		p.Changes = append(p.Changes, fmt.Sprintf("%s : nom corrigé en « %s »", r.Name, in.Name))
+		r.Name = in.Name
+		note(true, "nom")
+	}
+
 	// curated fields: only filled when empty
 	note(fill(&r.Description, in.Description), "description")
 	note(fill(&r.Emoji, in.Emoji), "emoji")

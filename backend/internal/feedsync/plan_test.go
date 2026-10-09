@@ -442,3 +442,24 @@ func TestReconcileScoped(t *testing.T) {
 		t.Fatalf("exécution complète : %+v", st)
 	}
 }
+
+// A name truncated by the former cleaning rule ("Pitta" for the source's
+// "Pitta Mons") is repaired from the source; a real name is left alone.
+func TestReconcileRepairsTruncatedName(t *testing.T) {
+	cur := curatedTomo()
+	cur.Name = "Tomo Ramen de"
+	feed := feedTomo(item("Miso ramen", 1450))
+	feed.Name = "Tomo Ramen de Mons"
+	db := apply(t, []*Restaurant{cur}, Reconcile([]*Restaurant{cur}, []menusync.Restaurant{feed}, opts()))
+	if db[0].Name != "Tomo Ramen de Mons" {
+		t.Fatalf("name not repaired: %q", db[0].Name)
+	}
+
+	cur = curatedTomo() // "Tomo": a real name, the feed's longer name does not replace it
+	feed = feedTomo(item("Miso ramen", 1450))
+	feed.Name = "Tomo Mons Ramen"
+	db = apply(t, []*Restaurant{cur}, Reconcile([]*Restaurant{cur}, []menusync.Restaurant{feed}, opts()))
+	if db[0].Name != cur.Name {
+		t.Fatalf("real name changed: %q", db[0].Name)
+	}
+}

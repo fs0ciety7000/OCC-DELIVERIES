@@ -23,6 +23,10 @@ func TestNormalizeName(t *testing.T) {
 		"Hashtag Bakeries (MON)":            "Hashtag Bakeries",
 		"New Delhi (MONS)":                  "New Delhi",
 		"Pili Pili Mons":                    "Pili Pili",
+		"Pitta Mons":                        "Pitta Mons",
+		"Pizza - Mons":                      "Pizza - Mons",
+		"O'Tacos Centre ville de Mons":      "O'Tacos Centre ville de Mons",
+		"Melanza Mons":                      "Melanza",
 		"BUGA RAMEN MONS":                   "Buga Ramen",
 		"BBQ Home - Mons":                   "BBQ Home",
 		"BAGEL CITY":                        "Bagel City",
@@ -183,5 +187,24 @@ func TestFetcherCacheTTL(t *testing.T) {
 	})
 	if _, err := f.Get(ctx, srv.URL+"/page"); err != nil || hits != 2 {
 		t.Fatalf("expired cache must be refetched: %v %d", err, hits)
+	}
+}
+
+func TestTruncatedName(t *testing.T) {
+	cases := []struct {
+		stored, published string
+		want              bool
+	}{
+		{"Pitta", "Pitta Mons", true},
+		{"O'Tacos Centre ville de", "O'Tacos Centre ville de Mons", true},
+		{"Melanza", "Melanza Mons", false},  // a real name, not truncated
+		{"Pitta Mons", "Pitta Mons", false}, // unchanged
+		{"Pizza", "Pizza Hut", true},        // generic word alone, longer name published
+		{"Tomo", "Sushi Tomo", false},       // not a prefix
+	}
+	for _, c := range cases {
+		if got := TruncatedName(c.stored, c.published); got != c.want {
+			t.Errorf("TruncatedName(%q, %q) = %v", c.stored, c.published, got)
+		}
 	}
 }

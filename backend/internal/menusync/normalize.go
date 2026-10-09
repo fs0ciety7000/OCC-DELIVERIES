@@ -71,7 +71,9 @@ func isCityPart(part, city string) bool {
 }
 
 func stripCitySuffix(name, city string) string {
-	keep := func(s string) bool { return utf8.RuneCountInString(strings.TrimSpace(s)) >= 3 }
+	keep := func(s string) bool {
+		return utf8.RuneCountInString(strings.TrimSpace(s)) >= 3 && !danglingName(s)
+	}
 	for {
 		changed := false
 		if m := parenSuffixRe.FindStringSubmatchIndex(name); m != nil {
@@ -93,6 +95,36 @@ func stripCitySuffix(name, city string) string {
 			return strings.Trim(name, " -–—|,")
 		}
 	}
+}
+
+// nameConnectors end a name that still expects a complement: removing the
+// city after them leaves "O'Tacos Centre ville de".
+var nameConnectors = map[string]bool{
+	"de": true, "du": true, "des": true, "d": true, "a": true, "au": true, "aux": true,
+	"la": true, "le": true, "les": true, "l": true, "of": true, "in": true, "en": true, "sur": true,
+}
+
+// danglingName reports whether a name left once the city is removed would be
+// truncated or meaningless: it ends with a connector ("… ville de") or is a
+// single generic word ("Pitta", "Pizza", "Snack").
+func danglingName(s string) bool {
+	words := strings.Fields(strings.Trim(nonSlug.ReplaceAllString(Fold(s), " "), " "))
+	if len(words) == 0 {
+		return true
+	}
+	if nameConnectors[words[len(words)-1]] {
+		return true
+	}
+	return len(words) == 1 && genericNameWords[words[0]]
+}
+
+// TruncatedName reports whether the stored name looks like a truncated form
+// of the name now published by the source ("Pitta" for "Pitta Mons",
+// "O'Tacos Centre ville de" for "O'Tacos Centre ville de Mons"), so that the
+// synchronisation may repair it.
+func TruncatedName(stored, published string) bool {
+	s, p := Fold(strings.TrimSpace(stored)), Fold(strings.TrimSpace(published))
+	return s != "" && s != p && strings.HasPrefix(p, s) && danglingName(stored)
 }
 
 func isAllCaps(s string) bool {
