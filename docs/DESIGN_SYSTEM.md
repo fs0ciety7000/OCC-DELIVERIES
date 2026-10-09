@@ -172,8 +172,19 @@ un parcours critique, toutes interruptibles.
      à bouts arrondis 4 px posées sur la ligne de base, écart 2 px, grille discrète, infobulle
      au survol/focus, tableau `sr-only` en alternative — pas de librairie de graphiques),
      répartition par statut en badges, top restaurants.
-   * *Restaurants* : recherche + `Segmented` (Tous / Visibles / Masqués / Obsolètes), lignes avec emoji,
-     badges « Masqué » / « Sans coordonnées » (warning) / « Verrouillé » (`info`, icône `Lock`) /
+   * *Restaurants* : carte **Cartes incomplètes** en tête (`IncompleteMenusCard`) — pastille icône
+     `EyeOff` 40 px, `CardTitle`, texte d'explication `muted` ; ligne de réglage qui passe à la ligne
+     en mobile : `Toggle` (`role="switch"`, « Masquer les restaurants incomplets ») + libellé
+     « Masquer les restaurants de moins de » + `Input` numérique 80 px centré `tabular-nums` + « plats »,
+     bouton `sm` « Appliquer » seulement si le seuil saisi diffère du seuil actif ; erreur de saisie
+     en `danger` (`role="alert"`, `aria-invalid`). Pied séparé d'une bordure : compteur `aria-live`
+     (« **N restaurants masqués** sur M actifs », ou aperçu « N restaurants seraient masqués avec ce
+     seuil » quand le filtre est coupé / le seuil modifié), bouton `ghost` « Voir les restaurants
+     masqués » (icône `ListFilter`) qui active le filtre *Incomplets* ; note `subtle` vers le favori
+     « Exporter vers OCC ».
+     Puis recherche + `Segmented` (Tous / Visibles / Masqués / Obsolètes / Incomplets, défilant en
+     mobile, `?filtre=` dans l'URL), lignes avec emoji, badges « Masqué » / « Masqué : carte
+     incomplète (N plats) » (`warning`, icône `EyeOff`) / « Sans coordonnées » (warning) / « Verrouillé » (`info`, icône `Lock`) /
      « Obsolète » (`warning`, icône `TriangleAlert`, date en infobulle), interrupteur de visibilité
      (`Toggle`, `role="switch"`), actions Menu / Modifier. Formulaire en `Sheet lg` par
      sections (Identité, Adresse + bouton *Géocoder*, Livraison, Plateformes — Uber Eats,

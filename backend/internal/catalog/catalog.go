@@ -400,7 +400,8 @@ func Import(app core.App, in RestaurantImport) (string, int, error) {
 				count++
 			}
 		}
-		return nil
+		// the restaurant record was saved before its new menu
+		return RefreshItemsCount(tx, rest.Id)
 	})
 	if err != nil {
 		return "", 0, err

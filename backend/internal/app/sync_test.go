@@ -203,6 +203,11 @@ func TestSyncReconcilesIntoDatabase(t *testing.T) {
 	if len(baal) != 1 || !baal[0].GetBool("active") || baal[0].GetString("source_key") == "" {
 		t.Fatalf("baalbeck %v", baal)
 	}
+	// items_count follows the reconciled menus (Tomo lost "Ancien plat")
+	assertItemsCounts(t, e.app)
+	if n, _ := catalog.CountAvailableItems(e.app, tomoID); n == 0 || tomo.GetInt("items_count") != n {
+		t.Fatalf("tomo items_count %d, %d available", tomo.GetInt("items_count"), n)
+	}
 	for _, s := range run.Sources {
 		if s.Status != feedsync.StatusOK {
 			t.Fatalf("source %+v", s)
@@ -439,6 +444,11 @@ func TestSyncUberEatsSnapshot(t *testing.T) {
 	alice := e.user("Alice")
 	party := e.expect(200, "POST", "/api/collections/parties/records", alice.token, map[string]any{"title": "Midi"}).m(t)
 	e.expect(200, "POST", "/api/occ/parties/"+party["id"].(string)+"/transition", alice.token, map[string]any{"to": "ordering", "restaurant": w.Id})
+
+	assertItemsCounts(t, e.app)
+	if w2, _ := e.app.FindRecordById(colRestaurants, w.Id); w2.GetInt("items_count") != 2 {
+		t.Fatalf("wok items_count %d", w2.GetInt("items_count"))
+	}
 
 	// second run: nothing changes; the wok is never stale (no feed lists it)
 	run = e.runSync(triggerManual)

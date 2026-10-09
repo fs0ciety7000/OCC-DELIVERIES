@@ -41,6 +41,8 @@ func (h *handlers) config(e *core.RequestEvent) error {
 			"lat": h.cfg.DefaultLat, "lng": h.cfg.DefaultLng, "label": h.cfg.DefaultLabel,
 		},
 		"providers": list,
+		// restaurants with fewer available items are hidden from /nearby (0 = none)
+		"minMenuItems": minMenuItems(e.App),
 	})
 }
 
@@ -76,6 +78,8 @@ func (h *handlers) nearby(e *core.RequestEvent) error {
 	if err != nil {
 		return err
 	}
+	// incomplete menus are hidden from the listings (still reachable by link)
+	minItems := minMenuItems(e.App)
 
 	type hit struct {
 		data   map[string]any
@@ -85,6 +89,9 @@ func (h *handlers) nearby(e *core.RequestEvent) error {
 	}
 	hits := []hit{}
 	for _, r := range recs {
+		if domain.HiddenIncomplete(r.GetInt(catalog.ItemsCountField), minItems) {
+			continue
+		}
 		var cuisines []string
 		_ = r.UnmarshalJSONField("cuisines", &cuisines)
 		if cuisine != "" {

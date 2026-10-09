@@ -135,6 +135,40 @@
     }
   }
 
+  // ---------- 1 bis. microdonnées schema.org (sites satellites Takeaway, sites de restos) ----------
+  function fromMicrodata(doc) {
+    var offers = doc.querySelectorAll('[itemprop="offers"] [itemprop="price"], [itemprop="price"]')
+    if (!offers.length) return null
+    var cats = []
+    var byCat = {}
+    var seen = {}
+    for (var i = 0; i < offers.length; i++) {
+      var priceEl = offers[i]
+      // le plat : plus proche ancêtre qui porte un [itemprop=name]
+      var card = priceEl.parentElement
+      for (var d = 0; card && d < 6 && !card.querySelector('[itemprop="name"]'); d++) card = card.parentElement
+      if (!card) continue
+      var nameEl = card.querySelector('[itemprop="name"]')
+      var name = clean(nameEl && (nameEl.childNodes[0] && nameEl.childNodes[0].nodeType === 3 ? nameEl.childNodes[0].textContent : nameEl.textContent), 120)
+      var price = toCents(priceEl.getAttribute('content') || priceEl.textContent)
+      if (!name || price <= 0 || seen[name + price]) continue
+      seen[name + price] = 1
+      var descEl = card.querySelector('[itemprop="description"]')
+      // catégorie : groupe parent (gabarit Takeaway « menucat ») ou titre précédent
+      var group = card.closest ? card.closest('.menucat, [class*="meals-group"], section') : null
+      var catName = 'Menu'
+      if (group) {
+        var h = group.querySelector('.menucat__title, [class*="category-name"], h2, h3, h4')
+        if (h) catName = clean(h.textContent, 80) || 'Menu'
+      }
+      if (!byCat[catName]) { byCat[catName] = { name: catName, items: [] }; cats.push(byCat[catName]) }
+      byCat[catName].items.push({ name: name, description: clean(descEl && descEl.textContent, 400), price: price, tags: [], option_groups: [], popular: false })
+    }
+    if (!cats.length) return null
+    var footer = doc.querySelector('[itemtype*="Restaurant"] [itemprop="name"], .restaurant-name, h1')
+    return { name: clean(footer && footer.textContent, 120), categories: cats }
+  }
+
   // ---------- 2. États embarqués / données chargées par la page (heuristique) ----------
   var NAME_KEYS = ['title', 'name', 'displayName']
   function pickName(o) {
@@ -296,7 +330,12 @@
     var url
     try { url = new URL(href) } catch (e) { url = { hostname: '', href: href } }
     var ld = fromJsonLd(doc) || {}
-    var st = (!ld.categories || !ld.categories.length) ? categoriesFromBlobs(embeddedBlobs(doc).concat(extraBlobs || [])) : null
+    var st = null
+    if (!ld.categories || !ld.categories.length) {
+      st = fromMicrodata(doc)
+      if (st) st.micro = true
+      else st = categoriesFromBlobs(embeddedBlobs(doc).concat(extraBlobs || []))
+    }
     if (!st && (!ld.categories || !ld.categories.length)) {
       st = fromDom(doc)
       if (st) st.dom = true
@@ -335,7 +374,7 @@
         source_urls: [pageUrl],
         menu_checked_at: new Date().toISOString().slice(0, 10),
       },
-      stats: { categories: categories.length, items: count, source: ld.categories && ld.categories.length ? 'json-ld' : st ? (st.dom ? 'page affichée' : (extraBlobs && extraBlobs.length ? 'données chargées' : 'état embarqué')) : 'aucune' },
+      stats: { categories: categories.length, items: count, source: ld.categories && ld.categories.length ? 'json-ld' : st ? (st.micro ? 'microdonnées' : st.dom ? 'page affichée' : (extraBlobs && extraBlobs.length ? 'données chargées' : 'état embarqué')) : 'aucune' },
     }
   }
 

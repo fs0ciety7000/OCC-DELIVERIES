@@ -29,7 +29,7 @@ export function Segmented<T extends string>({ value, onChange, options, label, c
             disabled={disabled}
             onClick={() => onChange(o.value)}
             className={cn(
-              'min-h-9 flex-1 rounded-full px-3.5 text-sm font-semibold transition-colors duration-[120ms] disabled:opacity-50',
+              'min-h-9 flex-1 rounded-full px-3.5 text-sm font-semibold whitespace-nowrap transition-colors duration-[120ms] disabled:opacity-50',
               active ? 'bg-surface text-fg shadow-card' : 'text-muted hover:text-fg',
             )}
           >

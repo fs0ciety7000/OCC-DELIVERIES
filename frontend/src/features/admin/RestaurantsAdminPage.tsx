@@ -1,15 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Lock, MapPinOff, Pencil, Plus, Search, TriangleAlert, UtensilsCrossed } from 'lucide-react'
+import { EyeOff, Lock, MapPinOff, Pencil, Plus, Search, TriangleAlert, UtensilsCrossed } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { Badge, Button, buttonClass, Card, EmptyState, Input, Segmented, Skeleton } from '@/components/ui'
 import { adminApi } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
+import { plural } from '@/lib/format'
 import { qk } from '@/lib/queryKeys'
 import type { Restaurant } from '@/lib/types'
 import { AdminHeader } from './AdminLayout'
 import { fold } from './text'
+import { IncompleteMenusCard } from './IncompleteMenusCard'
+import { isIncomplete } from './incomplete'
 import { RestaurantForm } from './RestaurantForm'
 import { Toggle } from './Toggle'
 
@@ -20,14 +23,46 @@ function formatDay(value: string): string {
   return Number.isNaN(d.getTime()) ? value : dayFmt.format(d)
 }
 
-type Filter = 'all' | 'active' | 'inactive' | 'stale'
+type Filter = 'all' | 'active' | 'inactive' | 'stale' | 'incomplete'
+
+const FILTERS: readonly Filter[] = ['all', 'active', 'inactive', 'stale', 'incomplete']
+
+/** Valeur du paramètre `?filtre=` (lien « Voir les restaurants masqués »). */
+const INCOMPLETE_PARAM = 'incompletes'
 
 export function RestaurantsAdminPage() {
   const [q, setQ] = useState('')
-  const [filter, setFilter] = useState<Filter>('all')
+  const [params, setParams] = useSearchParams()
+  const raw = params.get('filtre')
+  const filter: Filter = raw === INCOMPLETE_PARAM ? 'incomplete' : FILTERS.includes(raw as Filter) ? (raw as Filter) : 'all'
+  const setFilter = (f: Filter) =>
+    setParams(
+      (p) => {
+        if (f === 'all') p.delete('filtre')
+        else p.set('filtre', f === 'incomplete' ? INCOMPLETE_PARAM : f)
+        return p
+      },
+      { replace: true },
+    )
   const [editing, setEditing] = useState<Restaurant | null | undefined>(undefined)
   const list = useQuery({ queryKey: qk.admin.restaurants, queryFn: adminApi.restaurants })
   const qc = useQueryClient()
+  const settings = useQuery({ queryKey: qk.admin.settings, queryFn: adminApi.settings })
+  const minItems = settings.data?.minMenuItems ?? 0
+  const saveSettings = useMutation({
+    mutationFn: adminApi.saveSettings,
+    onSuccess: (s) => {
+      qc.setQueryData(qk.admin.settings, s)
+      toast.success(
+        s.minMenuItems > 0
+          ? `Restaurants de moins de ${plural(s.minMenuItems, 'plat')} masqués (${s.hiddenRestaurants})`
+          : 'Tous les restaurants actifs sont de nouveau listés',
+      )
+      void qc.invalidateQueries({ queryKey: ['nearby'] })
+      void qc.invalidateQueries({ queryKey: qk.config })
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  })
 
   const toggle = useMutation({
     mutationFn: ({ r, active }: { r: Restaurant; active: boolean }) => adminApi.saveRestaurant(r.id, { active }),
@@ -46,10 +81,11 @@ export function RestaurantsAdminPage() {
       if (filter === 'active' && !r.active) return false
       if (filter === 'inactive' && r.active) return false
       if (filter === 'stale' && !r.stale_since) return false
+      if (filter === 'incomplete' && !(r.active && isIncomplete(r, minItems))) return false
       if (!needle) return true
       return fold(`${r.name} ${r.slug} ${r.address} ${(r.cuisines ?? []).join(' ')}`).includes(needle)
     })
-  }, [list.data, q, filter])
+  }, [list.data, q, filter, minItems])
 
   const counts = { all: list.data?.length ?? 0, active: list.data?.filter((r) => r.active).length ?? 0 }
 
@@ -64,21 +100,33 @@ export function RestaurantsAdminPage() {
           </Button>
         }
       />
+      {settings.data && (
+        <IncompleteMenusCard
+          settings={settings.data}
+          restaurants={list.data}
+          saving={saveSettings.isPending}
+          onSave={(n) => saveSettings.mutate(n)}
+          onShowHidden={() => setFilter('incomplete')}
+        />
+      )}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="min-w-0 flex-1">
           <Input type="search" aria-label="Rechercher un restaurant" placeholder="Nom, slug, adresse, cuisine…" value={q} onChange={(e) => setQ(e.target.value)} leftIcon={<Search className="size-4" />} />
         </div>
-        <Segmented<Filter>
-          label="Filtrer par visibilité"
-          value={filter}
-          onChange={setFilter}
-          options={[
-            { value: 'all', label: 'Tous' },
-            { value: 'active', label: 'Visibles' },
-            { value: 'inactive', label: 'Masqués' },
-            { value: 'stale', label: 'Obsolètes' },
-          ]}
-        />
+        <div className="-mx-1 max-w-full overflow-x-auto px-1">
+          <Segmented<Filter>
+            label="Filtrer par visibilité"
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { value: 'all', label: 'Tous' },
+              { value: 'active', label: 'Visibles' },
+              { value: 'inactive', label: 'Masqués' },
+              { value: 'stale', label: 'Obsolètes' },
+              { value: 'incomplete', label: 'Incomplets' },
+            ]}
+          />
+        </div>
       </div>
 
       {list.isPending && (
@@ -91,8 +139,16 @@ export function RestaurantsAdminPage() {
       {list.isError && <EmptyState tone="danger" emoji="⚠️" title="Chargement impossible" description={errorMessage(list.error)} action={<Button variant="secondary" onClick={() => list.refetch()}>Réessayer</Button>} />}
       {list.data && shown.length === 0 && (
         <EmptyState
-          title={list.data.length === 0 ? 'Aucun restaurant' : 'Aucun résultat'}
-          description={list.data.length === 0 ? 'Crée un restaurant ou importe un fichier JSON / CSV.' : 'Essaie un autre mot-clé.'}
+          title={list.data.length === 0 ? 'Aucun restaurant' : filter === 'incomplete' && !q ? 'Aucune carte incomplète' : 'Aucun résultat'}
+          description={
+            list.data.length === 0
+              ? 'Crée un restaurant ou importe un fichier JSON / CSV.'
+              : filter === 'incomplete' && !q
+                ? minItems > 0
+                  ? `Tous les restaurants actifs ont au moins ${plural(minItems, 'plat')}.`
+                  : 'Le filtre « cartes incomplètes » est désactivé.'
+                : 'Essaie un autre mot-clé.'
+          }
           action={
             list.data.length === 0 && (
               <Link to="/admin/import" className={buttonClass('secondary')}>
@@ -116,6 +172,11 @@ export function RestaurantsAdminPage() {
                     {r.name}
                   </Link>
                   {!r.active && <Badge>Masqué</Badge>}
+                  {r.active && isIncomplete(r, minItems) && (
+                    <Badge variant="warning" title={`Absent des listes publiques : moins de ${plural(minItems, 'plat')} disponibles.`}>
+                      <EyeOff className="size-3" aria-hidden /> Masqué : carte incomplète ({plural(r.items_count ?? 0, 'plat')})
+                    </Badge>
+                  )}
                   {r.locked && (
                     <Badge variant="info" title="Modifié à la main : la synchronisation ne touche plus ce restaurant.">
                       <Lock className="size-3" aria-hidden /> Verrouillé

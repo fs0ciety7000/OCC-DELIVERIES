@@ -75,6 +75,7 @@ PocketBase `/_/`). Le lien « Admin » apparaît dans la navigation des comptes 
   l'app mais reste dans l'historique), créer / modifier (adresse + bouton
   **Géocoder** via OpenStreetMap, liens Uber Eats / Takeaway / Deliveroo / weloveat,
   frais en euros). Badges **Verrouillé** et **Obsolète** : voir *Synchronisation*.
+* **Cartes incomplètes** (carte en tête de *Restaurants*) : voir ci-dessous.
 * **Menu** (clic sur un resto) : catégories (ajout, renommage, ordre ↑↓, suppression),
   articles (prix en euros `12,50`, étiquettes, disponible / populaire, options :
   groupes min/max et choix avec supplément).
@@ -82,6 +83,22 @@ PocketBase `/_/`). Le lien « Admin » apparaît dans la navigation des comptes 
   **annulation forcée**.
 * **Synchronisation** : restaurants et menus relus automatiquement, voir ci-dessous.
 * **Import** : voir ci-dessous.
+
+### Cartes incomplètes : masquer / ré-afficher les restos de moins de N plats
+* *Admin → Restaurants*, carte **Cartes incomplètes** : interrupteur « Masquer les restaurants
+  incomplets » + champ « moins de [10] plats » (1–100, bouton **Appliquer** si on change le
+  nombre pendant que le filtre est actif). Activé par défaut à **10** en production (migration
+  `1760000010`) ; désactivé (0) sur une installation de démo.
+* Un restaurant masqué disparaît de l'accueil, de *Restos* et du choix des candidats, mais reste
+  ouvrable par lien, utilisable dans les commandes déjà lancées, et visible dans l'admin avec le
+  badge « Masqué : carte incomplète (N plats) ». Seuls les plats **disponibles** comptent.
+* **Ré-afficher** : couper l'interrupteur (tout redevient visible), baisser le seuil, ou compléter
+  le menu — le restaurant réapparaît tout seul dès qu'il atteint le seuil (import, favori
+  « Exporter vers OCC », synchronisation ou éditeur de menu). « Voir les restaurants masqués »
+  (ou le filtre *Incomplets*, lien `/admin/restaurants?filtre=incompletes`) liste ceux à compléter.
+* API (jeton admin ou superuser) : `GET /api/occ/admin/settings`,
+  `PATCH /api/occ/admin/settings` avec `{"minMenuItems": 10}` (`0` = tout afficher). Le réglage
+  vit dans la collection `app_settings` (une ligne, aussi modifiable dans `/_/`).
 
 ### Importer des menus (JSON ou CSV)
 1. *Admin → Import* : télécharge le **modèle CSV** (une ligne par article, prix en

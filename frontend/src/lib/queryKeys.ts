@@ -27,5 +27,6 @@ export const qk = {
     syncRuns: (page: number) => ['admin', 'sync', 'runs', page] as const,
     syncRun: (id: string) => ['admin', 'sync', 'run', id] as const,
     syncSources: ['admin', 'sync', 'sources'] as const,
+    settings: ['admin', 'settings'] as const,
   },
 }

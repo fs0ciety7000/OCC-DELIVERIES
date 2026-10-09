@@ -16,6 +16,7 @@ import (
 	"github.com/pocketbase/pocketbase/tools/cron"
 	"github.com/pocketbase/pocketbase/tools/types"
 
+	"github.com/fs0ciety7000/occ-deliveries/backend/internal/catalog"
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/domain"
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/feedsync"
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/menusync"
@@ -686,7 +687,7 @@ func applyRestaurantPlan(app core.App, rp *feedsync.RestaurantPlan) error {
 			}
 		}
 		if len(rp.Items) == 0 {
-			return nil
+			return catalog.RefreshItemsCount(tx, rec.Id)
 		}
 		itemCol, err := tx.FindCollectionByNameOrId(colMenuItems)
 		if err != nil {
@@ -726,6 +727,6 @@ func applyRestaurantPlan(app core.App, rp *feedsync.RestaurantPlan) error {
 				return fmt.Errorf("%s : %w", it.Name, err)
 			}
 		}
-		return nil
+		return catalog.RefreshItemsCount(tx, rec.Id)
 	})
 }

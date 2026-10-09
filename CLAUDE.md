@@ -73,6 +73,17 @@ docker compose up --build         # http://localhost:8090
 Les apprentissages importants (pièges PocketBase, décisions d'UX) sont ajoutés
 ci-dessous, du plus récent au plus ancien.
 
+* 2026-10-09 — **Cartes incomplètes masquées** (demande : « masquer les restos avec moins de 10 plats,
+  mais possible de les ré-afficher »). Seuil global `app_settings.min_menu_items` (0–100, 0 = off ;
+  migration `1760000010` : 10 si données réelles, 0 en démo) + `restaurants.items_count` (plats
+  **disponibles**, serveur). Le filtre est évalué **à la lecture** dans `/nearby` (`domain.HiddenIncomplete`) :
+  rien n'est écrit sur les restaurants, donc la synchronisation ne « défait » rien et un menu complété
+  réapparaît seul. Comptage par `catalog.RefreshItemsCount` (`UPDATE … COUNT(*)` brut, sans hook) après
+  les écritures d'articles via la collection, en fin de `catalog.Import` et de chaque restaurant
+  synchronisé ; le hook restaurants écrase toute valeur client. Piège : un `Save` d'un restaurant chargé
+  avant ses plats réécrit l'ancien `items_count` → toujours recompter **après** (fin de transaction).
+  Admin : carte « Cartes incomplètes » (`/admin/restaurants`, `?filtre=incompletes`),
+  `GET/PATCH /api/occ/admin/settings` ; `/api/occ/config` expose `minMenuItems`.
 * 2026-10-09 — **Verrouillage explicite uniquement** (retour utilisateur : le formulaire admin
   verrouillait par défaut et empêchait la resynchronisation). `autoLock` supprimé, interrupteur
   initialisé sur l'état réel, migration `1760000007` qui lève tous les verrous existants.

@@ -1,5 +1,6 @@
 import { pb } from './pb'
 import type {
+  AdminSettings,
   AdminStats,
   AdminUserList,
   AdminUser,
@@ -186,6 +187,16 @@ export const adminApi = {
   saveSyncSource: (id: string | null, data: Partial<SyncSource>) =>
     id ? pb.collection('sync_sources').update<SyncSource>(id, data) : pb.collection('sync_sources').create<SyncSource>(data),
   deleteSyncSource: (id: string) => pb.collection('sync_sources').delete(id),
+
+  /* --- réglages (cartes incomplètes) --- */
+
+  settings: () => pb.send<AdminSettings>('/api/occ/admin/settings', { method: 'GET' }),
+  saveSettings: (minMenuItems: number) =>
+    pb.send<AdminSettings>('/api/occ/admin/settings', {
+      method: 'PATCH',
+      body: JSON.stringify({ minMenuItems }),
+      headers: { 'Content-Type': 'application/json' },
+    }),
 
   /* --- catalogue (collections, rules « role = admin ») --- */
 

@@ -6,6 +6,7 @@ import (
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 
+	"github.com/fs0ciety7000/occ-deliveries/backend/internal/catalog"
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/domain"
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/providers"
 )
@@ -24,6 +25,7 @@ func bindCatalogHooks(app core.App) {
 
 	app.OnRecordCreateRequest(colMenuItems).BindFunc(onMenuItemUpsert)
 	app.OnRecordUpdateRequest(colMenuItems).BindFunc(onMenuItemUpsert)
+	app.OnRecordDeleteRequest(colMenuItems).BindFunc(onMenuItemDelete)
 }
 
 // cleanStrings normalizes a JSON string list field (trim, lower, dedupe).
@@ -69,6 +71,15 @@ func onRestaurantUpsert(e *core.RecordRequestEvent) error {
 	if r.GetInt("eta_min") > 0 && r.GetInt("eta_max") > 0 && r.GetInt("eta_min") > r.GetInt("eta_max") {
 		return badRequest("Le délai minimum dépasse le délai maximum.")
 	}
+	// items_count is computed by the server (never trusted from the client)
+	n := 0
+	if !r.IsNew() {
+		var err error
+		if n, err = catalog.CountAvailableItems(e.App, r.Id); err != nil {
+			return err
+		}
+	}
+	r.Set(catalog.ItemsCountField, n)
 	// unique slug with a readable message (the index would answer a generic error)
 	if slug := r.GetString("slug"); slug != "" {
 		if other, err := e.App.FindFirstRecordByData(colRestaurants, "slug", slug); err == nil && other.Id != r.Id {
@@ -126,5 +137,15 @@ func onMenuItemUpsert(e *core.RecordRequestEvent) error {
 		groups = []domain.OptionGroup{}
 	}
 	r.Set("option_groups", groups)
-	return e.Next()
+	if err := e.Next(); err != nil {
+		return err
+	}
+	return catalog.RefreshItemsCount(e.App, r.GetString("restaurant"))
+}
+
+func onMenuItemDelete(e *core.RecordRequestEvent) error {
+	if err := e.Next(); err != nil {
+		return err
+	}
+	return catalog.RefreshItemsCount(e.App, e.Record.GetString("restaurant"))
 }

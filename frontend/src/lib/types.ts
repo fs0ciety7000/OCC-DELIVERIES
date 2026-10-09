@@ -93,6 +93,8 @@ export interface Restaurant extends BaseRecord {
   partial_menu?: boolean
   /** Position approximative (lieu par défaut) : distance non fiable. */
   geo_approx?: boolean
+  /** Serveur : nombre de plats disponibles (cartes incomplètes masquées sous `minMenuItems`). */
+  items_count?: number
 }
 
 export type NearbyRestaurant = Restaurant & { distanceKm: number }
@@ -344,6 +346,17 @@ export interface AppConfig {
   currency: string
   defaultLocation: { lat: number; lng: number; label: string }
   providers: ProviderConfig[]
+  /** Les restaurants ayant moins de plats disponibles sont absents des listes (0 = aucun filtre). */
+  minMenuItems: number
+}
+
+/** `GET / PATCH /api/occ/admin/settings`. */
+export interface AdminSettings {
+  /** Seuil « cartes incomplètes » (0 = désactivé, 1–100). */
+  minMenuItems: number
+  /** Restaurants actifs masqués des listes publiques par ce seuil. */
+  hiddenRestaurants: number
+  activeRestaurants: number
 }
 
 export interface NearbyQuery {

@@ -122,6 +122,7 @@ membres de la party concernée. Hook : `wero_id` / `bancontact_phone` normalisé
 | stale_since | date | obsolète : plus proposé par aucune source activée depuis cette date (vide sinon) ; reste actif |
 | partial_menu | bool | **carte partielle** : seuls quelques plats sont connus (catégorie « Aperçu », instantané Uber Eats) ; badge « Aperçu du menu » + bandeau vers Uber Eats — migration `1760000006` |
 | geo_approx | bool | **position approximative** (lieu par défaut `OCC_DEFAULT_LAT/LNG`) : distance masquée dans l'UI, classé après les autres dans `/nearby` |
+| items_count | number int ≥ 0 | **serveur** : nombre de plats **disponibles** (migration `1760000010`, rétro-calculé). Recalculé après chaque création / modification / suppression d'article via la collection, à la fin de `catalog.Import` et après chaque restaurant écrit par la synchronisation (`catalog.RefreshItemsCount`, simple `UPDATE … COUNT(*)`, sans hook ni `updated`) ; toute valeur envoyée par un client est remplacée par le compte réel |
 
 Rules : list/view `active = true || @request.auth.role = "admin"` ;
 create/update/delete `@request.auth.role = "admin"` (superusers : toujours).
@@ -132,6 +133,12 @@ Hooks (écritures via la collection) : slug/nom normalisés, slug unique (messag
 **Verrouillage** : uniquement explicite (interrupteur « Verrouillé »). Une modification admin ne
 verrouille pas : la synchronisation peut ensuite remettre à jour la fiche (migration `1760000007`
 a levé les verrous posés par l'ancien verrouillage automatique).
+**Cartes incomplètes** : un restaurant actif dont `items_count` < `app_settings.min_menu_items`
+(si > 0) est **absent des listes publiques** (`/api/occ/restaurants/nearby` : accueil, page Restos,
+choix des candidats) mais reste lisible par lien direct (`/api/collections/restaurants/records/{id}`),
+utilisable dans les parties existantes (candidats / restaurant retenu : les transitions ne vérifient que
+`active`) et visible des admins. Rien n'est écrit sur le restaurant : la règle est évaluée à la lecture
+(`domain.HiddenIncomplete`), donc un menu complété réapparaît tout seul et baisser le seuil (0) ré-affiche tout.
 **Import** (`catalog.Import`) : le restaurant visé est retrouvé par slug, sinon par un lien de
 plateforme identique (hôte + chemin, liens génériques type page ville ignorés), sinon par le nom
 normalisé (casse, accents, « (Mons) », « - Mons ») — dans les deux derniers cas seulement si un seul
@@ -176,6 +183,16 @@ la catégorie doit appartenir au même restaurant, `restaurant` immuable.
     "choices": [ { "id": "cheese", "name": "Fromage", "price": 150 } ] }
 ]
 ```
+
+### `app_settings` — réglages globaux (une seule ligne)
+| champ | type | notes |
+|---|---|---|
+| min_menu_items | number int 0–100 | seuil « cartes incomplètes » : restaurants de moins de N plats disponibles masqués des listes publiques ; `0` = désactivé |
+
+Rules : list/view/update `@request.auth.role = "admin"` ; create/delete `nil` (la ligne est créée par la
+migration `1760000010`, avec `10` si des données réelles sont embarquées — production — sinon `0` — démo).
+Hook (update via la collection) : entier 0–100, message en français. Le front passe par
+`GET/PATCH /api/occ/admin/settings` ; le public lit le seuil dans `/api/occ/config` (`minMenuItems`).
 
 ### `sync_sources` — sources de la synchronisation (admin)
 | champ | type | notes |
@@ -379,8 +396,8 @@ PocketBase `{ "status": 400, "message": "…", "data": {} }`, messages en franç
 | méthode & route | auth | corps / query | réponse |
 |---|---|---|---|
 | `GET /api/occ/health` | — | | `{ "status": "ok", "version": "x.y.z" }` |
-| `GET /api/occ/config` | — | | `{ "currency":"EUR", "defaultLocation":{lat,lng,label}, "providers":[{id,name,color,enabled}] }` |
-| `GET /api/occ/restaurants/nearby` | — | `lat,lng,radiusKm(=5),q,cuisine` | `{ "items": [Restaurant & { "distanceKm": number }] }` triés par distance ; les positions approximatives (`geo_approx`) après les autres |
+| `GET /api/occ/config` | — | | `{ "currency":"EUR", "defaultLocation":{lat,lng,label}, "providers":[{id,name,color,enabled}], "minMenuItems": 10 }` (`minMenuItems` = seuil des cartes incomplètes, 0 = aucun) |
+| `GET /api/occ/restaurants/nearby` | — | `lat,lng,radiusKm(=5),q,cuisine` | `{ "items": [Restaurant & { "distanceKm": number }] }` triés par distance ; les positions approximatives (`geo_approx`) après les autres ; restaurants actifs uniquement, **sans les cartes incomplètes** (`items_count < minMenuItems` quand le seuil > 0) |
 | `POST /api/occ/parties/join` | ✔ | `{ "code": "K7M2QX" }` | `{ "party": Party }` (idempotent ; statuts lobby/voting/ordering/review) |
 | `POST /api/occ/parties/{id}/leave` | membre (≠ hôte) | | `{ "ok": true }` — seulement en lobby/voting/ordering ; supprime ses votes/items |
 | `POST /api/occ/parties/{id}/transition` | hôte | `{ "to": Status, "restaurant"?: id }` | `{ "party": Party }` |
@@ -402,6 +419,8 @@ PocketBase `{ "status": 400, "message": "…", "data": {} }`, messages en franç
 | `GET /api/occ/admin/sync/status` | admin | | `{ enabled, cron, timezone: "Europe/Brussels", running: SyncRun\|null (avec logTail), lastRun: SyncRun\|null, nextRunAt: ISO\|null }` |
 | `GET /api/occ/admin/sync/runs` | admin | `page`, `perPage` (≤ 100, défaut 20) | `{ page, perPage, totalItems, items: SyncRun[] }` (sans `changes` ni `log`, avec `changesCount`), plus récent d'abord |
 | `GET /api/occ/admin/sync/runs/{id}` | admin | | `{ "run": SyncRun }` complet (`changes`, `log`) ; 404 sinon |
+| `GET /api/occ/admin/settings` | admin | | `AdminSettings` |
+| `PATCH /api/occ/admin/settings` | admin | `{ "minMenuItems": 0–100 }` (entier ; 0 = tout afficher) | `AdminSettings` à jour ; 400 si absent, décimal ou hors bornes |
 | `POST /api/occ/admin/sync/run` | admin | | **202** `{ "run": SyncRun }` (status `running`, exécution en arrière-plan) ; **409** si une exécution tourne ; 400 si `OCC_SYNC_ENABLED=false` |
 
 « admin » = utilisateur `role = "admin"` **ou** superuser (401 sans auth, 403 sinon).
@@ -527,6 +546,12 @@ dans l'éditeur de menu ou en JSON.
   "changesCount": 50, "changes": ["Tomo — Miso ramen : 14,50 € → 15,00 €"], "log": "…", "error": "" }
 ```
 Les sources (`sync_sources`) se gèrent par la collection (rules admin).
+
+### `AdminSettings`
+```json
+{ "minMenuItems": 10, "hiddenRestaurants": 24, "activeRestaurants": 61 }
+```
+`hiddenRestaurants` = restaurants **actifs** masqués des listes publiques par le seuil (0 si désactivé).
 
 ### `AdminStats`
 ```json

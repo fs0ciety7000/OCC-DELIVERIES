@@ -111,6 +111,7 @@ func register(app core.App, cfg Config) *handlers {
 	bindRoleHooks(app, cfg)
 	bindCatalogHooks(app)
 	bindSyncHooks(app)
+	bindSettingsHooks(app)
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
 		if err := promoteAdmins(se.App, cfg.AdminEmails); err != nil {
 			return err
@@ -158,6 +159,8 @@ func (h *handlers) routes(r *router.Router[*core.RequestEvent]) {
 	admin.GET("/sync/runs", h.adminSyncRuns)
 	admin.GET("/sync/runs/{id}", h.adminSyncRun)
 	admin.POST("/sync/run", h.adminSyncStart)
+	admin.GET("/settings", h.adminSettings)
+	admin.PATCH("/settings", h.adminSetSettings)
 }
 
 // ---------------------------------------------------------------- helpers
