@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.7
 # OCC DELIVERIES — image unique : binaire PocketBase/Go + SPA React.
 
 # ---------- 1. Frontend ----------
@@ -16,12 +15,13 @@ COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 COPY backend/ ./
 ARG VERSION=dev
-RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/occ .
+RUN CGO_ENABLED=0 go build -trimpath -tags timetzdata -ldflags "-s -w -X main.version=${VERSION}" -o /out/occ .
 
 # ---------- 3. Runtime ----------
 FROM alpine:3.22
-RUN apk add --no-cache ca-certificates tzdata wget \
- && adduser -D -H -u 10001 occ \
+# ca-certificates et wget (busybox) sont déjà dans alpine ; tzdata est embarqué
+# dans le binaire (-tags timetzdata) → aucun accès réseau requis à cette étape.
+RUN adduser -D -H -u 10001 occ \
  && mkdir -p /pb/pb_data && chown -R occ:occ /pb
 WORKDIR /pb
 COPY --from=api /out/occ /pb/occ

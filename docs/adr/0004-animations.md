@@ -16,7 +16,7 @@ inclus (Flip, MotionPath, MorphSVG, Physics2D, SplitText).
 * Illustrations SVG maison, colorées via les tokens. Pas de Lottie.
 
 ## Conséquences
-* Deux bibliothèques (≈ +25 Ko gzip pour GSAP core + plugins utilisés), compensé
+* Deux bibliothèques (≈ +55 Ko gzip mesurés pour GSAP core + Flip, MorphSVG, SplitText, Physics2D), compensé
   par le chargement différé des scènes.
 * `prefers-reduced-motion` géré via `gsap.matchMedia()` côté GSAP, et
   `useReducedMotion` côté `motion`.
