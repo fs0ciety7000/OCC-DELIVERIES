@@ -73,6 +73,59 @@ docker compose up --build         # http://localhost:8090
 Les apprentissages importants (pièges PocketBase, décisions d'UX) sont ajoutés
 ci-dessous, du plus récent au plus ancien.
 
+* 2026-10-09 — **Notifications push, heures limites automatiques, hors ligne** (migration `1760000015`, `internal/notify`,
+  `app/push.go`, `app/deadlines.go`, `frontend/pwa/`). Web Push VAPID (`webpush-go` v1.4.0) : clés `OCC_VAPID_*` ou
+  générées une fois dans `server_secrets` (superuser) ; envoi asynchrone (4 workers), 404/410 → abonnement supprimé ;
+  évènements par hooks `OnRecordAfter*Success` (exécutés **après commit**), l'auteur exclu via `SaveWithContext(ctx)`
+  (l'`e.Context` du hook est celui du `Save`) ; `applyTransition` partagé entre l'hôte et le planificateur (cron chaque
+  minute, drapeaux indexés par l'heure limite dans `parties.auto_state` caché → idempotent). Toasts in-app par un
+  **sujet temps réel personnalisé** `occ/notifications` (`SubscriptionsBroker`, filtre sur le client authentifié).
+  Pièges : `Record.Original()` n'est pas rafraîchi après `Save` (deux saves dans une transaction → deux hooks avec le
+  même original : dédoublonner) ; `/index.html` est redirigé (301) par `apis.Static` → précacher `/` ; un
+  *stale-while-revalidate* sur les données d'une party renvoie la liste **d'avant** l'écriture à l'invalidation
+  TanStack (panier « vide » après ajout, e2e cassés) → réseau d'abord pour les données vivantes, SWR pour le catalogue ;
+  `Notification.requestPermission()` dans le clic (pas dans `useMutation`). Doublon de vote = 200 idempotent (contrat).
+
+* 2026-10-09 — **Salons d'équipe & invités sans compte** (migration `1760000016`, `app/teams.go`, `app/guests.go`,
+  `features/teams`). `teams` (lien fixe `/e/:code` 8 car., rules `members.id ?=`, admins choisis par le propriétaire,
+  archivage au lieu de suppression), `parties.team` immuable, « Lancer la commande du jour » idempotent (adresse,
+  candidats encore actifs, partage de l'équipe), un membre rejoint en un geste (`POST /parties/{id}/join`),
+  toast realtime via `teams.last_party` ; push = `app.SetTeamNotifier` (point d'extension, non branché).
+  Invités : `POST /api/occ/guest` (code valide, 10/h/IP), `users.is_guest` **visible mais écrit par le serveur
+  seul** (un champ `Hidden` aurait privé l'UI de l'info : le hook force `false` / refuse le changement),
+  e-mail `guest-<id>@guest.occ.invalid`, jeton `NewStaticAuthToken(30 j)`. Pièges : un jeton statique n'est
+  **pas renouvelé** par `auth-refresh` (il renvoie le même) → hook `OnRecordAuthRefreshRequest` qui émet un
+  nouveau jeton statique (fenêtre glissante) ; un hook `OnRecordCreateRequest(parties)` lié **après**
+  `bindHooks` s'exécute **dans** `onPartyCreate` (hôte déjà forcé, transaction ouverte) — mais celui-ci a déjà
+  mis `split_mode = equal` : lire `RequestInfo().Body` pour savoir si le client l'a choisi ; OAuth2 d'un invité
+  connecté = PocketBase lie le compte **connecté** (avant la recherche par e-mail) → on y pose l'e-mail Google
+  et `is_guest = false` ; `OnMailerSend` jette tout envoi vers `*.invalid`. Front : `/j/:code` n'est plus sous
+  `RequireAuth` (page `InviteGate`) — garder l'état « non connecté » à l'ouverture, sinon l'invité créé par le
+  formulaire déclenche aussi l'auto-join (« Te revoilà » en double). E2E `guest.spec.ts` (Léa) vert sur :8102.
+
+* 2026-10-09 — **Recherche globale** (`GET /api/occ/search`, `internal/search`, migration `1760000017`,
+  palette `features/search` : Ctrl K / ⌘K / « / », icône d'en-tête, « Plats correspondants » sur Restos,
+  `?plat=<id>` défile jusqu'au plat). SQLite FTS5 **disponible** dans le SQLite modernc de PocketBase (3.53,
+  `fts5vocab` aussi) : tables SQL hors collections, texte **plié en Go** (accents, ligatures) à l'indexation
+  et à la requête, préfixes, corrections Damerau-Levenshtein via `fts5vocab` ; visibilité (actif, cartes
+  incomplètes, `available`) **jointe à la requête**, jamais indexée. Pièges : une colonne id `UNINDEXED` dans
+  une table FTS est parcourue à chaque `DELETE` → tables `*_docs` (rowid ↔ id) ; hooks `OnRecordCreate/
+  Update/Delete` (pas `AfterSuccess`) pour indexer **dans** la transaction de l'écriture (`e.App` = `txApp`) ;
+  `Record.Original()` comparé avant `e.Next()` pour ne réindexer que si le texte change ; bm25 classe
+  « pita » (rare) devant « pizza » pour « piza » → bonus à la meilleure correction (préfixe commun le plus
+  long). Collègues = party ou équipe partagée, rien d'autre n'est lu. 6–20 ms pour 10 000 plats.
+  Le scratchpad est **partagé** entre agents parallèles : y travailler dans un sous-dossier à son nom.
+
+* 2026-10-09 — **Animations de party** (`components/food`, `features/party/steps`) : panier vivant (vols
+  realtime vers l'avatar du collègue, total du groupe qui compte au centime), transitions d'étapes
+  directionnelles + annonce `aria-live`, livreur / ingrédients d'attente, scène « Commande envoyée » et
+  révélation du gagnant (une fois par party, `localStorage`, lazy), cœur liquide, coche dessinée, `press`
+  tokenisé, haptique (`lib/haptics.ts`). Réglage **« Animations réduites »** (`useMotionPref`, `occ-motion`,
+  `data-motion`) branché sur `withMotion`, `MotionConfig`, `motion-reduce:` et la CSS globale. Pièges :
+  les petits composants de party s'importent **par leur fichier** — le barrel `components/food` est importé
+  par le shell et les tire dans le bundle initial (+1,8 Ko gzip constaté) ; un mock `matchMedia` en
+  `query.includes('reduce')` matche aussi `no-preference` (« reduce**d**-motion ») → tester `': reduce'` ;
+  « une fois par party » = lecture dans l'initialiseur `useState`, écriture dans un effet (StrictMode).
 * 2026-10-09 — **Historique & reprise de commande** : `GET /api/occ/me/history` / `me/stats`,
   `GET|POST /parties/{id}/reorder`, `join` renvoie `alreadyMember`. Cause du « salon introuvable » :
   `partiesApi.mineActive` filtrait `members ?= {:u}` — le piège relation multiple vaut aussi pour les

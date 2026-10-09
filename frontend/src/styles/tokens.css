@@ -80,6 +80,9 @@
   --shadow-sheet: 0 -12px 48px -12px rgb(0 0 0 / 0.7);
 
   --ease-ember: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Appui sur un bouton (utilitaire `press`). */
+  --press-scale: 0.97;
+  --press-duration: 120ms;
 
   --animate-shimmer: shimmer 1.6s linear infinite;
   --animate-live: live-pulse 600ms var(--ease-ember);

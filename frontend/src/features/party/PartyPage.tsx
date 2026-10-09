@@ -1,4 +1,3 @@
-import { AnimatePresence, motion } from 'motion/react'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { Link, useParams } from 'react-router'
 import { toast } from 'sonner'
@@ -6,7 +5,6 @@ import { Button, EmptyState, Skeleton } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
 import { errorMessage, isNotFound } from '@/lib/errors'
 import { forgetParty, readLastParty, rememberParty } from '@/lib/lastParty'
-import { fadeUp } from '@/lib/motion'
 import { usePartyRealtime } from '@/lib/realtime'
 import type { Party, PartyStatus, User } from '@/lib/types'
 import type { PartyCtx } from './context'
@@ -17,7 +15,10 @@ import { LobbyStep } from './steps/LobbyStep'
 import { OrderingStep } from './steps/OrderingStep'
 import { PayingStep } from './steps/PayingStep'
 import { ReviewStep } from './steps/ReviewStep'
+import { StepTransition } from './steps/StepTransition'
 import { VotingStep } from './steps/VotingStep'
+import { PartyDeadlines } from '@/features/deadlines/PartyDeadlines'
+import { TeamMissingMembers } from '@/features/teams/TeamMissingMembers'
 
 const STATUS_TOASTS: Partial<Record<PartyStatus, string>> = {
   voting: 'Le vote est ouvert — à vos cœurs ! ❤️',
@@ -112,11 +113,11 @@ export function PartyPage() {
   return (
     <div className="space-y-6">
       <PartyHeader ctx={ctx} />
-      <AnimatePresence mode="wait">
-        <motion.div key={ctx.party.status} {...fadeUp}>
-          <StepView ctx={ctx} />
-        </motion.div>
-      </AnimatePresence>
+      <TeamMissingMembers party={ctx.party} />
+      <PartyDeadlines party={ctx.party} isHost={ctx.isHost} />
+      <StepTransition status={ctx.party.status}>
+        <StepView ctx={ctx} />
+      </StepTransition>
     </div>
   )
 }

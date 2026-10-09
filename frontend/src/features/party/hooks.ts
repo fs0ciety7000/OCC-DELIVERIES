@@ -2,8 +2,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { occ, partiesApi, type PartyFeesInput } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
+import { readyAction } from '@/lib/offlineActions'
+import { pb } from '@/lib/pb'
 import { qk } from '@/lib/queryKeys'
-import type { DeclareMethod, DispatchMethod, Party, PartyStatus, PaymentAction } from '@/lib/types'
+import type { DeclareMethod, DispatchMethod, Party, PartyMember, PartyStatus, PaymentAction } from '@/lib/types'
 
 export function useParty(id: string | undefined) {
   return useQuery({ queryKey: qk.partyDetail(id ?? ''), queryFn: () => partiesApi.get(id!), enabled: !!id })
@@ -96,8 +98,14 @@ export function useFees(partyId: string) {
 export function useReady(partyId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (ready: boolean) => occ.ready(partyId, ready),
-    onSuccess: () => {
+    // hors ligne : mis en file et rejoué au retour du réseau (lib/offlineActions)
+    mutationFn: (ready: boolean) => readyAction(partyId, ready),
+    onSuccess: (res, ready) => {
+      if (res === 'queued') {
+        const me = pb.authStore.record?.id
+        qc.setQueryData<PartyMember[]>(qk.members(partyId), (list) => list?.map((m) => (m.user === me ? { ...m, ready } : m)))
+        return
+      }
       void qc.invalidateQueries({ queryKey: qk.members(partyId) })
       void qc.invalidateQueries({ queryKey: qk.summary(partyId) })
     },

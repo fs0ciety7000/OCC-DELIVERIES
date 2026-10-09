@@ -1,6 +1,8 @@
 package app
 
 import (
+	"context"
+
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/types"
@@ -88,10 +90,10 @@ func (h *handlers) payer(e *core.RequestEvent) error {
 
 		p.Set("payer", body.Payer)
 		p.Set("status", domain.StatusPaying)
-		if err := tx.Save(p); err != nil {
+		if err := tx.SaveWithContext(actorContext(e), p); err != nil {
 			return err
 		}
-		if _, err := closeIfAllConfirmed(tx, p); err != nil {
+		if _, err := closeIfAllConfirmed(actorContext(e), tx, p); err != nil {
 			return err
 		}
 		party = p
@@ -104,7 +106,7 @@ func (h *handlers) payer(e *core.RequestEvent) error {
 }
 
 // closeIfAllConfirmed closes the party when every payment is confirmed.
-func closeIfAllConfirmed(app core.App, party *core.Record) (bool, error) {
+func closeIfAllConfirmed(ctx context.Context, app core.App, party *core.Record) (bool, error) {
 	if party.GetString("status") != domain.StatusPaying {
 		return false, nil
 	}
@@ -122,7 +124,7 @@ func closeIfAllConfirmed(app core.App, party *core.Record) (bool, error) {
 	}
 	party.Set("status", domain.StatusClosed)
 	party.Set("closed_at", types.NowDateTime())
-	return true, app.Save(party)
+	return true, app.SaveWithContext(ctx, party)
 }
 
 // paymentForMember loads a payment and its party, checking membership.
@@ -196,7 +198,7 @@ func (h *handlers) paymentAction(e *core.RequestEvent) error {
 		default:
 			return badRequest("Action inconnue.")
 		}
-		if err := tx.Save(pay); err != nil {
+		if err := tx.SaveWithContext(actorContext(e), pay); err != nil {
 			return err
 		}
 		if body.Action == domain.ActionConfirm {
@@ -204,7 +206,7 @@ func (h *handlers) paymentAction(e *core.RequestEvent) error {
 			if err != nil {
 				return err
 			}
-			_, err = closeIfAllConfirmed(tx, p)
+			_, err = closeIfAllConfirmed(actorContext(e), tx, p)
 			return err
 		}
 		return nil

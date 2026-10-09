@@ -6,6 +6,7 @@ import { errorMessage } from '@/lib/errors'
 import { useDebounced } from '@/lib/hooks'
 import { itemVariants, listVariants } from '@/lib/motion'
 import { plural } from '@/lib/format'
+import { DishMatches } from '@/features/search/DishMatches'
 import { useNearby } from './hooks'
 import { LocationBar } from './LocationBar'
 import { RestaurantCard, RestaurantCardSkeleton } from './RestaurantCard'
@@ -38,12 +39,12 @@ export function RestaurantsPage() {
       <div className="space-y-3">
         <div role="search">
           <label htmlFor="resto-search" className="sr-only">
-            Rechercher un restaurant
+            Rechercher un restaurant ou un plat
           </label>
           <Input
             id="resto-search"
             type="search"
-            placeholder="Pizza, sushi, nom du resto…"
+            placeholder="Pizza, ramen, nom du resto ou d’un plat…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             leftIcon={<Search className="size-4" />}
@@ -74,6 +75,8 @@ export function RestaurantsPage() {
           )}
         </div>
       </div>
+
+      <DishMatches q={debounced} />
 
       {nearby.isPending ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

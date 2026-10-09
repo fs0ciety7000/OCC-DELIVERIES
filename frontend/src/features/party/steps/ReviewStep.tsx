@@ -9,6 +9,7 @@ import type { Dispatch, DispatchMethod, SplitMode, Summary } from '@/lib/types'
 import type { PartyCtx } from '../context'
 import { useDispatch, useFees, useSetPayer, useSummary, useTransition } from '../hooks'
 import { DISPATCH_LABELS } from '../labels'
+import { DispatchedBanner } from './DispatchedBanner'
 import { DispatchSheet } from './DispatchSheet'
 import { ConsolidatedCard, ParticipantsList, TotalsCard } from './SummaryViews'
 
@@ -17,6 +18,8 @@ export function ReviewStep({ ctx }: { ctx: PartyCtx }) {
   const summary = useSummary(party.id)
   const [payerOpen, setPayerOpen] = useState(false)
   const transition = useTransition(party.id)
+  // La traversée « Commande envoyée » attend que l'hôte ferme la sheet d'envoi.
+  const [dispatchSheetOpen, setDispatchSheetOpen] = useState(false)
 
   if (summary.isPending) {
     return (
@@ -34,6 +37,7 @@ export function ReviewStep({ ctx }: { ctx: PartyCtx }) {
   return (
     <div className="grid gap-6 pb-28 lg:grid-cols-[minmax(0,1fr)_380px]">
       <div className="min-w-0 space-y-6">
+        {party.dispatch && <DispatchedBanner party={party} paused={dispatchSheetOpen} />}
         {!isHost && (
           <Card className="border-info/30 bg-info/5">
             <CardBody className="text-sm">
@@ -54,12 +58,7 @@ export function ReviewStep({ ctx }: { ctx: PartyCtx }) {
       <aside className="space-y-4 lg:sticky lg:top-[calc(var(--header-h)+16px)] lg:self-start">
         <TotalsCard summary={s} />
         {isHost && <FeesEditor key={`${party.delivery_fee}-${party.service_fee}-${party.tip}-${party.split_mode}`} ctx={ctx} summary={s} />}
-        {isHost && <DispatchPanel ctx={ctx} />}
-        {!isHost && party.dispatch && (
-          <Badge variant="success">
-            Commande envoyée via {DISPATCH_LABELS[party.dispatch.method]} à {formatTime(party.dispatch.at)}
-          </Badge>
-        )}
+        {isHost && <DispatchPanel ctx={ctx} onSheetChange={setDispatchSheetOpen} />}
       </aside>
 
       {isHost && (
@@ -153,7 +152,7 @@ const DISPATCH_TILES: { method: DispatchMethod; title: string; hint: string; cla
 
 const isPlatform = (m: DispatchMethod) => m !== 'export' && m !== 'phone'
 
-function DispatchPanel({ ctx }: { ctx: PartyCtx }) {
+function DispatchPanel({ ctx, onSheetChange }: { ctx: PartyCtx; onSheetChange?: (open: boolean) => void }) {
   const { party } = ctx
   const config = useConfig()
   const dispatch = useDispatch(party.id)
@@ -178,7 +177,14 @@ function DispatchPanel({ ctx }: { ctx: PartyCtx }) {
               key={t.method}
               type="button"
               disabled={dispatch.isPending}
-              onClick={() => dispatch.mutate(t.method, { onSuccess: (r) => setResult(r.dispatch) })}
+              onClick={() =>
+                dispatch.mutate(t.method, {
+                  onSuccess: (r) => {
+                    setResult(r.dispatch)
+                    onSheetChange?.(true)
+                  },
+                })
+              }
               className={cn(
                 'flex min-h-22 flex-col items-start gap-1.5 rounded-md border border-border bg-elevated p-3 text-left transition-colors disabled:opacity-60',
                 t.className,
@@ -193,7 +199,11 @@ function DispatchPanel({ ctx }: { ctx: PartyCtx }) {
           ))}
         </div>
       </CardBody>
-      <DispatchSheet dispatch={result} party={party} phone={party.expand?.restaurant?.phone} restaurant={party.expand?.restaurant} onClose={() => setResult(null)} />
+      <DispatchSheet dispatch={result} party={party} phone={party.expand?.restaurant?.phone} restaurant={party.expand?.restaurant} onClose={() => {
+          setResult(null)
+          onSheetChange?.(false)
+        }}
+      />
     </Card>
   )
 }

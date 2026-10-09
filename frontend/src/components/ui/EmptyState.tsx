@@ -5,6 +5,8 @@ import { cn } from '@/lib/cn'
 export interface EmptyStateProps {
   /** Sans emoji : illustration animée « assiette vide ». */
   emoji?: string
+  /** Illustration personnalisée (prioritaire sur `emoji`), ex. `<EmptyBag />`. */
+  illustration?: ReactNode
   title: string
   description?: ReactNode
   action?: ReactNode
@@ -12,10 +14,12 @@ export interface EmptyStateProps {
   tone?: 'default' | 'danger'
 }
 
-export function EmptyState({ emoji, title, description, action, className, tone = 'default' }: EmptyStateProps) {
+export function EmptyState({ emoji, illustration, title, description, action, className, tone = 'default' }: EmptyStateProps) {
   return (
     <div className={cn('flex flex-col items-center gap-3 px-6 py-12 text-center', className)} role={tone === 'danger' ? 'alert' : undefined}>
-      {emoji ? (
+      {illustration ? (
+        illustration
+      ) : emoji ? (
         <div
           aria-hidden
           className={cn(

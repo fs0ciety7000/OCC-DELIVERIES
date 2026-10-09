@@ -7,6 +7,7 @@ export const USER_FILTERS: { value: UserFilter; label: string }[] = [
   { value: 'admins', label: 'Admins' },
   { value: 'banned', label: 'Suspendus' },
   { value: 'unverified', label: 'Non vérifiés' },
+  { value: 'guest', label: 'Invités' },
 ]
 
 /** Paramètres de `GET /api/occ/admin/users` pour un filtre de l'écran. */

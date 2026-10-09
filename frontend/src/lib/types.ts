@@ -26,6 +26,8 @@ export interface User extends BaseRecord {
   verified?: boolean
   /** `admin` donne accès au panneau /admin (OCC_ADMIN_EMAIL / OCC_ADMINS ou promotion). */
   role?: UserRole | ''
+  /** Invité·e sans compte (prénom seulement, `POST /api/occ/guest`) — géré par le serveur. */
+  is_guest?: boolean
 }
 
 /** Utilisateur « allégé » tel que renvoyé par `Summary`. */
@@ -315,6 +317,12 @@ export interface Party extends BaseRecord {
   payer: string
   dispatch: PartyDispatch | null
   closed_at: ISODate
+  /** L'hôte a désactivé la clôture automatique aux heures limites (migration 1760000015). */
+  auto_close_disabled?: boolean
+  /** Serveur : actions automatiques (rappels, clôtures) affichées dans la party. */
+  auto_events?: AutoEvent[] | null
+  /** Équipe pour laquelle la commande a été lancée (`''` sinon), immuable. */
+  team?: string
   expand?: {
     host?: User
     members?: User[]
@@ -338,6 +346,65 @@ export interface Vote extends BaseRecord {
   party: string
   user: string
   restaurant: string
+  /** Clé d'idempotence (file hors ligne) : rejouer le même vote renvoie le vote existant. */
+  client_key?: string
+}
+
+/** Entrée de `parties.auto_events` (planificateur des heures limites). */
+export type AutoEventKind =
+  | 'reminder_vote'
+  | 'reminder_order'
+  | 'vote_closed'
+  | 'vote_extended'
+  | 'vote_needs_host'
+  | 'ordering_closed'
+  | 'ordering_needs_host'
+  | 'auto_failed'
+
+export interface AutoEvent {
+  kind: AutoEventKind | (string & {})
+  /** RFC 3339 (UTC). */
+  at: ISODate
+  /** Texte français prêt à afficher (« Vote clôturé automatiquement à 11:45 — Pizza Nonna »). */
+  text: string
+}
+
+/* ------------------------------------------------------ notifications push */
+
+/** Préférences de notification (`users.notify_prefs`, champ caché). */
+export interface NotifyPrefs {
+  party: boolean
+  payments: boolean
+  reminders: boolean
+}
+
+/** `GET /api/occ/push/prefs`. */
+export interface PushPrefsResponse {
+  prefs: NotifyPrefs
+  /** Appareils abonnés à ce compte. */
+  devices: number
+  enabled: boolean
+}
+
+/** `GET /api/occ/push/public-key`. */
+export interface PushPublicKey {
+  enabled: boolean
+  publicKey: string
+}
+
+/** Charge utile d'une notification (push et toast temps réel `occ/notifications`). */
+export interface NotificationPayload {
+  kind: string
+  title: string
+  body: string
+  /** Lien interne (ex. `/party/{id}`). */
+  url: string
+  tag: string
+  partyId?: string
+  renotify: boolean
+  icon: string
+  badge: string
+  ts: number
 }
 
 export interface SelectedOption {
@@ -356,6 +423,7 @@ export interface OrderItem extends BaseRecord {
   options_label: string
   unit_price: Cents
   total: Cents
+  client_key?: string
 }
 
 /** Ce que le client envoie : uniquement des intentions (le serveur calcule les prix). */
@@ -366,6 +434,8 @@ export interface OrderItemInput {
   quantity: number
   selected_options: SelectedOption[]
   note: string
+  /** Clé d'idempotence (file hors ligne) : un rejeu renvoie la ligne existante. */
+  client_key?: string
 }
 
 export type PaymentMethod = 'qr' | 'revolut' | 'paypal' | 'link' | 'wero' | 'bancontact' | 'cash' | 'later' | 'self'
@@ -628,10 +698,12 @@ export interface AdminUser {
   providers: string[]
   /** Dernière connexion connue (`''` si aucune). */
   lastLoginAt: ISODate | ''
+  /** Invité·e sans compte (badge « Invité »). */
+  isGuest?: boolean
 }
 
 /** Filtre d'état de `GET /api/occ/admin/users` (`status`). */
-export type AdminUserStatus = 'banned' | 'unverified' | 'deleted'
+export type AdminUserStatus = 'banned' | 'unverified' | 'deleted' | 'guest'
 
 /** `GET /api/occ/admin/mail` — aucune donnée secrète. */
 export interface MailStatus {
@@ -753,4 +825,175 @@ export interface ReorderPreview {
 export interface ReorderResult {
   added: { name: string; quantity: number }[]
   skipped: { name: string; reason: string }[]
+}
+
+/* ------------------------------------------------- recherche globale (GET /api/occ/search) */
+
+export interface SearchQuery {
+  q: string
+  /** Résultats max par groupe (1–20, défaut 6). */
+  limit?: number
+  lat?: number
+  lng?: number
+}
+
+export interface SearchRestaurantHit {
+  id: string
+  name: string
+  emoji: string
+  cuisines: string[]
+  itemsCount: number
+  /** Absent sans position ou si la position du resto est approximative. */
+  distanceKm?: number
+}
+
+export interface SearchDishHit {
+  id: string
+  name: string
+  /** Centimes. */
+  price: number
+  emoji: string
+  /** Extrait de la description autour du terme trouvé (texte brut, accents d'origine). */
+  snippet: string
+  restaurant: { id: string; name: string; emoji: string }
+}
+
+export interface SearchSharedParty {
+  id: string
+  code: string
+  title: string
+  status: PartyStatus
+  created: string
+}
+
+/** Collègue : partage au moins une commande (ou une équipe) avec moi. */
+export interface SearchPerson {
+  id: string
+  name: string
+  avatar: string
+  color: string
+  sharedParties: number
+  recentParties: SearchSharedParty[]
+}
+
+export type SearchActionId = 'new-party' | 'restaurants' | 'my-orders' | 'admin'
+
+export interface SearchAction {
+  id: SearchActionId
+  label: string
+  href: string
+}
+
+export interface SearchResult {
+  query: string
+  /** Termes réellement cherchés (pliés : minuscules, sans accents ; corrections comprises) — pour surligner. */
+  terms: string[]
+  /** Au moins un terme a été corrigé (faute de frappe). */
+  fuzzy: boolean
+  restaurants: SearchRestaurantHit[]
+  dishes: SearchDishHit[]
+  /** Toujours vide sans connexion. */
+  people: SearchPerson[]
+  actions: SearchAction[]
+}
+
+/* ------------------------------------------ équipes & invités (1760000016) */
+
+export type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'
+export type TeamRole = 'owner' | 'admin' | 'member' | ''
+
+/** Collection `teams` (écriture des réglages par le propriétaire / les admins). */
+export interface TeamRecord extends BaseRecord {
+  name: string
+  code: string
+  owner: string
+  admins: string[]
+  members: string[]
+  address: string
+  lat: number
+  lng: number
+  usual_time: string
+  usual_days: Weekday[]
+  default_candidates: string[]
+  default_split: SplitMode | ''
+  emoji: string
+  color: string
+  archived: boolean
+  last_party: string
+  last_launch_at: ISODate
+}
+
+export interface TeamMember extends UserLite {
+  isGuest: boolean
+  role: TeamRole
+}
+
+/** Commande en cours d'une équipe (mise en avant sur la page d'équipe). */
+export interface TeamParty {
+  id: string
+  code: string
+  title: string
+  status: PartyStatus
+  created: ISODate
+  host: UserLite
+  memberCount: number
+  isMember: boolean
+  restaurant: HistoryRestaurant | null
+}
+
+/** `GET /api/occ/teams/{id}` (`team`) et `GET /api/occ/me/teams` (`items`, 6 membres max, sans candidats). */
+export interface Team {
+  id: string
+  name: string
+  code: string
+  emoji: string
+  color: string
+  address: string
+  lat: number
+  lng: number
+  usualTime: string
+  usualDays: Weekday[]
+  defaultCandidates: HistoryRestaurant[]
+  defaultSplit: SplitMode
+  archived: boolean
+  created: ISODate
+  myRole: TeamRole
+  memberCount: number
+  members: TeamMember[]
+  activeParty: TeamParty | null
+}
+
+export interface TeamHistoryPage {
+  page: number
+  perPage: number
+  totalItems: number
+  totalPages: number
+  items: { party: HistoryEntry; isMember: boolean }[]
+}
+
+/** `GET /api/occ/parties/{id}/team` — collègues de l'équipe pas encore dans la commande. */
+export interface PartyTeamInfo {
+  team: { id: string; name: string; emoji: string; color: string; isMember: boolean } | null
+  missing: TeamMember[]
+}
+
+/** `GET /api/occ/invites/{code}` — aperçu public d'un lien d'invitation. */
+export interface InvitePreview {
+  kind: 'party' | 'team'
+  code: string
+  title: string
+  joinable: boolean
+  memberCount: number
+  host?: string
+  status?: PartyStatus
+  emoji?: string
+  color?: string
+}
+
+/** `POST /api/occ/guest`. */
+export interface GuestAuthResponse {
+  token: string
+  record: User
+  party: { id: string; title: string } | null
+  team: { id: string; name: string } | null
 }

@@ -3,6 +3,7 @@ package app
 import (
 	"crypto/rand"
 	"math/big"
+	"net/http"
 	"slices"
 	"strings"
 	"unicode/utf8"
@@ -29,7 +30,7 @@ func randomColor() string {
 }
 
 // partyProtectedFields can only be changed through /api/occ/* endpoints.
-var partyProtectedFields = []string{"code", "host", "members", "status", "restaurant", "payer", "dispatch", "closed_at"}
+var partyProtectedFields = []string{"code", "host", "members", "status", "restaurant", "payer", "dispatch", "closed_at", "auto_events"}
 
 // partyFeeFields are editable by the host only before payments exist.
 var partyFeeFields = []string{"delivery_fee", "service_fee", "tip", "split_mode"}
@@ -237,6 +238,14 @@ func onOrderItemUpsert(e *core.RecordRequestEvent) error {
 	r := e.Record
 	isNew := r.IsNew()
 
+	if isNew {
+		if done, err := replayByClientKey(e, colOrderItems, nil); done {
+			return err
+		}
+	} else if r.GetString("client_key") != r.Original().GetString("client_key") {
+		return badRequest("La clé d'idempotence ne peut pas être modifiée.")
+	}
+
 	if !isNew && !e.HasSuperuserAuth() {
 		orig := r.Original()
 		if r.GetString("party") != orig.GetString("party") || r.GetString("user") != orig.GetString("user") {
@@ -311,6 +320,13 @@ func onOrderItemUpsert(e *core.RecordRequestEvent) error {
 }
 
 func onVoteCreate(e *core.RecordRequestEvent) error {
+	// a replayed vote (same client key, or the same restaurant again) returns
+	// the existing vote instead of failing on the unique index
+	if done, err := replayByClientKey(e, colVotes, dbx.HashExp{
+		"party": e.Record.GetString("party"), "user": e.Record.GetString("user"), "restaurant": e.Record.GetString("restaurant"),
+	}); done {
+		return err
+	}
 	party, err := e.App.FindRecordById(colParties, e.Record.GetString("party"))
 	if err != nil {
 		return badRequest("Commande introuvable.")
@@ -322,6 +338,36 @@ func onVoteCreate(e *core.RecordRequestEvent) error {
 		return badRequest("Ce restaurant ne fait pas partie des candidats.")
 	}
 	return e.Next()
+}
+
+// replayByClientKey implements the offline outbox idempotency: when the
+// client sends a `client_key` already used by this user in this collection
+// (or, optionally, a record matching `same` exists), the existing record is
+// returned with 200 and nothing is created. done = the response is written.
+func replayByClientKey(e *core.RecordRequestEvent, collection string, same dbx.HashExp) (bool, error) {
+	key := strings.TrimSpace(e.Record.GetString("client_key"))
+	e.Record.Set("client_key", key)
+	user := e.Record.GetString("user")
+	if user == "" {
+		return false, nil
+	}
+	var existing *core.Record
+	if key != "" {
+		existing, _ = e.App.FindFirstRecordByFilter(collection, "user = {:u} && client_key = {:k}", dbx.Params{"u": user, "k": key})
+		if existing != nil && existing.GetString("party") != e.Record.GetString("party") {
+			return true, badRequest("Clé d'idempotence déjà utilisée pour une autre commande.")
+		}
+	}
+	if existing == nil && same != nil {
+		recs, _ := e.App.FindAllRecords(collection, same)
+		if len(recs) > 0 {
+			existing = recs[0]
+		}
+	}
+	if existing == nil {
+		return false, nil
+	}
+	return true, e.JSON(http.StatusOK, existing)
 }
 
 func onPayoutProfileUpsert(e *core.RecordRequestEvent) error {

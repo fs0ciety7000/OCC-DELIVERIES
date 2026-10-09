@@ -88,7 +88,7 @@ Polices auto-hébergées via `@fontsource-variable/*` (aucun appel externe).
 * Courbe : `cubic-bezier(.2,.8,.2,1)` ; ressorts `stiffness 380, damping 30` pour les listes.
 * Entrées de liste : fade + translateY 8 px, stagger 30 ms.
 * Évènements live (vote, prêt, paiement) : *pulse* 600 ms sur l'avatar concerné.
-* `prefers-reduced-motion` → opacité uniquement.
+* `prefers-reduced-motion` ou réglage « Animations réduites » → opacité uniquement (voir « Mouvement réduit »).
 
 ### Deux moteurs, deux rôles (ADR 0004)
 | moteur | rôle | exemples |
@@ -119,10 +119,39 @@ Illustrations **SVG maison** (style flat, tokens de couleur, trait 2 px) dans
 | Envoi (dispatch) | scooter de livraison qui parcourt une route pointillée jusqu'au bureau | `MotionPath` + `drawSVG`-like `strokeDashoffset` |
 | Paiement confirmé | pièce/billet qui tombe dans une tirelire-burger | timeline GSAP |
 | Party clôturée | pluie d'emojis 🍕🍣🍔🥟🌮🍜 avec gravité, ~1,5 s, une seule fois | `Physics2D` sur un calque `pointer-events:none` |
-| États vides | assiette vide avec fourchette qui tapote, oscillation douce | boucle GSAP lente |
+| États vides | assiette vide avec fourchette qui tapote, oscillation douce ; **panier vide** : sac de livraison qui se balance + miette qui tombe (`EmptyBag`) | boucle GSAP lente |
+| Panier vivant (Commande) | un plat ajouté par un·e collègue (realtime) vole du menu — ou du bord droit — jusqu'à **son avatar** dans l'en-tête (`[data-party-avatars]`), qui fait un *bump* ; avatar hors écran → vers le total du groupe ; mes ajouts gardent le vol vers le sac. Barre collante : ligne « Total du groupe · n paniers » dont le montant **compte** jusqu'à sa valeur (`AnimatedMoney`, centimes entiers, `tabular-nums`, valeur finale en `sr-only`) | `MotionPath` (`ColleagueFlight.ts`, départs espacés ≥ 220 ms, 3 vols max, au-delà bump seul), tween GSAP arrondi au centime |
+| Changement d'étape | remplissage du `Stepper` qui grandit (scaleX, 500 ms) + point ambre de l'étape courante qui pulse une fois ; contenu en fondu + glissement 28 px **selon le sens** (avancer → vers la gauche, « Rouvrir » → vers la droite) ; annonce `aria-live` « Étape 3 sur 5 : Commande » ; focus posé sur le contenu s'il a été perdu | `motion` (`StepTransition`, `AnimatePresence custom`) |
+| Attente (vote) | j'ai voté, d'autres non : carte « On attend les autres… » avec un **livreur** qui regarde sa montre, tapote du pied, bulle « … » (`WaitingRider`, boucle ≈ 3 s) ; compteurs « 2/4 ont voté », « 3/5 prêts », « n prêts » qui pulsent à chaque changement (`PulseOnChange`) | timeline SVG (`svgOrigin`), scale 1 → 1,14 |
+| Attente (salon) | « En attente des collègues… » (seul·e) / « En attente du lancement du vote… » (invité·e) : tomate, basilic, piment qui sautillent (`WaitingDots`) | boucle GSAP `stagger` |
+| Commande envoyée | carte `success/6` pleine largeur en tête du récap et des remboursements : scooter qui traverse une route (marquage qui défile, lignes de vitesse), repasse et se gare, puis « Commande envoyée via Uber Eats à 12:03 · arrivée estimée ~35 min » (milieu de `eta_min`/`eta_max` arrondi à 5 min, masqué sans délai ; téléphone / export : « Commande passée par téléphone » / « Commande exportée »). **Une fois par party** et par appareil (`localStorage occ-dispatched-<id>`), ≈ 2 s, bouton « Passer l'animation » ; côté hôte, attend la fermeture de la sheet d'envoi ; ensuite carte statique | timeline GSAP lazy (`DispatchedScene`) |
+| Révélation du gagnant | vote → commande (seulement après un vrai vote, ≥ 2 candidats) : la carte « Le resto gagnant » se retourne et grandit, l'emoji rebondit, gerbe d'ingrédients, effacement à ~2 s ; calque `pointer-events: none`, décoratif (le toast annonce déjà) ; une fois par party (`occ-winner-<id>`) | timeline + `Physics2D` lazy (`WinnerReveal`) |
 
 Budget : chaque scène ≤ 6 Ko gzip, aucune animation bloquante (> 1,5 s) sur
-un parcours critique, toutes interruptibles.
+un parcours critique, toutes interruptibles. Mesuré (2026-10-09) : `DispatchedScene` 1,4 Ko,
+`WinnerReveal` 1,0 Ko, `WaitingRider` 1,0 Ko gzip (chunks lazy) ; petits composants de party
+≈ + 3,9 Ko dans le chunk `PartyPage` (importés par leur fichier, **pas** via le barrel
+`components/food/index.ts`, que le shell importe : ils finiraient dans le bundle initial).
+
+### Micro-interactions
+| interaction | rendu | notes |
+|---|---|---|
+| Appui sur un `Button` | enfoncement `scale(var(--press-scale))` = 0,97, `--press-duration` 120 ms | utilitaire `press` (`styles/index.css`) dans `buttonClass` ; aucun effet en mouvement réduit |
+| Vote | cœur qui se **remplit comme un liquide** (vague qui monte, 550 ms) + pop 1,22 (`LiquidHeart`), puis la gerbe `VoteBurst` | vide → retombe en 250 ms |
+| « Je suis prêt·e » | la coche se **dessine** (`stroke-dashoffset`) dans un cercle qui pop (`DrawCheck`) | |
+| Toasts | entrée 320 ms sur la courbe Ember (`[data-sonner-toast]`) | coupée en mouvement réduit |
+| Haptique | `navigator.vibrate` : vote 10 ms, prêt `[15, 40, 15]`, paiement confirmé `[20, 60, 20]` (payeur qui confirme, ou ma part confirmée en direct) | `lib/haptics.ts` : garde sur l'API, `try/catch`, jamais seule porteuse d'information, coupée par « Animations réduites » |
+
+### Mouvement réduit
+`prefers-reduced-motion` **ou** le réglage **« Animations réduites »** (Profil → Mes infos →
+Apparence, interrupteur désactivé et coché si le système le demande déjà) coupent toutes les
+animations non essentielles. Réglage stocké comme le thème (`localStorage occ-motion`,
+`data-motion="reduced"` posé sur `<html>` dès `index.html`) et exposé par `useMotionPref()`
+(`lib/motionPref.ts`) ; branché partout : `withMotion` / `prefersReducedMotion` (GSAP),
+`MotionConfig reducedMotion="always"` (`motion`), variantes Tailwind `motion-reduce:` /
+`motion-safe:` redéfinies, mêmes règles CSS globales que le média, haptique. Versions
+statiques : carte « Commande envoyée » posée, pas de révélation ni de vol, compteurs qui
+sautent à la valeur finale, cœur / coche à l'état final.
 
 ## 3. Composants (`frontend/src/components/ui`)
 
@@ -134,7 +163,7 @@ un parcours critique, toutes interruptibles.
 | `Avatar` / `AvatarStack` | tailles 24/32/40/56 ; anneau `ready` vert | initiales sur `user.color` si pas d'image |
 | `Input`, `Textarea`, `Field` | label + aide + erreur | |
 | `Sheet` | bottom sheet mobile / dialog centré desktop | focus trap, Échap |
-| `Stepper` | étapes de la party (Salon → Vote → Commande → Récap → Paiement) | |
+| `Stepper` | étapes de la party (Salon → Vote → Commande → Récap → Paiement) | remplissage animé (scaleX) + point ambre de l'étape courante ; voir « Changement d'étape » |
 | `Money` | `<Money cents={1250} />` | tabular-nums |
 | `EmptyState` | illustration emoji + titre + action | |
 | `Skeleton` | shimmer | |
@@ -150,6 +179,7 @@ un parcours critique, toutes interruptibles.
 | Carte d'historique (`HistoryCard`, profil) | | vignette resto 56 px, nom du resto en titre (`h3`), date longue (« ven. 9 octobre 2026 ») + titre de la commande en `muted` 12 px, badge de **mon** remboursement (`success` Remboursé, `info` Déclaré · Wero, `warning` À rembourser, `brand` Tu as avancé l'argent, `danger` Annulée, statut en cours avec point live), **ma part** à droite (display 18 px, `tabular-nums`, « ma part » en `subtle`). Pied bordé : « Mes plats (n) » (`aria-expanded`, chevron qui pivote, `motion-reduce`) → panneau `elevated/40` (quantité ×, nom, options, note en italique, total de ligne ; puis Mes plats / Ma part des frais / Ma part / Total de la commande / payeur et moyen) ; lien « Voir » ou « Reprendre » (en cours) ; « Relancer ici » (`ghost`, `text-brand`, icône `RotateCcw`) seulement si le resto est actif et la commande finie → `CreatePartySheet` avec ce resto (commande directe, sans vote) |
 | Onglets du profil (`ProfileTabs`) | | motif ARIA *tabs* (flèches, Début / Fin, `tabIndex` itinérant) au look `Segmented` (pills pleine largeur, 44 px) : « Mes commandes » (défaut) / « Mes infos » (`?onglet=infos`) |
 | Carte « Comme la dernière fois ? » (`ReorderCard`, étape Commande) | | affichée quand **mon** panier est vide et que j'ai déjà commandé dans ce resto : pastille icône `History` braise 40 px, date de la commande source, 4 plats max (+ n autres), plats retirés en `warning`, « Environ X € » (prix actuels serveur), bouton `secondary` « Reprendre ma dernière commande » (le `primary` reste « Je suis prêt·e ») ; toasts : succès « n plats remis dans ton panier », avertissement listant les plats sautés et la raison |
+| Palette de recherche (`CommandPalette`, `features/search`) | mobile (< 768 px) : **plein écran** `elevated`, flèche retour 44 px, champ 56 px en 18 px ; desktop : dialogue 640 px à 12 vh du haut, `rounded-xl`, bord `border`, `shadow-card`, voile `bg/70` flouté, pied d'aide clavier (`Kbd` : ↑ ↓ naviguer, ↵ ouvrir, Échap fermer, « / » ou Ctrl K / ⌘K partout) | ouverture : bouton d'en-tête (`SearchButton` : icône 44 px, pastille « Rechercher… Ctrl K » dès 1024 px), **Ctrl K / ⌘K** (bascule) et **« / »** hors champ de saisie, jamais par-dessus une autre modale. Motif ARIA *combobox* + *listbox* : le focus reste dans le champ (`aria-activedescendant`), ↑ ↓ bouclent, Entrée ouvre, survol = option active, Tab piégé dans le dialogue, Échap (fiche → résultats → fermeture), focus rendu au déclencheur. Saisie différée de **150 ms** ; `Spinner` dans le champ pendant le chargement, squelettes au premier chargement, erreur `role="alert"` + « Réessayer », annonce `aria-live` (« 6 résultats »). **Vide** : chips « Envie de… » (Pizza, Sushi, Burger, Poké, Ramen, Thaï, Indien, Libanais, Frites), recherches récentes (6, sur l'appareil, « Effacer l'historique »), raccourcis. **Résultats** groupés avec en-têtes 12 px capitales `subtle` + icône : Restaurants (`Store`), Plats (`UtensilsCrossed`), Collègues (`Users`), Raccourcis (`Sparkles`, pastille `brand/12`) ; lignes 56 px, vignette emoji 40 px `surface`, titre gras, méta `muted` 12 px (cuisines · distance · n plats ; « Chez X » · extrait `subtle` ; « n commandes en commun »), prix `tabular-nums` à droite, option active `fg/7` + ↵. Termes trouvés surlignés `<mark>` `brand/20` (pliage accents identique au serveur). « Résultats approchants pour « x » » (`Sparkles` braise) si faute corrigée ; aucun résultat : loupe + « Aucun résultat pour « x » » + chips. **Collègue** : fiche (avatar 56, nom display 20 px, « n commandes en commun » / « Vous êtes dans la même équipe », 3 dernières commandes en liens 48 px avec badge de statut). **Plat** → page du resto `?plat=<id>` : défilement centré sur le plat de sa catégorie (pas la rangée « Populaires »), focus sur la carte, **pulse braise 2 × 600 ms** (anneau `brand` 55 % → 0) ; `prefers-reduced-motion` : défilement instantané, anneau fixe 2 s. Entrées : fondu + 8 px (opacité seule en mouvement réduit) |
 
 ## 4. Écrans clés
 
@@ -159,7 +189,10 @@ un parcours critique, toutes interruptibles.
    (« Le vote est ouvert — « Midi du vendredi » », action « Voir ») quand une de mes commandes
    avance pendant que je suis sur une autre page.
 2. **Restaurants** — recherche, filtres cuisine en chips, cartes (cover/emoji,
-   note, ETA, frais, distance, badges fournisseurs).
+   note, ETA, frais, distance, badges fournisseurs). Dès 2 caractères, section **« Plats correspondants »**
+   (même endpoint que la palette) au-dessus des restos : cartes 64 px (vignette emoji 40 px, nom surligné,
+   « Chez X · prix », chevron) vers le resto ancré sur le plat ; squelettes pendant le chargement, rien si
+   aucun plat ne correspond, erreur discrète + « Réessayer ».
 3. **Restaurant** — héros, catégories en onglets collants, items avec options.
 4. **Party** — en-tête (titre, code, avatars, stepper) + contenu par étape :
    * En-tête : code + copier le lien + **partager** (`navigator.share` avec le lien `/j/:code`, si dispo) ;
@@ -293,6 +326,86 @@ un parcours critique, toutes interruptibles.
      leur raison (son propre compte, e-mails coupés). Confirmations en `Sheet` (« Suspendre Bob ? » avec
      `Textarea` « Motif » facultatif ≤ 300 ; « Supprimer le compte de Bob ? » qui rappelle que l'historique
      reste et que c'est irréversible) : `secondary` Annuler + `danger` / `primary` à droite.
+     Filtre « Invités » dans le `Segmented` ; badge `info` **Invité** (remplace « Non vérifié »), méta
+     « sans compte (prénom seulement) » à la place de l'e-mail réservé.
+8. **Salon d'équipe** (`/equipes/:id`, `features/teams`) — colonne de lecture 680 px.
+   * *En-tête* : `TeamEmblem` 64 px (emoji sur la couleur de l'équipe à 22 %, bordure à 45 % — donnée
+     utilisateur comme `users.color`, jamais un token), nom display 32 px, lignes `muted` 14 px avec icônes
+     `Clock` (« Du lundi au vendredi à 12:15 ») et `MapPin` (adresse) ; badge `warning` « Archivée » ;
+     bouton icône `ghost` `Settings` « Réglages de l'équipe » (propriétaire / admins).
+   * *Action principale* : **une seule** — s'il y a une commande d'équipe en cours, `Card selected` « Commande
+     en cours » (badge `brand` du statut, emoji du resto ou 🗳️, titre, « Lancée par Bob · 2 participants · resto »)
+     avec `primary lg` « Rejoindre la commande » (un geste, sans code) ou lien `secondary` « Ouvrir la commande »
+     si j'y suis ; sinon `primary lg` « Lancer la commande du jour » (icône `Rocket`). Invité·e : carte `muted`
+     « En invité·e, tu rejoins en un geste celles que lance l'équipe » (pas de lancement).
+   * *Membres* : carte « N membres », lignes avatar 40 px + nom (« (toi) » en `subtle`) + badges `brand`
+     Propriétaire / `info` Admin / neutre Invité·e ; propriétaire : bouton icône `ShieldCheck` (`aria-pressed`,
+     `info` si admin) « Nommer X admin » (jamais pour un·e invité·e) ; propriétaire / admins : `UserMinus`
+     « Retirer X de l'équipe » (cibles 44 px).
+   * *Lien de l'équipe* (`TeamInviteCard`, même gabarit que `InviteCard`) : « Copier le lien », « Partager »
+     (Web Share), `ghost` « Nouveau lien » (admins), URL `/e/:code` en `subtle`, QR 132 px.
+   * *Historique de l'équipe* : lignes compactes (emoji 40 px, resto ou titre, « date · n participants · statut »,
+     ma part en `Money` si j'y étais — ligne cliquable vers la party seulement dans ce cas), « Voir plus ».
+   * `ghost` « Quitter l'équipe » en bas (sauf propriétaire).
+   * *Réglages* (`Sheet`) : nom, emoji en `Chip` 44 px, couleur (pastilles d'avatar), adresse + bouton icône
+     `LocateFixed` « Localiser l'adresse sur la carte » (Nominatim, position en aide), heure (`input time`,
+     « Heure de Bruxelles »), jours en `Chip` (Lun…Dim, `aria-label` du jour complet), `Segmented` partage
+     (Parts égales / Au prorata), candidats par défaut (chips retirables + recherche dans les restos proches,
+     20 max), `danger sm` « Archiver l'équipe » (propriétaire).
+   * *Accueil* : section **Mes équipes** (sous les commandes en cours) — cartes `interactive` (ou `selected`
+     si une commande d'équipe tourne, badge « Commande en cours — rejoindre »), emblème, horaire habituel en
+     `subtle`, `AvatarStack` 24 ; `ghost sm` « Créer une équipe » (comptes) → `Sheet` nom / adresse / heure.
+     Feuille « Lancer une commande » : `select` « Pour l'équipe… » (si j'ai des équipes) avec aide « Toute
+     l'équipe est prévenue… ».
+   * *Party d'équipe* : sous l'en-tête, carte « Membres de l'équipe pas encore là · 🍕 OCC Mons » (avatars
+     24 px à 60 % d'opacité + prénom `muted`, « (invité·e) »), tant que la commande est en salon / vote / commande.
+   * *Toast realtime* « 🍕 OCC Mons : la commande du jour est lancée ! » avec action « Rejoindre » (15 s, un
+     seul par commande), seulement pour les membres pas encore dedans.
+9. **Invitation & invités** (`/j/:code`, `/e/:code` sans session — `InviteGate`, gabarit `AuthLayout`) :
+   surtitre braise « Invitation à une commande » / « Invitation d'équipe », titre display (emoji + nom),
+   « Bob t'invite · 3 membres » (`Users`) ; carte : `primary lg` « Se connecter », `secondary` « Créer un compte »
+   (retour automatique sur le lien), `ghost` « Continuer en invité·e » → formulaire **prénom seul** (aide « Pas
+   d'e-mail, pas de mot de passe… »), couleur d'avatar facultative (pastilles 44 px, `aria-pressed`), erreur
+   `role="alert"`, `primary lg` « Rejoindre la commande / l'équipe », lien « J'ai déjà un compte ». Commande
+   fermée / équipe archivée : carte `muted` sans formulaire.
+   * *Bandeau invité* (`GuestBanner`, shell, hors party / auth / profil) : encadré `info/10` bordure `info/30`,
+     icône `UserPlus`, « **Tu es invité·e** — crée un compte pour garder ton historique », `ghost sm` « Créer mon
+     compte » (→ Profil › Mes infos), croix « Masquer ce rappel » (mémorisé dans `localStorage`). Le bandeau
+     « Confirme ton adresse e-mail » n'est jamais montré à un·e invité·e.
+   * *Profil limité* : sous-titre « Invité·e — sans compte » à la place de l'e-mail ; carte **Créer mon compte**
+     (pastille `info` `UserPlus`, e-mail, mot de passe + confirmation, `primary` « Créer mon compte », puis
+     « Continuer avec Google ») ; pas de carte Remboursements ni Sécurité. Feuille « Lancer une commande » :
+     explication + `primary` « Créer mon compte ».
+
+### Notifications, hors ligne, heures limites (PWA)
+* **Carte « Notifications »** (Profil → Mes infos, après Sécurité ; `features/notifications/NotificationsCard.tsx`) :
+  titre avec icône `Bell` en `text-brand`, badge d'état (`success` « Activées ici », `danger` « Bloquées », neutre
+  « Désactivées »), une phrase d'explication, puis **une seule action principale** : « Activer les notifications »
+  (la permission est demandée dans le clic, jamais au chargement) ou, une fois abonné, « Envoyer un test »
+  (secondaire) + « Désactiver sur cet appareil » (ghost). Trois interrupteurs (`role="switch"`, ≥ 44 px) :
+  *Étapes des commandes*, *Remboursements*, *Rappels d'heure limite*, avec une ligne d'aide `text-xs text-muted`.
+  Cas particuliers en encadré : iPhone hors écran d'accueil (`info/10` : « Partager → Sur l'écran d'accueil »),
+  navigateur incompatible ou serveur sans push (neutre), permission refusée (`danger/10`). Ligne « Installer l'app »
+  (invite native Chrome / Edge / Android, mode d'emploi sur iOS), masquée si l'app est déjà installée.
+* **Bandeau hors ligne** (`pwa/PwaRuntime.tsx`, en tête de `<main>`, `role="status"`, `aria-live="polite"`) :
+  `warning/10` + bordure `warning/30`, icône `CloudOff`, « **Hors ligne** — les données affichées peuvent dater. »,
+  puis « N actions en attente d'envoi » ; au retour du réseau « Connexion rétablie : tes actions hors ligne vont être
+  envoyées. » puis toast « Synchronisé : Ajout : Margherita » / « N actions hors ligne synchronisées » (erreur :
+  toast `error` « Non synchronisé : … » + raison du serveur). Les boutons non rejouables (Clore le vote, Passer au
+  récap, heures limites) sont **désactivés** avec l'infobulle « Indisponible hors ligne » ; vote, « prêt·e » et
+  ajout au panier restent actifs (toast « … sera ajouté dès le retour du réseau »).
+* **Heures limites** (`features/deadlines/PartyDeadlines.tsx`, sous l'en-tête de la party, en vote / commande) :
+  carte compacte « Fin du vote à **11:45** » (heure de Bruxelles, `tabular`) + `Countdown` + badge `info`
+  « Clôture automatique » ou neutre « Clôture par l'hôte ». Hôte : chips `+5/+10/+15/+20 min`, champ « à HH:MM »
+  + « Fixer », chip « Retirer », interrupteur « Clôturer automatiquement » avec son explication. Les membres ne voient
+  que la ligne (rien sans heure limite).
+* **Chips d'évènements automatiques** (journal `AutoEvents`, sous la carte, toutes étapes) : encadré `fg/[0.03]`,
+  3 dernières lignes (la plus récente en `text-fg`, les autres `text-muted`), « Tout afficher (n) ». Icônes :
+  rappel `BellRing` `info`, clôture `CheckCircle2` `success`, prolongation `Hourglass` `warning`, décision de l'hôte
+  `AlertTriangle` `warning`, échec `AlertTriangle` `danger`. Textes rédigés par le serveur (« Vote clôturé
+  automatiquement à 11:45 — Pizza Nonna »).
+* **Notifications système** : titre court avec un emoji au plus (« Le vote est ouvert 🗳️ »), corps d'une phrase
+  qui nomme la commande entre « », montants au format `12,40 €`, tutoiement ; icône = logo, badge = flamme blanche.
 
 ## 5. Ton éditorial
 

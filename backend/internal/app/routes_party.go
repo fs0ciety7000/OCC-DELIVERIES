@@ -116,65 +116,10 @@ func (h *handlers) transition(e *core.RequestEvent) error {
 		if err != nil {
 			return err
 		}
-		from := p.GetString("status")
-		candidates := p.GetStringSlice("candidates")
-		nItems, err := tx.CountRecords(colOrderItems, dbx.HashExp{"party": p.Id})
-		if err != nil {
+		if err := applyTransition(tx, p, body.To, body.Restaurant); err != nil {
 			return err
 		}
-
-		in := domain.TransitionInput{
-			From: from, To: body.To,
-			Candidates:           len(candidates),
-			RequestedRestaurant:  body.Restaurant,
-			RequestedIsCandidate: slices.Contains(candidates, body.Restaurant),
-			Items:                int(nItems),
-		}
-		if err := domain.ValidateTransition(in); err != nil {
-			return toAPIError(err)
-		}
-
-		switch {
-		case body.To == domain.StatusOrdering && (from == domain.StatusLobby || from == domain.StatusVoting):
-			restID := body.Restaurant
-			if restID == "" {
-				restID, err = electWinner(tx, p.Id, candidates)
-				if err != nil {
-					return err
-				}
-			}
-			rest, err := tx.FindRecordById(colRestaurants, restID)
-			if err != nil || !rest.GetBool("active") {
-				return badRequest("Restaurant introuvable ou indisponible.")
-			}
-			p.Set("restaurant", rest.Id)
-		case body.To == domain.StatusReview:
-			rest, err := tx.FindRecordById(colRestaurants, p.GetString("restaurant"))
-			if err != nil {
-				return badRequest("Aucun restaurant choisi.")
-			}
-			p.Set("delivery_fee", rest.GetInt("delivery_fee"))
-		case from == domain.StatusReview && body.To == domain.StatusOrdering:
-			// saved one by one (small set) so that realtime subscribers are notified
-			pms, err := partyMembers(tx, p.Id)
-			if err != nil {
-				return err
-			}
-			for _, pm := range pms {
-				if !pm.GetBool("ready") {
-					continue
-				}
-				pm.Set("ready", false)
-				if err := tx.Save(pm); err != nil {
-					return err
-				}
-			}
-		case body.To == domain.StatusClosed:
-			p.Set("closed_at", types.NowDateTime())
-		}
-
-		p.Set("status", body.To)
-		if err := tx.Save(p); err != nil {
+		if err := tx.SaveWithContext(actorContext(e), p); err != nil {
 			return err
 		}
 		party = p
@@ -184,6 +129,71 @@ func (h *handlers) transition(e *core.RequestEvent) error {
 		return err
 	}
 	return ok(e, map[string]any{"party": party})
+}
+
+// applyTransition validates the transition of p to `to` and applies its
+// side effects (winner, fee snapshot, ready reset…); the caller saves p.
+// Shared by the host endpoint and the deadline scheduler.
+func applyTransition(tx core.App, p *core.Record, to, restaurant string) error {
+	from := p.GetString("status")
+	candidates := p.GetStringSlice("candidates")
+	nItems, err := tx.CountRecords(colOrderItems, dbx.HashExp{"party": p.Id})
+	if err != nil {
+		return err
+	}
+
+	in := domain.TransitionInput{
+		From: from, To: to,
+		Candidates:           len(candidates),
+		RequestedRestaurant:  restaurant,
+		RequestedIsCandidate: slices.Contains(candidates, restaurant),
+		Items:                int(nItems),
+	}
+	if err := domain.ValidateTransition(in); err != nil {
+		return toAPIError(err)
+	}
+
+	switch {
+	case to == domain.StatusOrdering && (from == domain.StatusLobby || from == domain.StatusVoting):
+		restID := restaurant
+		if restID == "" {
+			restID, err = electWinner(tx, p.Id, candidates)
+			if err != nil {
+				return err
+			}
+		}
+		rest, err := tx.FindRecordById(colRestaurants, restID)
+		if err != nil || !rest.GetBool("active") {
+			return badRequest("Restaurant introuvable ou indisponible.")
+		}
+		p.Set("restaurant", rest.Id)
+	case to == domain.StatusReview:
+		rest, err := tx.FindRecordById(colRestaurants, p.GetString("restaurant"))
+		if err != nil {
+			return badRequest("Aucun restaurant choisi.")
+		}
+		p.Set("delivery_fee", rest.GetInt("delivery_fee"))
+	case from == domain.StatusReview && to == domain.StatusOrdering:
+		// saved one by one (small set) so that realtime subscribers are notified
+		pms, err := partyMembers(tx, p.Id)
+		if err != nil {
+			return err
+		}
+		for _, pm := range pms {
+			if !pm.GetBool("ready") {
+				continue
+			}
+			pm.Set("ready", false)
+			if err := tx.Save(pm); err != nil {
+				return err
+			}
+		}
+	case to == domain.StatusClosed:
+		p.Set("closed_at", types.NowDateTime())
+	}
+
+	p.Set("status", to)
+	return nil
 }
 
 func electWinner(app core.App, partyID string, candidates []string) (string, error) {

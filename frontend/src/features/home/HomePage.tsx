@@ -12,6 +12,7 @@ import { useNearby } from '@/features/restaurants/hooks'
 import { LocationBar } from '@/features/restaurants/LocationBar'
 import { RestaurantCard, RestaurantCardSkeleton } from '@/features/restaurants/RestaurantCard'
 import { RestaurantCover } from '@/features/restaurants/RestaurantCover'
+import { TeamsSection } from '@/features/teams/TeamsSection'
 import { useAuth } from '@/lib/auth'
 import { formatRelativeTime } from '@/lib/format'
 import { itemVariants, listVariants } from '@/lib/motion'
@@ -107,6 +108,8 @@ export function HomePage() {
           )}
         </section>
       )}
+
+      {user && <TeamsSection user={user} />}
 
       <section className="space-y-3" aria-labelledby="h-nearby">
         <div className="flex flex-wrap items-end justify-between gap-2">

@@ -23,6 +23,7 @@ import (
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/feedsync"
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/menusync"
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/providers"
+	"github.com/fs0ciety7000/occ-deliveries/backend/internal/search"
 	"github.com/fs0ciety7000/occ-deliveries/backend/migrations"
 )
 
@@ -773,7 +774,7 @@ func applyRestaurantPlan(app core.App, rp *feedsync.RestaurantPlan) error {
 			}
 		}
 		if len(rp.Items) == 0 {
-			return catalog.RefreshItemsCount(tx, rec.Id)
+			return refreshAfterSync(tx, rec.Id)
 		}
 		itemCol, err := tx.FindCollectionByNameOrId(colMenuItems)
 		if err != nil {
@@ -813,6 +814,15 @@ func applyRestaurantPlan(app core.App, rp *feedsync.RestaurantPlan) error {
 				return fmt.Errorf("%s : %w", it.Name, err)
 			}
 		}
-		return catalog.RefreshItemsCount(tx, rec.Id)
+		return refreshAfterSync(tx, rec.Id)
 	})
+}
+
+// refreshAfterSync recomputes the server fields derived from a restaurant's
+// menu (items_count, search index) at the end of its transaction.
+func refreshAfterSync(tx core.App, restaurantID string) error {
+	if err := catalog.RefreshItemsCount(tx, restaurantID); err != nil {
+		return err
+	}
+	return search.Reindex(tx, restaurantID)
 }

@@ -1,10 +1,15 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, CheckCircle2, Circle, Pencil, ShoppingBag, Timer } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Circle, Pencil, ShoppingBag } from 'lucide-react'
 import { motion } from 'motion/react'
-import { useMemo, useRef, useState } from 'react'
-import { flyToCart, ReadyBell } from '@/components/food'
+import { Suspense, useCallback, useMemo, useRef, useState } from 'react'
+import { flyToCart, ReadyBell, WinnerReveal } from '@/components/food'
+import { AnimatedMoney } from '@/components/food/AnimatedMoney'
+import { useColleagueFlights } from '@/components/food/ColleagueFlight'
+import { DrawCheck } from '@/components/food/DrawCheck'
+import { EmptyBag } from '@/components/food/EmptyBag'
+import { PulseOnChange } from '@/components/food/PulseOnChange'
 import { toast } from 'sonner'
-import { Avatar, Badge, Button, Card, CardBody, Chip, Countdown, EmptyState, Money, QuantityStepper, Sheet } from '@/components/ui'
+import { Avatar, Badge, Button, Card, CardBody, Countdown, EmptyState, Money, QuantityStepper, Sheet } from '@/components/ui'
 import { useMenu } from '@/features/restaurants/hooks'
 import { ItemSheet, type ItemDraft } from '@/features/restaurants/ItemSheet'
 import { MenuSkeleton, MenuView } from '@/features/restaurants/MenuView'
@@ -13,12 +18,16 @@ import { RestaurantCover } from '@/features/restaurants/RestaurantCover'
 import { partiesApi } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { errorMessage } from '@/lib/errors'
-import { isoInMinutes, plural } from '@/lib/format'
+import { plural } from '@/lib/format'
+import { addItemAction } from '@/lib/offlineActions'
+import { OFFLINE_HINT, useOnline } from '@/lib/online'
+import { haptic } from '@/lib/haptics'
+import { useFirstTime } from '@/lib/once'
 import { fromSelectedOptions, toSelectedOptions } from '@/lib/price'
 import { qk } from '@/lib/queryKeys'
 import type { MenuItem, OrderItem } from '@/lib/types'
 import type { PartyCtx } from '../context'
-import { useOrderItems, useReady, useTransition, useUpdateParty } from '../hooks'
+import { useOrderItems, useReady, useTransition } from '../hooks'
 import { ReorderCard } from '../ReorderCard'
 import { cartStatsByUser } from '../logic'
 
@@ -30,7 +39,7 @@ export function OrderingStep({ ctx }: { ctx: PartyCtx }) {
   const qc = useQueryClient()
   const ready = useReady(party.id)
   const transition = useTransition(party.id)
-  const updateParty = useUpdateParty(party.id)
+  const online = useOnline()
   const [picked, setPicked] = useState<MenuItem | null>(null)
   const [editing, setEditing] = useState<OrderItem | null>(null)
   const [cartOpen, setCartOpen] = useState(false)
@@ -50,6 +59,25 @@ export function OrderingStep({ ctx }: { ctx: PartyCtx }) {
   const amReady = !!myMember?.ready
   const readyCount = members.filter((m) => m.ready).length
   const menuItemsById = useMemo(() => new Map((menu.data?.items ?? []).map((i) => [i.id, i])), [menu.data])
+  // Total indicatif du groupe : somme des lignes calculées par le serveur.
+  const groupTotal = useMemo(() => allItems.reduce((sum, i) => sum + i.total, 0), [allItems])
+  const groupCarts = stats.size
+
+  // « Panier vivant » : les plats ajoutés par les collègues volent vers leur avatar.
+  const emojiFor = useCallback((l: OrderItem) => menuItemsById.get(l.menu_item)?.emoji || '🍽️', [menuItemsById])
+  useColleagueFlights(items.data, me.id, emojiFor)
+
+  // Révélation du gagnant, une fois par party, seulement après un vrai vote.
+  const firstReveal = useFirstTime(`occ-winner-${party.id}`, (party.candidates?.length ?? 0) >= 2 && !!restaurant)
+  const [revealing, setRevealing] = useState(firstReveal)
+
+  const toggleReady = (onDone?: () => void) =>
+    ready.mutate(!amReady, {
+      onSuccess: () => {
+        if (!amReady) haptic('ready')
+        onDone?.()
+      },
+    })
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: qk.items(party.id) })
@@ -58,15 +86,19 @@ export function OrderingStep({ ctx }: { ctx: PartyCtx }) {
 
   const add = async (item: MenuItem, d: ItemDraft) => {
     try {
-      await partiesApi.addItem({
-        party: party.id,
-        user: me.id,
-        menu_item: item.id,
-        quantity: d.quantity,
-        selected_options: toSelectedOptions(item, d.selections),
-        note: d.note,
-      })
-      toast.success(`${item.name} ajouté à ton panier`)
+      const sent = await addItemAction(
+        {
+          party: party.id,
+          user: me.id,
+          menu_item: item.id,
+          quantity: d.quantity,
+          selected_options: toSelectedOptions(item, d.selections),
+          note: d.note,
+        },
+        item.name,
+      )
+      if (sent === 'queued') toast(`${item.name} sera ajouté dès le retour du réseau`, { description: 'Hors ligne : action mise en attente.' })
+      else toast.success(`${item.name} ajouté à ton panier`)
       flyToCart(pickEl.current, item.emoji || '🍽️')
       refresh()
     } catch (err) {
@@ -110,13 +142,16 @@ export function OrderingStep({ ctx }: { ctx: PartyCtx }) {
     onSettled: refresh,
   })
 
-  const setDeadline = (minutes: number) =>
-    updateParty.mutate({ ordering_ends_at: minutes ? isoInMinutes(minutes) : '' })
 
   if (!party.restaurant) return <EmptyState emoji="🤷" title="Aucun resto choisi" description="L'hôte doit choisir un restaurant." />
 
   return (
-    <div className="grid gap-6 pb-32 lg:grid-cols-[minmax(0,1fr)_320px]">
+    <div className="grid gap-6 pb-36 lg:grid-cols-[minmax(0,1fr)_320px]">
+      {revealing && restaurant && (
+        <Suspense fallback={null}>
+          <WinnerReveal emoji={restaurant.emoji || '🍽️'} name={restaurant.name} onDone={() => setRevealing(false)} />
+        </Suspense>
+      )}
       <div className="min-w-0 space-y-4">
         {restaurant && (
           <div className="flex items-center gap-3">
@@ -152,9 +187,11 @@ export function OrderingStep({ ctx }: { ctx: PartyCtx }) {
           <CardBody className="space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="font-display text-lg font-semibold">L'équipe</h2>
-              <Badge variant={readyCount === members.length ? 'success' : 'neutral'} className="tabular">
-                {readyCount}/{members.length} prêts
-              </Badge>
+              <PulseOnChange value={readyCount}>
+                <Badge variant={readyCount === members.length ? 'success' : 'neutral'} className="tabular">
+                  {readyCount}/{members.length} prêts
+                </Badge>
+              </PulseOnChange>
             </div>
             <ul className="space-y-1">
               {members.map((m) => {
@@ -180,22 +217,8 @@ export function OrderingStep({ ctx }: { ctx: PartyCtx }) {
         {isHost && (
           <Card>
             <CardBody className="space-y-3">
-              <h2 className="flex items-center gap-2 font-semibold">
-                <Timer aria-hidden className="size-4 text-brand" /> Heure limite
-              </h2>
-              <div className="flex flex-wrap gap-2">
-                {[10, 15, 20].map((m) => (
-                  <Chip key={m} onClick={() => setDeadline(m)} className="min-h-8 px-3">
-                    +{m} min
-                  </Chip>
-                ))}
-                {party.ordering_ends_at && (
-                  <Chip onClick={() => setDeadline(0)} className="min-h-8 px-3">
-                    Retirer
-                  </Chip>
-                )}
-              </div>
-              <Button block variant="secondary" rightIcon={<ArrowRight className="size-4" />} onClick={() => setReviewOpen(true)} disabled={allItems.length === 0}>
+              {/* heure limite + clôture automatique : features/deadlines (sous l'en-tête) */}
+              <Button block variant="secondary" rightIcon={<ArrowRight className="size-4" />} onClick={() => setReviewOpen(true)} disabled={allItems.length === 0 || !online} title={online ? undefined : OFFLINE_HINT}>
                 Passer au récap
               </Button>
               {allItems.length === 0 && <p className="text-xs text-muted">Il faut au moins un article dans un panier.</p>}
@@ -206,7 +229,15 @@ export function OrderingStep({ ctx }: { ctx: PartyCtx }) {
 
       {/* Barre d'action collante : panier + prêt */}
       <div className="fixed inset-x-0 bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom))] z-30 border-t border-border bg-bg/85 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1200px] items-center gap-2 px-4 py-3 sm:px-8">
+        <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-2 px-4 pt-2 text-xs text-muted sm:px-8">
+          <span>
+            Total du groupe <span className="text-subtle">· {plural(groupCarts, 'panier')}</span>
+          </span>
+          <span data-group-total className="inline-flex">
+            <AnimatedMoney cents={groupTotal} className="text-sm font-semibold text-fg" />
+          </span>
+        </div>
+        <div className="mx-auto flex max-w-[1200px] items-center gap-2 px-4 pt-1.5 pb-3 sm:px-8">
           <Button data-cart-target variant="secondary" size="lg" className="flex-1 justify-between sm:flex-none sm:gap-4" onClick={() => setCartOpen(true)} aria-label={`Mon panier : ${plural(myStats.count, 'article')}`}>
             <span className="inline-flex items-center gap-2">
               <span className="relative">
@@ -227,13 +258,13 @@ export function OrderingStep({ ctx }: { ctx: PartyCtx }) {
             className={cn('flex-1', amReady && 'border-success/40 text-success')}
             loading={ready.isPending}
             disabled={!amReady && myStats.count === 0}
-            onClick={() => ready.mutate(!amReady, { onSuccess: () => toast(amReady ? 'OK, tu peux encore modifier' : 'Top, t’es prêt·e ! ✅') })}
-            leftIcon={amReady ? <CheckCircle2 className="size-5" /> : undefined}
+            onClick={() => toggleReady(() => toast(amReady ? 'OK, tu peux encore modifier' : 'Top, t’es prêt·e ! ✅'))}
+            leftIcon={amReady ? <DrawCheck /> : undefined}
           >
             {amReady ? 'Prêt·e — modifier' : myStats.count === 0 ? 'Ajoute un article' : 'Je suis prêt·e'}
           </Button>
           {isHost && (
-            <Button size="lg" variant="ghost" className="hidden md:inline-flex" onClick={() => setReviewOpen(true)} disabled={allItems.length === 0}>
+            <Button size="lg" variant="ghost" className="hidden md:inline-flex" onClick={() => setReviewOpen(true)} disabled={allItems.length === 0 || !online} title={online ? undefined : OFFLINE_HINT}>
               Récap
             </Button>
           )}
@@ -266,7 +297,7 @@ export function OrderingStep({ ctx }: { ctx: PartyCtx }) {
                 <Money cents={myStats.total} className="font-display text-2xl font-bold" />
               </div>
               <p className="text-xs text-subtle">Hors frais partagés (livraison, service, pourboire) répartis au récap.</p>
-              <Button block size="lg" variant={amReady ? 'secondary' : 'primary'} onClick={() => ready.mutate(!amReady)} loading={ready.isPending}>
+              <Button block size="lg" variant={amReady ? 'secondary' : 'primary'} onClick={() => toggleReady()} loading={ready.isPending}>
                 {amReady ? 'Je ne suis plus prêt·e' : 'Je suis prêt·e'}
               </Button>
             </div>
@@ -274,7 +305,7 @@ export function OrderingStep({ ctx }: { ctx: PartyCtx }) {
         }
       >
         {mine.length === 0 ? (
-          <EmptyState emoji="🛒" title="Panier vide" description="Pioche dans le menu, on t'attend !" action={<Button onClick={() => setCartOpen(false)}>Voir le menu</Button>} />
+          <EmptyState illustration={<EmptyBag />} title="Panier vide" description="Pioche dans le menu, on t'attend !" action={<Button onClick={() => setCartOpen(false)}>Voir le menu</Button>} />
         ) : (
           <ul className="divide-y divide-border">
             {mine.map((line) => (

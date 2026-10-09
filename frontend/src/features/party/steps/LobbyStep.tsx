@@ -1,5 +1,6 @@
 import { Check, Search, Vote as VoteIcon, Zap } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { WaitingDots } from '@/components/food/WaitingDots'
 import { Badge, Button, Card, CardBody, Chip, EmptyState, Input, Sheet, Skeleton } from '@/components/ui'
 import { useNearby } from '@/features/restaurants/hooks'
 import { LocationBar } from '@/features/restaurants/LocationBar'
@@ -159,6 +160,11 @@ export function LobbyStep({ ctx }: { ctx: PartyCtx }) {
           <CardBody>
             <h2 className="mb-1 font-display text-lg font-semibold">Dans le salon</h2>
             <MemberList ctx={ctx} />
+            {ctx.members.length < 2 ? (
+              <WaitingDots label="En attente des collègues…" className="pt-3" />
+            ) : (
+              !isHost && <WaitingDots label="En attente du lancement du vote…" className="pt-3" />
+            )}
           </CardBody>
         </Card>
         {party.notes && (

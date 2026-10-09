@@ -54,6 +54,7 @@ export function Avatar({ user, size = 32, ready, className, decorative }: Avatar
       aria-label={label}
       aria-hidden={decorative || undefined}
       title={user.name}
+      data-avatar-user={user.id}
       className={cn(
         'relative inline-grid shrink-0 place-items-center overflow-hidden rounded-full font-semibold ring-2 ring-bg select-none',
         tone === 'ink' ? 'text-ink' : 'text-paper',
@@ -86,7 +87,7 @@ export function AvatarStack({ users, size = 32, max = 5, className, showReady }:
         <Avatar key={u.id} user={u} size={size} ready={showReady && u.ready} decorative />
       ))}
       {rest > 0 && (
-        <span aria-hidden className={cn('relative inline-grid place-items-center rounded-full bg-elevated font-semibold text-muted ring-2 ring-bg tabular', sizeClass[size])}>
+        <span aria-hidden data-avatar-more className={cn('relative inline-grid place-items-center rounded-full bg-elevated font-semibold text-muted ring-2 ring-bg tabular', sizeClass[size])}>
           +{rest}
         </span>
       )}

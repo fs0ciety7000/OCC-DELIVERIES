@@ -24,7 +24,7 @@ func isAdmin(e *core.RequestEvent) bool {
 	if e.Auth.IsSuperuser() {
 		return true
 	}
-	return e.Auth.Collection().Name == colUsers && e.Auth.GetString("role") == roleAdmin
+	return e.Auth.Collection().Name == colUsers && e.Auth.GetString("role") == roleAdmin && !isGuestRecord(e.Auth)
 }
 
 // requireAdmin guards /api/occ/admin/*: 401 without auth, 403 without the role.

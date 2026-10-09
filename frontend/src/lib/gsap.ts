@@ -5,6 +5,7 @@ import { MorphSVGPlugin } from 'gsap/MorphSVGPlugin'
 import { MotionPathPlugin } from 'gsap/MotionPathPlugin'
 import { Physics2DPlugin } from 'gsap/Physics2DPlugin'
 import { SplitText } from 'gsap/SplitText'
+import { motionReduced, readUserReducedMotion } from './motionPref'
 
 /**
  * GSAP : enregistré UNE seule fois ici (ADR 0004).
@@ -18,16 +19,18 @@ export { gsap, useGSAP, Flip, MotionPathPlugin, MorphSVGPlugin, Physics2DPlugin,
 export const REDUCED_MOTION = '(prefers-reduced-motion: reduce)'
 export const FULL_MOTION = '(prefers-reduced-motion: no-preference)'
 
+/** Système (`prefers-reduced-motion`) OU réglage « Animations réduites » du profil. */
 export function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(REDUCED_MOTION).matches
+  return motionReduced()
 }
 
 /**
  * Exécute `animate` seulement si l'utilisateur accepte les animations,
  * sinon `still` (version statique). Renvoie une fonction de nettoyage.
+ * Le réglage « Animations réduites » (profil) force la version statique.
  */
 export function withMotion(animate: () => void | (() => void), still?: () => void | (() => void)): () => void {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function' || readUserReducedMotion()) {
     still?.()
     return () => undefined
   }

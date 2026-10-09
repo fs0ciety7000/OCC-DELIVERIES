@@ -223,10 +223,11 @@ test('commande groupée complète : vote → paniers → récap → dispatch →
       expect(code).toMatch(/^[A-HJ-NP-Z2-9]{6}$/)
       await expect(alice.page.getByText(`/j/${code}`)).toBeVisible()
 
-      // Bob : lien d'invitation, non connecté → login → inscription → retour sur /j/:code → salle.
+      // Bob : lien d'invitation, non connecté → page d'invitation (connexion / invité·e) → inscription
+      // → retour sur /j/:code → salle.
       await bob.page.goto(`/j/${code}`)
-      await bob.page.waitForURL(/\/login\?next=/)
-      await bob.page.getByRole('link', { name: 'Crée-le en 20 secondes' }).click()
+      await expect(bob.page.getByRole('heading', { name: `Midi E2E ${RUN}` })).toBeVisible()
+      await bob.page.getByRole('link', { name: 'Créer un compte' }).click()
       await bob.page.waitForURL(/\/register\?next=%2Fj%2F/)
       await register(bob)
       await bob.page.waitForURL(`**${partyPath}`)

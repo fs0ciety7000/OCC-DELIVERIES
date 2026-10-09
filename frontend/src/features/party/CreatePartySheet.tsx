@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { Button, Field, Input, Sheet, Textarea } from '@/components/ui'
 import { RestaurantCover } from '@/features/restaurants/RestaurantCover'
+import { TeamPicker } from '@/features/teams/TeamPicker'
 import { occ, partiesApi } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import { errorMessage } from '@/lib/errors'
@@ -28,11 +29,15 @@ export function CreatePartySheet({ open, onClose, restaurant }: CreatePartySheet
   const [title, setTitle] = useState(defaultTitle)
   const [address, setAddress] = useState('')
   const [notes, setNotes] = useState('')
+  const [team, setTeam] = useState('')
 
   const create = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error('Connecte-toi pour lancer une commande.')
-      const party = await partiesApi.create({ title: title.trim() || defaultTitle(), delivery_address: address.trim(), notes: notes.trim() }, user.id)
+      const party = await partiesApi.create(
+        { title: title.trim() || defaultTitle(), delivery_address: address.trim(), notes: notes.trim(), ...(team ? { team } : {}) },
+        user.id,
+      )
       if (restaurant) {
         try {
           await occ.transition(party.id, { to: 'ordering', restaurant: restaurant.id })
@@ -43,12 +48,38 @@ export function CreatePartySheet({ open, onClose, restaurant }: CreatePartySheet
       return party
     },
     onSuccess: (party) => {
-      toast.success(restaurant ? `C'est parti chez ${restaurant.name} !` : 'Commande lancée — invite tes collègues !')
+      toast.success(restaurant ? `C'est parti chez ${restaurant.name} !` : team ? "Commande lancée — l'équipe est prévenue !" : 'Commande lancée — invite tes collègues !')
       onClose()
       navigate(`/party/${party.id}`)
     },
     onError: (err) => toast.error(errorMessage(err)),
   })
+
+  if (user?.is_guest) {
+    // Invité·e : rejoindre oui, lancer non (le serveur refuse aussi) → proposer de créer son compte.
+    return (
+      <Sheet
+        open={open}
+        onClose={onClose}
+        title="Lancer une commande"
+        description="En invité·e, tu rejoins les commandes des collègues avec leur lien."
+        footer={
+          <Button
+            block
+            size="lg"
+            onClick={() => {
+              onClose()
+              navigate('/profile?onglet=infos')
+            }}
+          >
+            Créer mon compte
+          </Button>
+        }
+      >
+        <p className="text-sm text-muted">Crée ton compte (gratuit, ton historique est conservé) pour lancer tes propres commandes et créer une équipe.</p>
+      </Sheet>
+    )
+  }
 
   return (
     <Sheet
@@ -82,7 +113,8 @@ export function CreatePartySheet({ open, onClose, restaurant }: CreatePartySheet
         <Field label="Nom de la commande">
           {(p) => <Input {...p} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} required data-autofocus />}
         </Field>
-        <Field label="Adresse de livraison" optional hint="Visible par les membres et reprise dans le récap.">
+        {!restaurant && <TeamPicker value={team} onChange={setTeam} />}
+        <Field label="Adresse de livraison" optional hint={team ? "Vide = adresse du bureau de l'équipe." : 'Visible par les membres et reprise dans le récap.'}>
           {(p) => <Input {...p} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Bureau, étage, rue…" autoComplete="street-address" />}
         </Field>
         <Field label="Un mot pour l'équipe" optional>

@@ -3,6 +3,7 @@ import { MotionConfig } from 'motion/react'
 import { RouterProvider } from 'react-router'
 import { Toaster } from 'sonner'
 import { LocationProvider } from '@/lib/geo'
+import { useMotionPref } from '@/lib/motionPref'
 import { useTheme } from '@/lib/theme'
 import { router } from './router'
 
@@ -10,6 +11,8 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 15_000,
+      // hors ligne : une tentative (réponse du cache du service worker), puis pause jusqu'au retour du réseau
+      networkMode: 'offlineFirst',
       retry: (count, err) => {
         const status = (err as { status?: number }).status
         if (status && status >= 400 && status < 500) return false
@@ -17,6 +20,8 @@ const queryClient = new QueryClient({
       },
       refetchOnWindowFocus: true,
     },
+    // les actions rejouables passent par la file hors ligne (lib/offlineActions) : jamais mises en pause
+    mutations: { networkMode: 'always' },
   },
 })
 
@@ -35,9 +40,11 @@ function ThemedToaster() {
 }
 
 export function App() {
+  // « Animations réduites » (profil) force le mode réduit de `motion`, en plus du système.
+  const { userReduced } = useMotionPref()
   return (
     <QueryClientProvider client={queryClient}>
-      <MotionConfig reducedMotion="user">
+      <MotionConfig reducedMotion={userReduced ? 'always' : 'user'}>
         <LocationProvider>
           <RouterProvider router={router} />
           <ThemedToaster />

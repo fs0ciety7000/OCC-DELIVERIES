@@ -3,6 +3,24 @@
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
+/* `motion-reduce:` / `motion-safe:` suivent le système ET le réglage « Animations réduites »
+   (`data-motion="reduced"` sur <html>, voir lib/motionPref.ts). */
+@custom-variant motion-reduce {
+  @media (prefers-reduced-motion: reduce) {
+    @slot;
+  }
+  &:where([data-motion="reduced"] *) {
+    @slot;
+  }
+}
+@custom-variant motion-safe {
+  @media (prefers-reduced-motion: no-preference) {
+    &:where(:not([data-motion="reduced"] *)) {
+      @slot;
+    }
+  }
+}
+
 @utility bg-ember {
   background-image: var(--gradient-ember);
 }
@@ -26,6 +44,20 @@
 }
 @utility pt-safe {
   padding-top: env(safe-area-inset-top);
+}
+/* Appui « press-down » des boutons : léger enfoncement tokenisé, coupé en mouvement réduit. */
+@utility press {
+  &:active:not(:disabled) {
+    transform: scale(var(--press-scale));
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &:active:not(:disabled) {
+      transform: none;
+    }
+  }
+  &:where([data-motion="reduced"] *):active {
+    transform: none;
+  }
 }
 @utility focus-ring {
   outline: 2px solid transparent;
@@ -139,6 +171,32 @@
   .skeleton {
     animation: none;
   }
+}
+/* Réglage « Animations réduites » (profil) : mêmes règles que le système. */
+[data-motion="reduced"] *,
+[data-motion="reduced"] *::before,
+[data-motion="reduced"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+[data-motion="reduced"] .skeleton {
+  animation: none;
+}
+
+/* Toasts : même courbe que le reste de l'interface (entrée 320 ms, « Ember »). */
+[data-sonner-toast] {
+  transition-timing-function: var(--ease-ember) !important;
+  transition-duration: 320ms !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-sonner-toast] {
+    transition-duration: 0.001ms !important;
+  }
+}
+[data-motion="reduced"] [data-sonner-toast] {
+  transition-duration: 0.001ms !important;
 }
 
 /* Bandeau « Commande en cours » posé au-dessus de la tab bar (mobile) : les barres

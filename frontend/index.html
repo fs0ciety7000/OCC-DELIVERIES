@@ -15,7 +15,7 @@
     <meta property="og:description" content="Qu'est-ce qu'on mange ? Commandes groupées entre collègues." />
     <meta property="og:type" content="website" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <script>
       ;(function () {
@@ -23,6 +23,7 @@
           var pref = localStorage.getItem('occ-theme') || 'dark'
           var theme = pref === 'system' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : pref
           document.documentElement.setAttribute('data-theme', theme)
+          if (localStorage.getItem('occ-motion') === 'reduced') document.documentElement.setAttribute('data-motion', 'reduced')
         } catch (e) {}
       })()
     </script>

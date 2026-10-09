@@ -4,7 +4,7 @@ export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
 export type ButtonSize = 'sm' | 'md' | 'lg' | 'icon'
 
 const base =
-  'relative inline-flex items-center justify-center gap-2 whitespace-nowrap font-semibold select-none transition-[transform,background-color,box-shadow,border-color,color,opacity] duration-[120ms] ease-ember active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand'
+  'relative inline-flex items-center justify-center gap-2 whitespace-nowrap font-semibold select-none transition-[transform,background-color,box-shadow,border-color,color,opacity] duration-[var(--press-duration)] ease-ember press disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand'
 
 const variants: Record<ButtonVariant, string> = {
   primary: 'bg-ember text-brand-fg shadow-glow hover:brightness-[1.06]',

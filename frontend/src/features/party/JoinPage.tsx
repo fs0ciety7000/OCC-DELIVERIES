@@ -1,14 +1,27 @@
 import { useMutation } from '@tanstack/react-query'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 import { Button, EmptyState, Spinner } from '@/components/ui'
 import { occ } from '@/lib/api'
+import { InviteGate } from '@/features/teams/InviteGate'
+import { useAuth } from '@/lib/auth'
 import { errorMessage } from '@/lib/errors'
 import { normalizeCode } from './hooks'
 
-/** `/j/:code` : rejoint la party (idempotent) puis redirige vers la salle. */
+/** `/j/:code` : sans session → connexion ou « Continuer en invité·e » ; sinon rejoint directement. */
 export function JoinPage() {
+  const { code = '' } = useParams()
+  const { isAuthenticated } = useAuth()
+  // Ouvert sans session : la page d'invitation redirige elle-même après « Continuer en invité·e ».
+  const [gated] = useState(!isAuthenticated)
+  const clean = normalizeCode(code)
+  if ((gated || !isAuthenticated) && clean.length === 6) return <InviteGate kind="party" code={clean} />
+  return <JoinPageAuthed />
+}
+
+/** Rejoint la party (idempotent) puis redirige vers la salle. */
+function JoinPageAuthed() {
   const { code = '' } = useParams()
   const navigate = useNavigate()
   const clean = normalizeCode(code)

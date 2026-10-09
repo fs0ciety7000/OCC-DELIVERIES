@@ -88,7 +88,7 @@ export function MenuView({ sections, onPick, inCart, stickyTop = 'top-[var(--hea
             </h2>
             <motion.ul variants={listVariants} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-40px' }} className="grid gap-2.5 md:grid-cols-2">
               {s.items.map((item) => (
-                <motion.li key={item.id} variants={itemVariants}>
+                <motion.li key={item.id} variants={itemVariants} data-dish={item.id} className="scroll-mt-[calc(var(--header-h)+80px)]">
                   <MenuItemRow item={item} onPick={(el) => onPick(item, el)} count={inCart?.[item.id]} />
                 </motion.li>
               ))}
@@ -131,7 +131,7 @@ export function MenuItemRow({ item, onPick, count }: { item: MenuItem; onPick: (
         </div>
       </div>
       <div className="relative shrink-0">
-        <div aria-hidden data-thumb className="grid size-20 place-items-center overflow-hidden rounded-md bg-elevated text-3xl">
+        <div aria-hidden data-thumb data-menu-item={item.id} className="grid size-20 place-items-center overflow-hidden rounded-md bg-elevated text-3xl">
           {img ? <img src={img} alt="" loading="lazy" className="size-full object-cover" /> : item.emoji || '🍽️'}
         </div>
         {!unavailable && (

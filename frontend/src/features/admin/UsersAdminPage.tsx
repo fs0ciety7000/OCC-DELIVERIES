@@ -136,7 +136,8 @@ export function UsersAdminPage() {
                     {u.role === 'admin' && <Badge variant="brand">Admin</Badge>}
                     {isMe && <Badge>Toi</Badge>}
                     {u.deleted ? <Badge>Supprimé</Badge> : u.banned && <Badge variant="danger">Suspendu</Badge>}
-                    {!u.deleted && !u.verified && <Badge variant="warning">Non vérifié</Badge>}
+                    {!u.deleted && u.isGuest && <Badge variant="info">Invité</Badge>}
+                    {!u.deleted && !u.verified && !u.isGuest && <Badge variant="warning">Non vérifié</Badge>}
                     {u.providers.map((p) => (
                       <Badge key={p} variant="info">
                         {providerLabel(p)}
@@ -144,7 +145,7 @@ export function UsersAdminPage() {
                     ))}
                   </div>
                   <p className="truncate text-xs text-subtle">
-                    {u.deleted ? `supprimé ${formatRelativeTime(u.deletedAt)}` : u.email} · {plural(u.parties, 'commande')} · inscrit {formatRelativeTime(u.created)}
+                    {u.deleted ? `supprimé ${formatRelativeTime(u.deletedAt)}` : u.isGuest ? 'sans compte (prénom seulement)' : u.email} · {plural(u.parties, 'commande')} · inscrit {formatRelativeTime(u.created)}
                     {u.lastLoginAt && !u.deleted ? ` · connecté ${formatRelativeTime(u.lastLoginAt)}` : ''}
                   </p>
                   {u.banned && !u.deleted && (

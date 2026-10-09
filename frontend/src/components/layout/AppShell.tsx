@@ -8,7 +8,11 @@ import { ResumeBanner } from '@/features/party/ActiveParties'
 import { useActiveParties } from '@/features/party/resume'
 import { VerifyEmailBanner } from '@/features/profile/VerifyEmailBanner'
 import { UserMenu } from './UserMenu'
+import { PwaRuntime } from '@/pwa/PwaRuntime'
 import { CreatePartySheet } from '@/features/party/CreatePartySheet'
+import { GuestBanner } from '@/features/teams/GuestBanner'
+import { TeamLaunchListener } from '@/features/teams/TeamLaunchListener'
+import { GlobalSearch } from '@/features/search/GlobalSearch'
 import { useAuth } from '@/lib/auth'
 import { cn } from '@/lib/cn'
 import { useMyPartiesRealtime } from '@/lib/realtime'
@@ -102,6 +106,7 @@ export function AppShell() {
           </nav>
           <div className="ml-auto flex items-center gap-1">
             <ResumeBanner parties={resume} variant="header" />
+            <GlobalSearch onLaunch={launch} />
             {isAdmin && (
               <Link to="/admin" className={cn(buttonClass('ghost', 'icon'), 'md:hidden')} aria-label="Administration">
                 <ShieldCheck className="size-5" aria-hidden />
@@ -126,6 +131,9 @@ export function AppShell() {
 
       <main id="main" className="relative z-10 mx-auto w-full max-w-[1200px] px-4 pt-4 pb-[calc(var(--tabbar-h)+env(safe-area-inset-bottom)+32px)] md:px-8 md:pt-8">
         {!inParty && !inAuth && location.pathname !== '/profile' && <VerifyEmailBanner user={user} dismissible className="mb-4" />}
+        {!inParty && !inAuth && location.pathname !== '/profile' && <GuestBanner user={user} className="mb-4" />}
+        <TeamLaunchListener user={user} />
+        <PwaRuntime />
         <Suspense fallback={<FoodLoader className="py-24" />}>
           <Outlet />
         </Suspense>

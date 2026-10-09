@@ -16,6 +16,7 @@ import (
 
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/domain"
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/providers"
+	"github.com/fs0ciety7000/occ-deliveries/backend/internal/search"
 )
 
 // Collection names.
@@ -48,6 +49,8 @@ type Config struct {
 	Mail MailConfig
 	// Google is the Google OAuth2 client (OCC_GOOGLE_CLIENT_*).
 	Google GoogleConfig
+	// Push is the Web Push configuration (OCC_VAPID_*, OCC_PUSH_ENABLED).
+	Push PushConfig
 }
 
 // ConfigFromEnv reads the OCC_* environment variables.
@@ -61,6 +64,7 @@ func ConfigFromEnv(version string) Config {
 	}
 	cfg.Sync = syncConfigFromEnv()
 	authConfigFromEnv(&cfg)
+	cfg.Push = pushConfigFromEnv(cfg.Mail.From, cfg.PublicURL)
 	cfg.AdminEmails = parseEmails(os.Getenv("OCC_ADMIN_EMAIL") + "," + os.Getenv("OCC_ADMINS"))
 	for _, p := range strings.Split(envOr("OCC_PROVIDERS", "ubereats,takeaway,deliveroo,weloveat"), ",") {
 		p = strings.ToLower(strings.TrimSpace(p))
@@ -113,14 +117,21 @@ func register(app core.App, cfg Config) *handlers {
 	if cfg.Sync.DefaultLabel == "" {
 		cfg.Sync.DefaultLabel = cfg.DefaultLabel
 	}
-	h := &handlers{cfg: cfg, sync: newSyncer(app, cfg.Sync)}
+	h := &handlers{cfg: cfg, sync: newSyncer(app, cfg.Sync), push: newPushService(app, cfg.Push), guests: newGuestState()}
 	h.sync.bind()
+	h.push.bind()
+	SetTeamNotifier(h.push)
+	h.deadlines = newDeadlineScheduler(app, h.push, cfg.Push.Now)
+	h.deadlines.bind()
 	bindHooks(app)
 	bindRoleHooks(app, cfg)
 	bindCatalogHooks(app)
 	bindSyncHooks(app)
 	bindSettingsHooks(app)
 	bindAccountHooks(app)
+	bindTeamHooks(app) // after bindHooks: runs inside onPartyCreate
+	bindGuestHooks(app)
+	search.Bind(app)
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
 		if err := applyAuthSettings(se.App, cfg); err != nil {
 			return err
@@ -136,8 +147,11 @@ func register(app core.App, cfg Config) *handlers {
 }
 
 type handlers struct {
-	cfg  Config
-	sync *syncer
+	cfg       Config
+	sync      *syncer
+	push      *pushService
+	deadlines *deadlineScheduler
+	guests    *guestState // rate limits of the guest endpoints
 }
 
 func (h *handlers) routes(r *router.Router[*core.RequestEvent]) {
@@ -145,6 +159,7 @@ func (h *handlers) routes(r *router.Router[*core.RequestEvent]) {
 	g.GET("/health", h.health)
 	g.GET("/config", h.config)
 	g.GET("/restaurants/nearby", h.nearby)
+	g.GET("/search", h.search)
 
 	user := apis.RequireAuth(colUsers)
 	g.POST("/parties/join", h.join).Bind(user)
@@ -162,9 +177,12 @@ func (h *handlers) routes(r *router.Router[*core.RequestEvent]) {
 	g.GET("/me/account", h.meAccount).Bind(user)
 	g.DELETE("/me/providers/{provider}", h.meUnlinkProvider).Bind(user)
 	g.POST("/me/delete", h.meDelete).Bind(user)
+	h.pushRoutes(g)
 	g.POST("/payments/{id}/action", h.paymentAction).Bind(user)
 	g.GET("/payments/{id}/qr", h.paymentQR).Bind(user)
 	g.GET("/payments/{id}/wallet-qr/{kind}", h.walletQR).Bind(user)
+	h.teamRoutes(g, user)
+	h.guestRoutes(g, user)
 
 	admin := g.Group("/admin")
 	admin.BindFunc(requireAdmin)

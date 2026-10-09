@@ -78,7 +78,10 @@ func TestAuthz(t *testing.T) {
 	e.expect(400, "POST", "/api/collections/votes/records", carol.token, map[string]any{"party": pid, "user": carol.id(), "restaurant": pizza})
 	e.expect(400, "POST", "/api/collections/votes/records", bob.token, map[string]any{"party": pid, "user": alice.id(), "restaurant": pizza})
 	v := e.expect(200, "POST", "/api/collections/votes/records", bob.token, map[string]any{"party": pid, "user": bob.id(), "restaurant": pizza}).m(t)
-	e.expect(400, "POST", "/api/collections/votes/records", bob.token, map[string]any{"party": pid, "user": bob.id(), "restaurant": pizza}) // unique
+	// same vote again (offline replay): idempotent, the existing vote is returned
+	if again := e.expect(200, "POST", "/api/collections/votes/records", bob.token, map[string]any{"party": pid, "user": bob.id(), "restaurant": pizza}).m(t); again["id"] != v["id"] {
+		t.Fatalf("duplicate vote must return the existing one: %v", again)
+	}
 	e.expect(403, "PATCH", "/api/collections/votes/records/"+v["id"].(string), bob.token, map[string]any{"restaurant": pizza})
 	e.expect(404, "DELETE", "/api/collections/votes/records/"+v["id"].(string), alice.token, nil)
 

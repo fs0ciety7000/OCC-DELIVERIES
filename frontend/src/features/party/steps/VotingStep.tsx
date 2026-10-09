@@ -1,16 +1,20 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Crown, Gavel, Heart } from 'lucide-react'
+import { Crown, Gavel } from 'lucide-react'
 import { motion } from 'motion/react'
 import { Suspense, useMemo, useState } from 'react'
-import { VoteBurst } from '@/components/food'
+import { VoteBurst, WaitingRider } from '@/components/food'
+import { LiquidHeart } from '@/components/food/LiquidHeart'
+import { PulseOnChange } from '@/components/food/PulseOnChange'
 import { toast } from 'sonner'
 import { AvatarStack, Badge, Button, Card, Countdown, EmptyState, Sheet, Skeleton } from '@/components/ui'
 import { PartialMenuBadge } from '@/features/restaurants/PartialMenu'
 import { RestaurantMeta } from '@/features/restaurants/RestaurantCard'
 import { RestaurantCover } from '@/features/restaurants/RestaurantCover'
-import { partiesApi } from '@/lib/api'
+import { unvoteAction, voteAction } from '@/lib/offlineActions'
+import { OFFLINE_HINT, useOnline } from '@/lib/online'
 import { cn } from '@/lib/cn'
 import { errorMessage } from '@/lib/errors'
+import { haptic } from '@/lib/haptics'
 import { itemVariants, listVariants, spring } from '@/lib/motion'
 import { qk } from '@/lib/queryKeys'
 import type { Restaurant, Vote } from '@/lib/types'
@@ -23,6 +27,7 @@ export function VotingStep({ ctx }: { ctx: PartyCtx }) {
   const votes = useVotes(party.id)
   const qc = useQueryClient()
   const transition = useTransition(party.id)
+  const online = useOnline()
   const [force, setForce] = useState<Restaurant | null>(null)
   const [closeOpen, setCloseOpen] = useState(false)
   const [bursts, setBursts] = useState<Record<string, number>>({})
@@ -34,12 +39,14 @@ export function VotingStep({ ctx }: { ctx: PartyCtx }) {
   const leaderId = ranked[0] && ranked[0].count > 0 ? ranked[0].restaurant.id : null
   const voters = new Set(allVotes.map((v) => v.user))
   const maxCount = Math.max(1, members.length)
+  const missing = Math.max(0, members.length - voters.size)
+  const waitingOthers = voters.has(me.id) && missing > 0
 
   const toggle = useMutation({
     mutationFn: async (restaurantId: string) => {
       const mine = allVotes.find((v) => v.user === me.id && v.restaurant === restaurantId)
-      if (mine) await partiesApi.unvote(mine.id)
-      else await partiesApi.vote(party.id, me.id, restaurantId)
+      // hors ligne : mis en file et rejoué au retour du réseau (lib/offlineActions)
+      return mine ? unvoteAction(party.id, me.id, restaurantId, mine.id) : voteAction(party.id, me.id, restaurantId)
     },
     onMutate: async (restaurantId) => {
       await qc.cancelQueries({ queryKey: qk.votes(party.id) })
@@ -55,7 +62,10 @@ export function VotingStep({ ctx }: { ctx: PartyCtx }) {
       if (ctx2) qc.setQueryData(qk.votes(party.id), ctx2.prev)
       toast.error(errorMessage(err))
     },
-    onSettled: () => void qc.invalidateQueries({ queryKey: qk.votes(party.id) }),
+    // en file hors ligne : on garde l'état optimiste (le cache du service worker daterait)
+    onSettled: (res) => {
+      if (res !== 'queued') void qc.invalidateQueries({ queryKey: qk.votes(party.id) })
+    },
   })
 
   if (votes.isPending) {
@@ -77,9 +87,11 @@ export function VotingStep({ ctx }: { ctx: PartyCtx }) {
         </div>
         <div className="flex items-center gap-2">
           <Countdown to={party.voting_ends_at} label="Fin du vote" />
-          <Badge className="tabular" aria-live="polite">
-            {voters.size}/{members.length} ont voté
-          </Badge>
+          <PulseOnChange value={voters.size}>
+            <Badge className="tabular" aria-live="polite">
+              {voters.size}/{members.length} ont voté
+            </Badge>
+          </PulseOnChange>
         </div>
       </div>
 
@@ -120,6 +132,7 @@ export function VotingStep({ ctx }: { ctx: PartyCtx }) {
                         whileTap={{ scale: 0.85 }}
                         onClick={() => {
                           if (!mine) setBursts((b) => ({ ...b, [r.id]: (b[r.id] ?? 0) + 1 }))
+                          haptic('vote')
                           toggle.mutate(r.id)
                         }}
                         aria-pressed={mine}
@@ -129,7 +142,7 @@ export function VotingStep({ ctx }: { ctx: PartyCtx }) {
                           mine ? 'border-brand/50 bg-brand/15 text-brand' : 'border-border-strong text-muted hover:text-fg',
                         )}
                       >
-                        <Heart className={cn('size-6', mine && 'fill-current')} />
+                        <LiquidHeart filled={mine} />
                       </motion.button>
                       </span>
                     </div>
@@ -157,6 +170,21 @@ export function VotingStep({ ctx }: { ctx: PartyCtx }) {
         </motion.ul>
       )}
 
+      {waitingOthers && (
+        <div className="flex items-center gap-3 rounded-lg border border-border bg-surface p-3 sm:p-4" role="status">
+          <Suspense fallback={<div className="h-20 w-30 shrink-0" />}>
+            <WaitingRider className="h-20 w-30 shrink-0" />
+          </Suspense>
+          <div className="min-w-0">
+            <p className="font-semibold">On attend les autres…</p>
+            <p className="text-sm text-muted">
+              {missing} {missing > 1 ? 'collègues n’ont' : 'collègue n’a'} pas encore voté.
+              {!isHost && ' L’hôte clôturera le vote ensuite.'}
+            </p>
+          </div>
+        </div>
+      )}
+
       {isHost ? (
         <div className="fixed inset-x-0 bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom))] z-30 border-t border-border bg-bg/85 p-3 backdrop-blur-xl md:static md:border-0 md:bg-transparent md:p-0">
           <div className="mx-auto flex max-w-[1200px] items-center gap-3">
@@ -169,13 +197,13 @@ export function VotingStep({ ctx }: { ctx: PartyCtx }) {
                 'Pas encore de vote.'
               )}
             </p>
-            <Button size="lg" className="flex-1 sm:flex-none" onClick={() => setCloseOpen(true)} disabled={candidates.length === 0}>
+            <Button size="lg" className="flex-1 sm:flex-none" onClick={() => setCloseOpen(true)} disabled={candidates.length === 0 || !online} title={online ? undefined : OFFLINE_HINT}>
               Clore le vote
             </Button>
           </div>
         </div>
       ) : (
-        <p className="text-center text-sm text-muted">L'hôte clôturera le vote quand tout le monde aura donné son avis.</p>
+        !waitingOthers && <p className="text-center text-sm text-muted">L'hôte clôturera le vote quand tout le monde aura donné son avis.</p>
       )}
 
       <Sheet

@@ -32,7 +32,7 @@ export function VerifyEmailBanner({ user, dismissible = false, className }: { us
     onSuccess: () => toast.success(`E-mail envoyé à ${user?.email}`, { description: 'Pense à regarder dans les indésirables.' }),
     onError: (e) => toast.error(errorMessage(e, "Impossible d'envoyer l'e-mail pour le moment.")),
   })
-  if (!user || user.verified !== false || !user.email || !config.data?.mailEnabled || dismissed) return null
+  if (!user || user.is_guest || user.verified !== false || !user.email || !config.data?.mailEnabled || dismissed) return null
   return (
     <aside aria-label="Adresse e-mail à confirmer" className={cn('flex items-start gap-3 rounded-md border border-warning/30 bg-warning/10 px-3 py-2.5 text-sm sm:items-center', className)}>
       <MailWarning aria-hidden className="mt-0.5 size-5 shrink-0 text-warning sm:mt-0" />

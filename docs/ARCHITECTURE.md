@@ -26,7 +26,9 @@
   règles d'accès PocketBase s'appliquent aussi aux événements SSE.
   Le shell (`AppShell`) s'abonne en plus à `parties` `*` : les rules ne livrent que
   les parties dont on est membre → bandeau « Commande en cours » et toasts de statut
-  partout dans l'app (`useMyPartiesRealtime`).
+  partout dans l'app (`useMyPartiesRealtime`). Il s'abonne aussi à `teams` `*` (rules : membres) : quand une
+  commande d'équipe est lancée (`last_party` change), toast « Rejoindre » pour les membres pas encore dedans
+  (`TeamLaunchListener`).
 * **Argent** : toujours en **centimes entiers** (`int`), devise EUR.
 
 Pourquoi PocketBase plutôt que Postgres : voir `docs/adr/0001-stack.md`.
@@ -44,12 +46,19 @@ backend/
     payout.go                revtag Revolut / PayPal.me / lien libre : normalisation, liens avec montant
     geo.go                   haversine
     contact.go               téléphones (E.164, affichage) et adresses (« Rue X 12, 7000 Mons ») des restaurants
+    team.go                  équipes (codes 8 car., noms, heure/jours habituels, rôles) et invités (prénom, e-mail réservé, inactivité)
+    ratelimit.go             limiteur en mémoire à fenêtre glissante (création d'invités par IP)
+    deadline.go              heures limites : rappels / clôtures automatiques (planification pure, idempotente)
+  internal/notify/           notifications Web Push : messages français + liens, préférences, envoi (pool de workers, VAPID) + tests
   internal/providers/        adaptateurs Uber Eats / Takeaway / Deliveroo / weloveat / manuel + tests
   internal/menusync/         lecture des flux restaurants + menus (Deliveroo, weloveat, sites), normalisation, fusion + tests
   internal/feedsync/         synchronisation : lecture des sources + réconciliation pure avec la base + tests
   internal/enrich/           enrichissement OpenStreetMap (Nominatim) : téléphone / adresse / position manquants + tests
+  internal/search/           recherche globale : index SQLite FTS5 (restos, plats), pliage des accents, fautes de frappe, collègues + tests / benchmark
   cmd/menusync/              outil CLI `menusync` (binaire séparé, /pb/menusync dans l'image)
-  internal/app/              hooks PocketBase + routes /api/occ (glue) ; sync.go = planification / exécution de la synchronisation
+  cmd/vapid/                 `go run ./cmd/vapid` : génère une paire de clés VAPID (Web Push)
+  internal/app/              hooks PocketBase + routes /api/occ (glue) ; sync.go = planification / exécution de la synchronisation ;
+                             push.go = notifications (hooks d'évènements, abonnements, VAPID) ; deadlines.go = planificateur des heures limites
   internal/catalog/           import / export des menus (JSON, CSV, rapport de validation)
   migrations/                migrations Go (schéma, seed démo, rôles admin, données réelles)
     data/                    mons_restaurants.json (données réelles embarquées), mons_ubereats.json (instantané Uber Eats)
@@ -58,6 +67,9 @@ frontend/
   src/components/ui/         design system (Button, Card, Sheet, Badge, Avatar…)
   src/features/<domaine>/    party, restaurants, auth, profile, payments, admin
   src/routes/                pages
+  src/pwa/                   enregistrement du service worker, invite d'installation, PwaRuntime (bandeau hors ligne, rejeu, toasts temps réel)
+  pwa/                       service worker : sw.js (gabarit), sw-routes.js (règles de cache pures), plugin.ts (plugin Vite → dist/sw.js)
+  scripts/generate-icons.mjs icônes PWA (PNG 192/512, maskable, badge, apple-touch) depuis public/favicon.svg
 docs/                        architecture, design system, workflow, déploiement, ADR
 ```
 
@@ -77,6 +89,8 @@ Toutes les collections de base ont `created` / `updated` (autodate).
 | banned_reason | text ≤ 300, **hidden** | motif (admins uniquement) |
 | banned_at | date, **hidden** | posé par le serveur à la suspension |
 | deleted_at | date, **hidden** | compte supprimé = **anonymisé** (voir §3 *Comptes*) |
+| is_guest | bool (visible, **écrit par le serveur seulement**) | compte **invité·e** créé par `POST /api/occ/guest` (prénom seul, migration `1760000016`) ; un client ne peut ni le poser (forcé à `false` à l'inscription) ni le changer (403) ; lisible pour l'UI (bandeau invité, badges « Invité·e ») — voir §3 *Invités* |
+| notify_prefs | json, **hidden** | préférences de notification `{ "party": bool, "payments": bool, "reminders": bool }` (migration `1760000015`) ; vide / clé absente = activé ; lu et écrit par `GET/PATCH /api/occ/push/prefs` |
 | password_set | bool, **hidden** | `false` pour un compte créé avec Google (mot de passe aléatoire) tant que son titulaire n'en a pas choisi un (lien « mot de passe oublié », changement depuis le profil) ; sert à interdire de dissocier Google d'un compte qui ne pourrait plus se connecter |
 
 Champs **hidden** : jamais renvoyés par l'API des collections (même au titulaire), ignorés en écriture
@@ -132,6 +146,41 @@ ou `OCC_ADMINS` passent `admin` ; un compte créé plus tard avec un de ces e-ma
   **conservés** (montants et totaux inchangés, le nom affiché devient « Compte supprimé »). Irréversible
   (pas de réactivation). Une nouvelle connexion Google avec l'ancienne adresse crée un compte neuf.
 
+### Invités sans compte (« lien magique, juste un prénom » — `app/guests.go`, migration `1760000016`)
+* **Création** — `POST /api/occ/guest { name, color?, partyCode | teamCode }` (sans session ; avec une session → 400) :
+  un code **valide** est obligatoire (commande en lobby/voting/ordering/review, ou équipe non archivée), prénom
+  1–40 caractères avec au moins une lettre (`domain.NormalizeGuestName`), couleur `#RRGGBB` facultative (sinon tirée
+  au hasard). En une transaction : enregistrement `users` avec `is_guest = true`, e-mail
+  `guest-<id>@guest.occ.invalid` (TLD réservé, jamais d'envoi), mot de passe aléatoire, `verified = false`,
+  `password_set = false`, rôle `user` ; puis ajout à la commande (`members` + `party_members`) ou à l'équipe.
+  Réponse `{ token, record, party: { id, title } | null, team: { id, name } | null }`.
+* **Jeton** — `record.NewStaticAuthToken(30 j)` (`domain.GuestTokenDays`). `auth-refresh` d'un·e invité·e renvoie un
+  **nouveau** jeton statique de 30 jours (fenêtre glissante tant qu'il ou elle utilise l'app) ; sans activité, le
+  jeton expire.
+* **Limite de débit** — en mémoire par IP (`domain.RateLimiter`, fenêtre glissante) : **10 créations / heure**
+  (les tentatives à code invalide comptent : pas de force brute), aperçu `GET /api/occ/invites/{code}` 60 / minute.
+  Dépassement → **429** « Trop de tentatives… ». (Mémoire du processus : remise à zéro au redémarrage.)
+* **Ce qu'un·e invité·e peut faire** : voir la commande, voter, commander, se déclarer prêt·e, payer sa part (QR EPC,
+  liens), rejoindre une équipe et en un geste ses commandes, changer son prénom / sa couleur, supprimer son compte.
+* **Interdits (rule + hook / garde)** : créer une commande (`parties.createRule … && @request.auth.is_guest = false`
+  + hook 403 « Crée ton compte… ») et donc lancer la commande du jour d'une équipe (403) ; créer une équipe (rule + hook) ;
+  être admin d'équipe (hook `teams` : 400) ; être **admin** de l'app (`isAdmin` exclut les invités,
+  `PATCH /admin/users/{id}/role` → 400, et filet de sécurité : un enregistrement invité repasse toujours `role = user`) ;
+  enregistrer un `payout_profiles` (rules create/update `… && @request.auth.is_guest = false` + hook 403).
+  Aucun e-mail n'est envoyé aux adresses `*.invalid` (hook `OnMailerSend` : invités et comptes supprimés).
+* **Créer mon compte (même enregistrement)** — `POST /api/occ/me/upgrade { email, password, passwordConfirm?, name? }`
+  (invité·e seulement, sinon 400) : e-mail valide, non `.invalid`, libre (sinon 400 « Un compte existe déjà… ») ;
+  mot de passe ≥ 8 ; → `is_guest = false`, `password_set = true`, `verified = false` (e-mail de vérification si SMTP),
+  réponse d'authentification PocketBase `{ token, record }`. **Google** : un·e invité·e connecté·e qui passe par
+  `auth-with-oauth2` (compte Google encore lié à personne) est converti·e : e-mail Google, vérifié,
+  `is_guest = false` (400 si l'adresse Google appartient déjà à un autre compte). Commandes, votes, paiements et
+  équipes sont conservés (même id).
+* **Nettoyage** — tâche cron `occGuestCleanup` (`40 3 * * *`, UTC) : invités non supprimés sans activité depuis
+  **60 jours** (`domain.GuestInactive` ; activité = max de `users.updated`, arrivées dans une commande, lignes,
+  votes, paiements, origines de connexion) → retirés de leurs équipes puis **anonymisés** (`anonymizeUser`, comme une
+  suppression de compte : historique et totaux conservés).
+* **Admin** — `AdminUser.isGuest` (badge « Invité ») et filtre `GET /api/occ/admin/users?status=guest`.
+
 ### `payout_profiles` — coordonnées de remboursement (privées)
 | champ | type | notes |
 |---|---|---|
@@ -147,7 +196,8 @@ ou `OCC_ADMINS` passent `admin` ; un compte créé plus tard avec un de ces e-ma
 | wero_qr | file | image (png/jpg/webp, ≤ 1 Mo, `protected`) — QR « recevoir » généré dans l'app bancaire |
 | bancontact_qr | file | idem pour Bancontact Pay |
 
-Rules : toutes `user = @request.auth.id` (create : `@request.auth.id != "" && user = @request.auth.id`).
+Rules : toutes `user = @request.auth.id` (create : `@request.auth.id != "" && user = @request.auth.id`) ;
+create et update exigent en plus `@request.auth.is_guest = false` (migration `1760000016` : pas de profil pour un·e invité·e).
 Jamais exposé aux autres membres : QR EPC, identifiants Wero/Bancontact et images
 QR ne sortent que via `/api/occ/payments/{id}/qr` et `/wallet-qr/{kind}`, pour les
 membres de la party concernée. Hook : `wero_id` / `bancontact_phone` normalisés
@@ -209,7 +259,8 @@ plateforme identique (hôte + chemin, liens génériques type page ville ignoré
 normalisé (casse, accents, « (Mons) », « - Mons ») — dans les deux derniers cas seulement si un seul
 restaurant correspond ; le slug existant est conservé, les liens fusionnés et les champs absents du
 fichier (note, délai, frais, cuisines, description…) gardent leur valeur. Téléphone (E.164 si lisible,
-sinon tel quel) et adresse normalisés.
+sinon tel quel) et adresse normalisés. En fin d'import : `items_count` puis index de recherche
+(`search.Reindex`, voir *Recherche globale*).
 **Normalisation existante** : la migration `1760000012` réécrit une fois tous les téléphones / adresses
 stockés (idempotente, verrouillés compris : seule la forme change ; un téléphone illisible est conservé).
 
@@ -341,7 +392,8 @@ Une exécution `running` trouvée au démarrage passe `failed` (« interrompue �
        marqué obsolète parce que les flux ne le listent pas) ; retiré du fichier → obsolète comme
        pour toute source ; fichier illisible → source `failed`, rien n'est marqué obsolète.
 3. Écriture **par restaurant dans une transaction** (`RunInTransaction`) ; un enregistrement
-   verrouillé entre-temps est laissé tel quel.
+   verrouillé entre-temps est laissé tel quel. En fin de transaction : `items_count` puis index de
+   recherche du restaurant (`refreshAfterSync` → `catalog.RefreshItemsCount` + `search.Reindex`).
 4. **Enrichissement OpenStreetMap** (`internal/enrich` + `app/enrich.go`, `OCC_ENRICH_ENABLED`, défaut `true`) à la
    fin de l'exécution : restaurants **actifs, non verrouillés** sans téléphone, sans adresse ou sans vraie position
    (`geo_approx` ou 0) — en exécution ciblée, seulement ceux qu'elle a écrits. Requête Nominatim
@@ -373,6 +425,86 @@ entité schema.org (Restaurant, LocalBusiness…) en microdonnées ou JSON-LD (`
 seules les coordonnées **professionnelles** de l'établissement sont gardées (`user`, `owner`, `manager`, e-mails,
 jetons… retirés avant le cache).
 
+### Recherche globale (`internal/search`, migration `1760000017`)
+Index **SQLite FTS5** (le SQLite de PocketBase — modernc, 3.53 — inclut FTS5 et `fts5vocab`), en tables
+SQL simples, **hors collections PocketBase** (invisibles dans `/_/`, incluses dans les sauvegardes) :
+
+| table | contenu |
+|---|---|
+| `occ_search_restaurants` | FTS5 `name`, `cuisines`, `address` |
+| `occ_search_items` | FTS5 `name`, `description`, `category` (nom de la catégorie), `restaurant` (nom du resto) |
+| `occ_search_restaurant_docs` / `occ_search_item_docs` | `docid` (= `rowid` FTS) ↔ id PocketBase (`restaurant` ; `item`, `restaurant` indexé) — une colonne id non indexée dans la table FTS serait parcourue à chaque suppression |
+| `occ_search_vocab_restaurants` / `occ_search_vocab_items` | `fts5vocab(…, 'row')` : termes indexés (corrections de fautes) |
+
+* **Texte plié en Go** à l'indexation **et** à la requête (`search.Fold` : minuscules, accents retirés,
+  ligatures `œ` → `oe`, `æ` → `ae`, `ß` → `ss`) ; tokenizer `unicode61 remove_diacritics 2` (défense en
+  profondeur), index de préfixes `2 3`. « Râmen », « RAMEN », « ram » trouvent « ramen ».
+* **Visibilité jamais stockée** : jointure à la requête sur `restaurants` / `menu_items` → restaurant
+  `active`, cartes incomplètes masquées (`items_count < min_menu_items`, même règle que `/nearby`), plats
+  `available` seulement. Prix, disponibilité et `items_count` ne demandent donc aucune réindexation.
+* **Mise à jour** : hooks `OnRecordCreate/Update/Delete` (autour de l'écriture, **dans sa transaction**
+  s'il y en a une) sur `restaurants` (ligne seule ; ligne + plats si le **nom** change), `menu_items`
+  (si nom, description, catégorie ou restaurant changent), `menu_categories` (renommage / suppression →
+  plats du resto) ; appels explicites `search.Reindex(tx, restaurantID)` en fin de `catalog.Import` et de
+  chaque restaurant écrit par la synchronisation. Une erreur d'index est journalisée (une fois) et ne
+  bloque jamais l'écriture. Filet de sécurité au démarrage (`RebuildIfDrifted`) : reconstruction complète
+  si les comptes de l'index diffèrent du catalogue (écritures SQL brutes d'une migration, sauvegarde
+  restaurée…). La migration indexe tout le catalogue ; avant elle, toutes les fonctions sont sans effet.
+* **Requête** : termes = lettres / chiffres pliés (≤ 6, 32 caractères ; la syntaxe FTS saisie est
+  neutralisée), chacun en **préfixe** (`"ram"*`), tous requis (ET). Un terme de ≥ 4 lettres qui n'est le
+  préfixe d'aucun terme indexé est remplacé par ses **corrections** (`Vocab.Corrections`, Damerau-Levenshtein
+  1 jusqu'à 6 lettres, 2 au-delà ; plus proche, puis plus long préfixe commun, puis plus fréquent ; ≤ 3) —
+  « piza » → `("pizza"* OR "pita"*)`, `fuzzy: true`. Un plat doit correspondre **par lui-même** (nom,
+  description ou catégorie) sur au moins un terme : « tomo » ne liste pas toute la carte de Tomo, « tomo
+  shoyu » cible le shoyu de Tomo. Une seule lettre : raccourcis seulement.
+* **Classement** : `bm25` pondéré (restos : nom 10, cuisines 4, adresse 1 ; plats : nom 8, catégorie 3,
+  restaurant 2, description 1) sur 4 × `limit` candidats, puis bonus en Go : nom exact (+100 resto, +50 plat)
+  > nom qui commence par la saisie (+40 / +20) > tous les termes en début de mots du nom (+20 / +10) >
+  cuisine exacte (+8) > meilleure correction (+6) > plat populaire (+2).
+* **Collègues** (connecté uniquement, collection `users`) : utilisateurs qui partagent **au moins une party**
+  (`party_members`) **ou une équipe** (`teams` : `owner`, `admins`, `members`, si la collection existe) ;
+  jamais soi-même, ni les comptes supprimés / suspendus ; correspondance sur les mots du **nom** (l'e-mail
+  n'est jamais cherché). Personne d'autre n'est jamais lu.
+* **Performance** (`BenchmarkSearch10k`, `TestSearchLatency10k` : 200 restos, 10 000 plats, Xeon 2,1 GHz) :
+  6–10 ms par requête, 20 ms pour un préfixe de 2 lettres très fréquent ; index complet reconstruit en ~1 s.
+
+### `teams` — salon d'équipe permanent (migration `1760000016`, `app/teams.go`)
+| champ | type | notes |
+|---|---|---|
+| name | text req ≤ 80 | ex. « OCC Mons — midi » (espaces normalisés, 2 car. min.) |
+| code | text unique | 8 car. `[A-HJ-NP-Z2-9]` — **serveur** ; lien fixe `/e/:code` |
+| owner | R(users) req | **serveur** (= créateur) |
+| admins | R(users) multi | choisis par le propriétaire seul ; membres non invités uniquement ; le propriétaire n'y figure jamais |
+| members | R(users) multi | **serveur** (rejoindre / quitter / retirer passent par `/api/occ/teams/*`) |
+| address | text ≤ 300 | adresse du bureau (adresse de livraison par défaut) |
+| lat, lng | number | facultatif (bouton « Localiser » : Nominatim depuis le navigateur, comme l'admin restos) |
+| usual_time | text `HH:MM` | heure habituelle, **Europe/Brussels** (`12h15`, `1215`… normalisés) |
+| usual_days | select multi `mon`…`sun` | jours habituels (ordre lundi → dimanche) |
+| default_candidates | R(restaurants) multi ≤ 20 | candidats proposés par défaut (actifs à l'enregistrement) |
+| default_split | select `equal` \| `proportional` | partage des frais par défaut (`equal` si vide) |
+| emoji | text | |
+| color | text `#RRGGBB` | majuscules |
+| archived | bool | archivée : plus de membres ni de commande, historique conservé (propriétaire) |
+| last_party | R(parties) | **serveur** : dernière commande lancée pour l'équipe |
+| last_launch_at | date | **serveur** : sa date (l'update est diffusé en realtime aux membres → toast « Rejoindre ») |
+
+Rules : list/view `members.id ?= @request.auth.id || @request.auth.role = "admin"` ;
+create `@request.auth.id != "" && @request.auth.is_guest = false` ; update `owner = @request.auth.id || admins.id ?= @request.auth.id` ;
+**delete `nil`** (archiver). Hooks : à la création `owner` = demandeur, `members = [owner]`, `admins = []`, `code` généré ;
+en mise à jour `code`, `owner`, `members`, `last_party`, `last_launch_at` refusés (400), `admins` modifiable par le
+propriétaire seul (403 sinon, `domain.CheckTeamAdmins`) ; champs normalisés (`domain.NormalizeTeamName`,
+`NormalizeUsualTime`, `NormalizeDays`, `NormalizeColor`), candidats actifs.
+
+**Commande d'équipe** (`parties.team`) : créée par `POST /api/occ/teams/{id}/launch` (titre `domain.DailyTitle` à l'heure de
+Bruxelles : « Midi du lundi », « Soirée du lundi » dès 16 h ; idempotent : une commande d'équipe ni close ni annulée est
+renvoyée telle quelle, le demandeur y est ajouté) ou par la collection avec `team` (feuille « Pour l'équipe … » : le
+créateur doit être membre, équipe non archivée). Valeurs par défaut si laissées vides : `delivery_address` = adresse de
+l'équipe, `candidates` = candidats par défaut **encore actifs**, `split_mode` = partage de l'équipe. Puis `last_party` /
+`last_launch_at` mis à jour (diffusion realtime) et **point d'extension notifications** : `app.SetTeamNotifier(n)` avec
+`TeamNotifier.TeamPartyLaunched(app, team, party, recipients)` (destinataires = membres hors hôte, comptes actifs ;
+erreurs journalisées) — à brancher sur le service Web Push. Un membre de l'équipe rejoint en un geste, sans code
+(`POST /api/occ/parties/{id}/join`) ; `team` est immuable sur la party.
+
 ### `parties` — une commande groupée
 | champ | type | notes |
 |---|---|---|
@@ -386,8 +518,11 @@ jetons… retirés avant le cache).
 | provider | select | `ubereats`, `takeaway`, `deliveroo`, `weloveat`, `manual` |
 | delivery_address | text | |
 | notes | text | |
-| voting_ends_at | date | indicatif (affiché en compte à rebours) |
-| ordering_ends_at | date | indicatif |
+| voting_ends_at | date | « Fin du vote » : rappel 2 min avant, clôture automatique à l'heure (voir *Heures limites*) ; éditable par l'hôte |
+| ordering_ends_at | date | « Fin de la commande » : idem |
+| auto_close_disabled | bool | l'hôte désactive la clôture automatique (les rappels restent) ; migration `1760000015` : `true` pour les parties ouvertes existantes (leurs heures restent indicatives) |
+| auto_events | json | **serveur** : journal des actions automatiques `[{ "kind", "at": RFC 3339, "text": "Vote clôturé automatiquement à 11:45 — Pizza Nonna" }]` (20 derniers) ; `kind` : `reminder_vote`, `reminder_order`, `vote_closed`, `vote_extended`, `vote_needs_host`, `ordering_closed`, `ordering_needs_host`, `auto_failed` |
+| auto_state | json, **hidden** | **serveur** : mémoire du planificateur (rappels envoyés / prolongation / abandon, indexés par l'heure limite concernée) |
 | split_mode | select | `equal` (défaut) ou `proportional` — frais partagés |
 | delivery_fee | number int | snapshot du restaurant au passage en `review` (éditable par l'hôte) |
 | service_fee | number int | éditable par l'hôte |
@@ -395,16 +530,17 @@ jetons… retirés avant le cache).
 | payer | R(users) | celui qui a avancé l'argent |
 | dispatch | json | `{ "method": "...", "at": "ISO", "url": "..." }` |
 | closed_at | date | |
+| team | R(teams) | équipe pour laquelle la commande a été lancée (migration `1760000016`) ; immuable |
 
 Rules :
 * list/view : `members.id ?= @request.auth.id || @request.auth.role = "admin"`
   (⚠ PocketBase (v0.36 à v0.40) : sur une relation multiple — dans les rules **comme dans les
   filtres `?filter=` du client** — `members ?= x` compare la
   valeur JSON brute et ne matche jamais → toujours écrire `members.id ?= …`)
-* create : `@request.auth.id != ""` → le hook force `host`, `members=[host]`, `code`, `status=lobby`.
+* create : `@request.auth.id != "" && @request.auth.is_guest = false` (migration `1760000016`) → le hook force `host`, `members=[host]`, `code`, `status=lobby`.
 * update : `host = @request.auth.id` → le hook **refuse** toute modification de
-  `code, host, members, status, restaurant, payer, dispatch, closed_at`
-  (passent par `/api/occ/*`). `candidates` modifiable seulement en `lobby`.
+  `code, host, members, status, restaurant, payer, dispatch, closed_at, auto_events`
+  (passent par `/api/occ/*` ou le planificateur ; `auto_state` est caché donc ignoré). `candidates` modifiable seulement en `lobby`.
   `delivery_fee`, `service_fee`, `tip`, `split_mode` figés à partir de `paying` ;
   plus aucune modification en `closed` / `cancelled`.
 * delete : `host = @request.auth.id && status = "lobby"`.
@@ -415,8 +551,10 @@ Rules :
 Rules : list/view `party.members.id ?= @request.auth.id || @request.auth.role = "admin"` ; écriture serveur uniquement.
 
 ### `votes` — vote par approbation (on peut liker plusieurs restaurants)
-`party` R(parties, cascade) · `user` R(users) · `restaurant` R(restaurants).
-Index unique `(party, user, restaurant)`.
+`party` R(parties, cascade) · `user` R(users) · `restaurant` R(restaurants) · `client_key` text ≤ 64 `[A-Za-z0-9_-]`
+(migration `1760000015`). Index uniques `(party, user, restaurant)` et `(user, client_key)` si `client_key` non vide.
+**Idempotent** : un vote déjà existant (même `client_key`, ou même restaurant pour ce membre) renvoie **200** avec le
+vote existant au lieu d'une erreur d'unicité (rejeu de la file hors ligne).
 Rules :
 * list/view `party.members.id ?= @request.auth.id || @request.auth.role = "admin"`
 * create `user = @request.auth.id && party.members.id ?= @request.auth.id && party.status = "voting"`
@@ -436,11 +574,32 @@ Rules :
 | options_label | text | **serveur** : « Large, Fromage » |
 | unit_price | number int | **serveur** : base + options |
 | total | number int | **serveur** : unit_price × quantity |
+| client_key | text ≤ 64 `[A-Za-z0-9_-]` | clé d'idempotence du client (migration `1760000015`), index unique `(user, client_key)` si non vide ; **création** avec une clé déjà utilisée par ce membre → **200** avec la ligne existante, rien n'est créé ni modifié (même party exigée, sinon 400) ; non modifiable ensuite |
 
 Rules : list/view membres `|| @request.auth.role = "admin"` ; create `user = @request.auth.id && party.members.id ?= @request.auth.id && party.status = "ordering"` ;
 update/delete `user = @request.auth.id && party.status = "ordering"`.
 Hooks : valide options (min/max, ids), recalcule prix ; toute écriture remet
 `party_members.ready = false` pour cet utilisateur.
+
+### `push_subscriptions` — appareils abonnés aux notifications (migration `1760000015`)
+| champ | type | notes |
+|---|---|---|
+| user | R(users) cascade, req | |
+| endpoint | text ≤ 1000, **unique** | URL du service push du navigateur (`https://`) |
+| p256dh, auth | text | clés du `PushSubscription` (base64 URL ; p256dh = 65 octets, auth = 16–32) |
+| user_agent | text ≤ 300 | navigateur (affichage, diagnostic) |
+| last_ok | date | dernière remise acceptée (2xx) |
+| failures | number int | échecs consécutifs ; 5 → supprimé ; 404 / 410 du service push → supprimé tout de suite |
+
+Rules : list/view/delete `user = @request.auth.id` ; create/update `nil` (uniquement `POST /api/occ/push/subscribe`).
+Un même `endpoint` qui s'abonne avec un autre compte (même navigateur, autre connexion) **change de propriétaire**.
+Au plus 10 appareils par compte (les plus anciens sont retirés). Les invités peuvent s'abonner (vrais appareils).
+
+### `server_secrets` — secrets générés par le serveur (migration `1760000015`)
+`name` text unique · `value` text **hidden**. Toutes les rules `nil` (superusers seulement, jamais exposé).
+Ligne `vapid` : `{ "public", "private" }` générés au premier démarrage si `OCC_VAPID_PUBLIC_KEY` /
+`OCC_VAPID_PRIVATE_KEY` sont absents (les abonnements survivent ainsi aux redémarrages et aux déploiements :
+le volume `pb_data` est persistant). La clé privée ne sort jamais du serveur.
 
 ### `payments` — part de chacun
 | champ | type | notes |
@@ -461,6 +620,85 @@ Rules : list/view `party.members.id ?= @request.auth.id || @request.auth.role = 
 > forcée passe par `POST /api/occ/admin/parties/{id}/cancel`. Les endpoints métier
 > réservés aux membres (`summary`, `export`…) restent réservés aux membres.
 
+### Notifications push (`internal/notify`, `app/push.go`)
+* **Transport** : Web Push (RFC 8291, `aes128gcm`) signé VAPID (`github.com/SherClockHolmes/webpush-go` v1.4.0).
+  Clés : `OCC_VAPID_PUBLIC_KEY` + `OCC_VAPID_PRIVATE_KEY` (les deux), sinon paire générée une fois et stockée dans
+  `server_secrets`. `sub` VAPID = `OCC_VAPID_SUBJECT`, sinon `mailto:OCC_MAIL_FROM`, sinon `mailto:noreply@<hôte de OCC_PUBLIC_URL>`.
+* **Envoi asynchrone** : file en mémoire (256) + 4 workers ; une requête n'attend jamais un service push (file pleine →
+  notification ignorée et journalisée). Par message : `TTL` (2 h ; rappels 3 min ; arrivées 30 min), `Urgency`
+  (`high` pour rappels / « tu dois » / « tout le monde est prêt », `low` pour la clôture), `Topic` = `party-<id>`
+  (un message non remis est remplacé par le suivant de la même party). 2xx → `last_ok` ; 404 / 410 → abonnement supprimé ;
+  autre échec → `failures + 1` (supprimé à 5). Comptes suspendus ignorés.
+* **Charge utile** (lue par le service worker) : `{ kind, title, body, url: "/party/<id>", tag: "party-<id>", partyId,
+  renotify, icon: "/icons/icon-192.png", badge: "/icons/badge-72.png", ts }`.
+* **Évènements** (hooks *après commit* ; l'auteur de l'action n'est jamais notifié — il est transmis par le contexte
+  du `Save`) :
+
+  | évènement | destinataires | préférence | exemple |
+  |---|---|---|---|
+  | lobby → voting | membres | `party` | « Le vote est ouvert 🗳️ — … avant 11:45 » |
+  | → ordering | membres | `party` | « On commande chez Pizza Nonna 🍽️ » (« Vote clôturé automatiquement. » si planificateur) |
+  | → review | membres | `party` | « Le récap est prêt 🧾 » |
+  | → paying | chaque débiteur / le payeur | `payments` | « Paiement : tu dois 12,40 € » / « C'est toi qui paies 💳 » |
+  | → closed / cancelled | membres | `party` | « Commande clôturée ✅ » / « Commande annulée » |
+  | tous les membres prêts | hôte (sauf s'il est le dernier) | `party` | « Tout le monde est prêt ✅ » (une fois par phase) |
+  | un membre rejoint | hôte | `party` | « Bob a rejoint la commande 👋 » (≤ 1 / 2 min / party, puis « Bob et 2 autres personnes ont rejoint ») |
+  | remboursement déclaré | payeur | `payments` | « Bob a déclaré t'avoir remboursé 12,40 € (Wero). Pense à confirmer. » |
+  | remboursement confirmé | débiteur | `payments` | « Bob a confirmé ton remboursement de 12,40 €. » |
+  | équipe : commande lancée (`TeamNotifier`) | membres de l'équipe sauf l'hôte | `party` | « Compta : la commande du jour est lancée — Rejoins « Midi du lundi ». » |
+  | rappels / clôtures automatiques | voir *Heures limites* | `reminders` / `party` | « Plus que 2 minutes pour voter ⏳ » |
+  | test | soi | toujours | « Notifications activées 🔔 » |
+* **Toasts in-app** : rappels, prolongation, « à toi de décider », clôture sans être prêt, « tout le monde est prêt »,
+  remboursements déclarés / confirmés sont aussi envoyés en temps réel sur le sujet personnalisé
+  **`occ/notifications`** aux onglets ouverts du destinataire (même charge utile ; le SPA s'y abonne dans le shell).
+  Les changements de statut ont déjà leurs toasts (abonnement `parties`).
+
+### Heures limites automatiques (`domain/deadline.go`, `app/deadlines.go`)
+Job cron PocketBase `occDeadlines` **chaque minute** : parties `voting` avec `voting_ends_at` et `ordering` avec
+`ordering_ends_at`. Pour chacune, en transaction (relecture), `domain.PlanDeadline` (pur, testé) renvoie **une** action :
+* **2 min avant** l'heure : rappel push (+ toast) aux membres qui **n'ont pas voté** / **ne sont pas prêts** (ceux qui
+  ont un panier : « valide ton panier »), une seule fois par heure limite (même si l'auto-clôture est désactivée).
+* **À l'heure** (si `auto_close_disabled = false`) :
+  - vote : ≥ 1 vote → `voting → ordering` avec le gagnant (même règle que l'hôte : votes, puis note, puis nom) ;
+    0 vote → **prolongé une fois** de 5 min (nouvelle heure = maintenant + 5 min, push à l'hôte, nouveau rappel) ;
+    toujours 0 vote → l'hôte est prévenu une fois (« à toi de décider »), la party reste en vote ;
+  - commande : ≥ 1 article → `ordering → review` (snapshot des frais) ; les membres **non prêts gardent leur panier tel
+    quel** (`ready` reste `false`) et reçoivent « Heure limite atteinte » ; panier vide → l'hôte est prévenu une fois,
+    la party reste ouverte ;
+  - transition impossible (ex. candidats désactivés) → `auto_close_disabled = true`, évènement `auto_failed`, push à l'hôte.
+* Chaque action est notée dans `auto_events` (affiché dans la party) et dans `auto_state` (caché), indexée par l'heure
+  limite (`2026-10-09T09:45:00Z`) : un nouveau réglage de l'hôte repart de zéro, un redémarrage ne répète rien, une
+  heure dépassée pendant un arrêt est traitée au premier passage (pas de rappel rétroactif). Granularité : la minute
+  (clôture au plus ~60 s après l'heure).
+* L'hôte règle l'heure par la collection (`voting_ends_at` / `ordering_ends_at` / `auto_close_disabled`, rule update
+  hôte) ; l'UI propose +5/+10/+15/+20 min (arrondi à la minute) ou « à HH:MM » (heure de **Bruxelles**).
+
+### Mode hors ligne (service worker `dist/sw.js`, file `src/lib/outbox.ts`)
+Service worker écrit à la main (`frontend/pwa/`), assemblé au build par `pwa/plugin.ts` (aucune dépendance PWA) ;
+enregistré seulement en production (`/sw.js`, portée `/`). Règles (`pwa/sw-routes.js`, testées) :
+* **Coquille** précachée dans `occ-shell-<empreinte>` (`/`, JS, CSS, polices latines, icônes, manifeste) ; à
+  l'activation les anciennes coquilles sont supprimées ; `skipWaiting` + `clients.claim`.
+* **Navigation** : réseau d'abord (préchargement), repli sur `/` en cache.
+* **Catalogue public** (`/api/occ/config`, `/api/occ/restaurants/nearby`, restaurants / catégories / plats) :
+  *stale-while-revalidate* (`occ-api-v1`, 120 entrées).
+* **Données d'une commande** (`/parties/{id}/summary`, collections `parties`, `party_members`, `votes`,
+  `order_items`, `payments`) : **réseau d'abord**, cache seulement hors ligne — un *stale-while-revalidate* renverrait
+  une liste périmée juste après une écriture ou un évènement temps réel.
+* **Images** (`/api/files/…` sans jeton, images distantes) : cache d'abord, 150 entrées.
+* **Jamais en cache** : toute requête non GET, `/api/realtime`, authentification (`/api/collections/users/…`,
+  `_…`, OAuth2), `/api/occ/me/*`, `/api/occ/push/*`, `/api/occ/admin/*`, `/api/occ/payments/*`, coordonnées de
+  paiement, fichiers protégés, `/_/`. Déconnexion → message `CLEAR_USER_DATA` (cache `occ-api-v1` vidé).
+* **Push** : `push` → `showNotification` (icône, badge, `tag` par party, `renotify`) ; `notificationclick` → onglet
+  existant focalisé (navigation interne par message `OPEN_URL`) ou nouvelle fenêtre.
+
+**File d'actions hors ligne** (IndexedDB `occ-outbox`, 50 au plus) — uniquement des actions sûres :
+« prêt·e » (dernier état seulement), vote / retrait de vote (s'annulent mutuellement), ajout au panier ; chaque action
+porte une clé (`client_key`) et le serveur dédoublonne (voir `votes`, `order_items`). Hors ligne ou serveur
+injoignable (erreur réseau) → mise en file ; au retour du réseau rejeu **dans l'ordre**, arrêt à la première erreur
+réseau, action refusée par le serveur (4xx) abandonnée avec un toast. Les actions non rejouables (transitions,
+paiements, heures limites…) sont désactivées hors ligne (« Indisponible hors ligne »). TanStack Query :
+`networkMode: 'offlineFirst'` (requêtes), `'always'` (mutations, la file décide).
+
 ## 4. Cycle de vie d'une party (state machine)
 
 ```
@@ -475,8 +713,8 @@ Rules : list/view `party.members.id ?= @request.auth.id || @request.auth.role = 
 |---|---|
 | lobby → voting | ≥ 2 `candidates` |
 | lobby → ordering | `restaurant` fourni dans la requête |
-| voting → ordering | gagnant = plus de votes ; égalité → meilleur `rating`, puis nom ; l'hôte peut imposer `restaurant` (doit être candidat) |
-| ordering → review | ≥ 1 `order_item` ; snapshot `delivery_fee` depuis le restaurant |
+| voting → ordering | gagnant = plus de votes ; égalité → meilleur `rating`, puis nom ; l'hôte peut imposer `restaurant` (doit être candidat) ; **ou automatique** à `voting_ends_at` (≥ 1 vote, voir *Heures limites*) |
+| ordering → review | ≥ 1 `order_item` ; snapshot `delivery_fee` depuis le restaurant ; **ou automatique** à `ordering_ends_at` |
 | review → ordering | réouverture (remet tous les `ready` à false) |
 | review → paying | **uniquement** via `POST /payer` |
 | paying → closed | automatique quand tous les `payments` sont `confirmed`, ou manuel par l'hôte |
@@ -492,6 +730,7 @@ PocketBase `{ "status": 400, "message": "…", "data": {} }`, messages en franç
 | `GET /api/occ/health` | — | | `{ "status": "ok", "version": "x.y.z" }` |
 | `GET /api/occ/config` | — | | `{ "currency":"EUR", "defaultLocation":{lat,lng,label}, "providers":[{id,name,color,enabled}], "minMenuItems": 10, "mailEnabled": true }` (`minMenuItems` = seuil des cartes incomplètes, 0 = aucun ; `mailEnabled` = SMTP configuré : vérification, mot de passe oublié, changement d'adresse disponibles) |
 | `GET /api/occ/restaurants/nearby` | — | `lat,lng,radiusKm(=5),q,cuisine` | `{ "items": [Restaurant & { "distanceKm": number }] }` triés par distance ; les positions approximatives (`geo_approx`) après les autres ; restaurants actifs uniquement, **sans les cartes incomplètes** (`items_count < minMenuItems` quand le seuil > 0) |
+| `GET /api/occ/search` | — (collègues : ✔) | `q` (≤ 200 car.), `limit` (par groupe, 1–20, défaut 6), `lat`, `lng` (facultatifs, distances) | `SearchResult` (ci-dessous) — restos et plats publics (mêmes règles de visibilité que `/nearby`) ; `people` toujours `[]` sans connexion ; **400** requête trop longue |
 | `POST /api/occ/parties/join` | ✔ | `{ "code": "K7M2QX" }` | `{ "party": Party, "alreadyMember": bool }` — idempotent : un **membre** retrouve sa party quel que soit son statut (`alreadyMember: true`, lien `/j/:code` réouvert) ; un nouveau venu seulement en lobby/voting/ordering/review |
 | `POST /api/occ/parties/{id}/leave` | membre (≠ hôte) | | `{ "ok": true }` — seulement en lobby/voting/ordering ; supprime ses votes/items |
 | `POST /api/occ/parties/{id}/transition` | hôte | `{ "to": Status, "restaurant"?: id }` | `{ "party": Party }` |
@@ -507,14 +746,33 @@ PocketBase `{ "status": 400, "message": "…", "data": {} }`, messages en franç
 | `GET /api/occ/me/account` | ✔ | | `{ email, verified, passwordSet, providers: [{ id, provider, created }], mailEnabled }` — sécurité du compte (Profil → Sécurité) |
 | `DELETE /api/occ/me/providers/{provider}` | ✔ | | `{ "ok": true }` — dissocie Google ; **400** si le compte n'a pas de mot de passe choisi et aucun autre lien ; **404** si non lié |
 | `POST /api/occ/me/delete` | ✔ | `{ "confirm": "SUPPRIMER" }` (casse et espaces ignorés) | **204** — anonymise son compte (RGPD, voir §3 *Comptes*) ; **400** sans le mot, si j'héberge une commande ni clôturée ni annulée, si des collègues me doivent encore un remboursement (commande `paying`), ou si je suis le dernier admin actif |
+| `GET /api/occ/push/public-key` | — | | `{ "enabled": bool, "publicKey": "<VAPID base64 URL>" }` (`""` si désactivé) |
+| `POST /api/occ/push/subscribe` | ✔ | `PushSubscription.toJSON()` : `{ "endpoint": "https://…", "keys": { "p256dh", "auth" } }` | `{ "ok": true, "id" }` — upsert par `endpoint` (rattaché au compte courant) ; **400** endpoint non `https`, clés invalides ou notifications désactivées (`OCC_PUSH_ENABLED=false`) |
+| `DELETE /api/occ/push/subscribe` | ✔ | `{ "endpoint" }` | `{ "ok": true, "deleted": 0\|1 }` — seulement ses propres abonnements |
+| `POST /api/occ/push/test` | ✔ | | `{ "queued": true, "devices": n }` — notification « Notifications activées 🔔 » à **soi-même** ; **400** « Aucun appareil abonné… » |
+| `GET /api/occ/push/prefs` | ✔ | | `{ "prefs": NotifyPrefs, "devices": n, "enabled": bool }` |
+| `PATCH /api/occ/push/prefs` | ✔ | `{ "party"?: bool, "payments"?: bool, "reminders"?: bool }` | `{ "prefs": NotifyPrefs }` ; **400** si aucune clé |
 | `POST /api/occ/payments/{id}/action` | voir | `{ "action": "declare"\|"confirm"\|"reset", "method"?: "qr"\|"revolut"\|"paypal"\|"link"\|"wero"\|"bancontact"\|"cash"\|"later" }` | `{ "payment": Payment }` |
 | `GET /api/occ/payments/{id}/qr` | membre | | `PaymentQR` |
 | `GET /api/occ/payments/{id}/wallet-qr/{kind}` | membre | `kind=wero\|bancontact` | image QR du payeur (stream, `Cache-Control: private`) ou 404 |
+| `POST /api/occ/guest` | — (sans session) | `{ "name": "Léa", "color"?: "#RRGGBB", "partyCode"?: "K7M2QX", "teamCode"?: "K7M2QXAB" }` (un seul code) | `{ token, record, party: {id,title}\|null, team: {id,name}\|null }` — crée un·e invité·e et le fait rejoindre (§3 *Invités*) ; **400** code absent / mal formé / commande fermée / équipe archivée / prénom vide, **404** code inconnu, **429** limite par IP |
+| `GET /api/occ/invites/{code}` | — | | aperçu public d'un lien : commande (6 car.) `{ kind: "party", code, title, host, status, memberCount, joinable }` ou équipe (8 car.) `{ kind: "team", code, title, emoji, color, memberCount, joinable }` ; 400 / 404 ; 429 (60/min/IP) |
+| `POST /api/occ/me/upgrade` | invité·e | `{ email, password, passwordConfirm?, name? }` | `{ token, record }` — « Créer mon compte » sur le même enregistrement (historique conservé) ; 400 si déjà un compte complet, e-mail invalide / pris, mot de passe < 8 |
+| `GET /api/occ/me/teams` | ✔ | | `{ items: TeamView[] }` — mes équipes (non archivées d'abord, puis nom) ; 6 membres max par équipe, sans candidats |
+| `POST /api/occ/teams/join` | ✔ | `{ "code": "K7M2QXAB" }` | `{ team: TeamView, alreadyMember }` — idempotent ; 400 lien mal formé / équipe archivée, 404 inconnu |
+| `GET /api/occ/teams/{id}` | membre de l'équipe | | `{ team: TeamView }` (ci-dessous) ; 403 non-membre, 404 |
+| `GET /api/occ/teams/{id}/parties` | membre de l'équipe | `page`, `perPage` (1–50) | `{ page, perPage, totalItems, totalPages, items: [{ party: HistoryEntry, isMember }] }` — historique de l'équipe, plus récent d'abord (mes totaux, même code que `/me/history`) |
+| `POST /api/occ/teams/{id}/launch` | membre (pas invité·e) | `{ "title"?: string }` (≤ 120) | `{ party: Party, created: bool }` — « Lancer la commande du jour » (voir `teams`) ; 400 équipe archivée ; 403 invité·e / non-membre |
+| `POST /api/occ/teams/{id}/leave` | membre (≠ propriétaire) | | `{ ok: true }` (perd aussi ses droits d'admin) |
+| `DELETE /api/occ/teams/{id}/members/{userId}` | propriétaire / admin | | `{ team: TeamView }` — propriétaire : tout le monde sauf lui ; admin : les simples membres (`domain.CheckRemoveMember`, 400 sinon) |
+| `POST /api/occ/teams/{id}/code` | propriétaire / admin | | `{ code }` — nouveau lien `/e/:code` (l'ancien ne fonctionne plus) |
+| `POST /api/occ/parties/{id}/join` | membre de l'équipe de la party | | `{ party, alreadyMember }` — rejoindre **en un geste, sans code** ; 403 party sans équipe ou non-membre de l'équipe ; 400 statut fermé |
+| `GET /api/occ/parties/{id}/team` | membre de la party | | `{ team: { id, name, emoji, color, isMember } \| null, missing: TeamMember[] }` — « Membres de l'équipe pas encore là » (comptes actifs) |
 | `GET /api/occ/admin/stats` | admin | | `AdminStats` (ci-dessous) |
 | `POST /api/occ/admin/import` | admin | `RestaurantImport` **ou** `RestaurantImport[]` ; `?dryRun=1` | `{ "report": ImportReport, "restaurant": id, "items": n }` — upsert par slug, tout ou rien ; invalide → **400** `{ status, message, data, report }` (rien n'est écrit) ; en dry run → 200 avec `report.valid=false` |
 | `POST /api/occ/admin/import/csv` | admin | multipart `file` (CSV, voir ci-dessous) ; `?dryRun=1` | idem |
 | `GET /api/occ/admin/export` | admin | | `RestaurantImport[]` (tous les restaurants, actifs ou non, menus complets ; `Content-Disposition: attachment`) — réimportable tel quel |
-| `GET /api/occ/admin/users` | admin | `q` (nom/e-mail, `%` `_` littéraux), `role` (`user`\|`admin`), `status` (`banned`\|`unverified`\|`deleted`), `page`, `perPage` (≤ 200) | `{ page, perPage, totalItems, items: AdminUser[] }`, plus récents d'abord (`AdminUser` ci-dessous) |
+| `GET /api/occ/admin/users` | admin | `q` (nom/e-mail, `%` `_` littéraux), `role` (`user`\|`admin`), `status` (`banned`\|`unverified`\|`deleted`\|`guest`), `page`, `perPage` (≤ 200) | `{ page, perPage, totalItems, items: AdminUser[] }`, plus récents d'abord (`AdminUser` ci-dessous) |
 | `PATCH /api/occ/admin/users/{id}/role` | admin | `{ "role": "user"\|"admin" }` | `{ "user": AdminUser }` (400 si on se retire ses propres droits, si c'est le dernier admin actif, ou si le compte est supprimé) |
 | `POST /api/occ/admin/users/{id}/ban` | admin | `{ "reason"?: string }` (≤ 300 car.) | `{ "user": AdminUser }` — suspend et déconnecte partout ; **400** soi-même, dernier admin actif, déjà suspendu, compte supprimé, motif trop long |
 | `POST /api/occ/admin/users/{id}/unban` | admin | | `{ "user": AdminUser }` — **400** si non suspendu ou supprimé |
@@ -549,7 +807,7 @@ fermées), `auth-with-oauth2`, `auth-methods`, update `users` avec `oldPassword`
   "verified": true, "created": "2026-10-01 10:00:00.000Z", "parties": 3,
   "banned": true, "bannedReason": "spam", "bannedAt": "2026-10-09 08:00:00.000Z",
   "deleted": false, "deletedAt": "", "passwordSet": true, "providers": ["google"],
-  "lastLoginAt": "2026-10-08 10:00:00.000Z" }
+  "lastLoginAt": "2026-10-08 10:00:00.000Z", "isGuest": false }
 ```
 `lastLoginAt` = dernière origine de connexion connue (`_authOrigins`, mise à jour à chaque connexion par mot
 de passe / Google ; `""` si aucune).
@@ -558,6 +816,22 @@ Règles `payments/{id}/action` :
 * `declare` — débiteur seulement. `method=qr|revolut|paypal|link|wero|bancontact|cash` → `status=declared` ; `method=later` → `status=pending`.
 * `confirm` — créancier (payeur) ou hôte → `status=confirmed`. Si tous confirmés → party `closed`.
 * `reset` — créancier ou hôte → `status=pending`.
+
+### `TeamView` (`/teams/{id}`, `/me/teams`)
+```json
+{ "id": "…", "name": "OCC Mons — midi", "code": "K7M2QXAB", "emoji": "🍕", "color": "#FF6A3D",
+  "address": "Rue de Nimy 7, 7000 Mons", "lat": 50.45, "lng": 3.95, "usualTime": "12:15",
+  "usualDays": ["mon","tue","wed","thu","fri"], "defaultSplit": "equal", "archived": false,
+  "defaultCandidates": [{ "id": "…", "name": "Pizza Nonna", "emoji": "🍕", "cover": "", "cover_url": "", "active": true }],
+  "created": "…", "myRole": "owner", "memberCount": 3,
+  "members": [{ "id": "…", "name": "Bob", "avatar": "", "color": "#…", "isGuest": false, "role": "owner" }],
+  "activeParty": { "id": "…", "code": "K7M2QX", "title": "Midi du lundi", "status": "voting", "created": "…",
+                   "host": { "id": "…", "name": "Bob", "avatar": "", "color": "#…" }, "memberCount": 2, "isMember": false,
+                   "restaurant": null } }
+```
+`members` : propriétaire d'abord puis ordre d'arrivée, comptes supprimés exclus (`TeamMember` = `UserInfo` + `isGuest`,
+`role` `owner`\|`admin`\|`member`) ; `myRole` du demandeur ; `activeParty` = commande d'équipe la plus récente ni close ni
+annulée (`null` sinon) ; `defaultCandidates` vide dans `/me/teams`.
 
 ### `Summary`
 ```json
@@ -613,6 +887,25 @@ mes paiements : 8 requêtes par page, comptage compris, quelle que soit sa taill
 Commande comptée (`domain.ComputeHistoryStats`, pur et testé) = party `review` / `paying` / `closed` où j'ai
 au moins un article ; `totalSpent` = Σ de mes parts (`total`). Favoris : plus de commandes (resto) / plus
 grande quantité cumulée (plat, nom insensible à la casse), puis le plus récent, puis le nom ; `null` si aucun.
+
+### `SearchResult` (`/search`)
+```json
+{ "query": "piza", "terms": ["pizza", "pita"], "fuzzy": true,
+  "restaurants": [{ "id": "…", "name": "La Pizza", "emoji": "🍕", "cuisines": ["pizza", "italien"],
+                    "itemsCount": 12, "distanceKm": 0.4 }],
+  "dishes": [{ "id": "…", "name": "Pizza truffe", "price": 1600, "emoji": "🍕",
+               "snippet": "…crème de truffe, mozzarella…", "restaurant": { "id": "…", "name": "La Pizza", "emoji": "🍕" } }],
+  "people": [{ "id": "…", "name": "Bob Martin", "avatar": "", "color": "#…", "sharedParties": 3,
+               "recentParties": [{ "id": "…", "code": "K7M2QX", "title": "Midi du vendredi", "status": "closed",
+                                   "created": "2026-10-09 10:02:11.000Z" }] }],
+  "actions": [{ "id": "new-party", "label": "Lancer une commande", "href": "/?lancer=1" }] }
+```
+`terms` = termes pliés réellement cherchés (corrections comprises), pour surligner côté client ; `snippet` =
+extrait **texte brut** de la description (accents d'origine, ≤ 90 car., « … ») autour du premier terme trouvé
+(début de la description sinon) ; `distanceKm` absent sans `lat`/`lng` ou si `geo_approx` ;
+`itemsCount` = plats disponibles ; `sharedParties` = parties en commun (0 = collègue d'équipe seulement),
+`recentParties` = 3 dernières. `actions` (raccourcis statiques filtrés par les termes ; tous si `q` est vide) :
+`new-party`, `restaurants`, `my-orders` (connecté), `admin` (admin).
 
 ### `ReorderPreview` (`/parties/{id}/reorder`)
 ```json
@@ -874,3 +1167,6 @@ proche à la même adresse. Voir `docs/DEPLOYMENT.md`.
 | `OCC_SMTP_TLS` | `true` si port 465, sinon `false` | `true` = TLS implicite ; `false` = STARTTLS si le serveur le propose |
 | `OCC_MAIL_FROM` | `OCC_SMTP_USERNAME` s'il contient `@` | expéditeur (ex. `noreply@fs0ciety.org`) |
 | `OCC_MAIL_FROM_NAME` | `OCC Deliveries` | nom d'expéditeur |
+| `OCC_PUSH_ENABLED` | `true` | notifications Web Push (`false` = aucune notification, abonnement refusé) |
+| `OCC_VAPID_PUBLIC_KEY` / `OCC_VAPID_PRIVATE_KEY` | — | paire VAPID (`go run ./cmd/vapid`) ; absentes = paire générée une fois et gardée dans `server_secrets` (`pb_data`) ; **changer de clés invalide tous les abonnements** |
+| `OCC_VAPID_SUBJECT` | `mailto:OCC_MAIL_FROM` | contact de l'expéditeur des notifications (`mailto:` ou `https://`) |

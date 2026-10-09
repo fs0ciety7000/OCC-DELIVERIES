@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { CheckCircle2, Lock, RotateCcw, UserRoundCog } from 'lucide-react'
 import { motion } from 'motion/react'
-import { Suspense, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { PaymentCoin } from '@/components/food'
 import { Avatar, Badge, Button, buttonClass, Card, CardBody, EmptyState, Money, Sheet, Skeleton } from '@/components/ui'
@@ -10,12 +10,14 @@ import { useMediaQuery } from '@/lib/hooks'
 import { cn } from '@/lib/cn'
 import { errorMessage } from '@/lib/errors'
 import { formatRelativeTime } from '@/lib/format'
+import { haptic } from '@/lib/haptics'
 import { spring } from '@/lib/motion'
 import { qk } from '@/lib/queryKeys'
 import type { DeclareMethod, Payment } from '@/lib/types'
 import type { PartyCtx } from '../context'
 import { usePaymentAction, usePayments, useSetPayer, useTransition } from '../hooks'
 import { availableMethods, declareLabel, METHOD_BADGE, METHOD_LABELS, methodHint, orderForDevice, payoutMethods } from '../labels'
+import { DispatchedBanner } from './DispatchedBanner'
 import { MethodDetails, MethodMark, MethodTiles, StatusBadge } from './PaymentMethods'
 
 export function PayingStep({ ctx }: { ctx: PartyCtx }) {
@@ -50,6 +52,7 @@ export function PayingStep({ ctx }: { ctx: PartyCtx }) {
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
       <div className="min-w-0 space-y-4">
+        {party.dispatch && <DispatchedBanner party={party} />}
         <Card>
           <CardBody className="space-y-3">
             <div className="flex items-center gap-3">
@@ -133,6 +136,12 @@ function MyShare({ ctx, payment }: { ctx: PartyCtx; payment: Payment }) {
   const [changing, setChanging] = useState(false)
   const method = chosen ?? methods[0] ?? null
   const declared = payment.status === 'declared'
+  // Vibration courte quand le payeur confirme ma part (évènement realtime, pas au chargement).
+  const lastStatus = useRef(payment.status)
+  useEffect(() => {
+    if (lastStatus.current !== 'confirmed' && payment.status === 'confirmed') haptic('paid')
+    lastStatus.current = payment.status
+  }, [payment.status])
   const showPicker = payment.status === 'pending' || changing
 
   return (
@@ -246,7 +255,15 @@ function PaymentsList({ ctx, payments, canManage }: { ctx: PartyCtx; payments: P
   const [busyId, setBusyId] = useState<string | null>(null)
   const run = (p: Payment, a: 'confirm' | 'reset') => {
     setBusyId(p.id)
-    action.mutate({ paymentId: p.id, action: a }, { onSettled: () => setBusyId(null) })
+    action.mutate(
+      { paymentId: p.id, action: a },
+      {
+        onSuccess: () => {
+          if (a === 'confirm') haptic('paid')
+        },
+        onSettled: () => setBusyId(null),
+      },
+    )
   }
   if (payments.length === 0) {
     return (

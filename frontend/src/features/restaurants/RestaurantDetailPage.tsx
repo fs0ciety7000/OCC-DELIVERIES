@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { Button, EmptyState, Money, Skeleton } from '@/components/ui'
 import { CreatePartySheet } from '@/features/party/CreatePartySheet'
+import { useDishFocus } from '@/features/search/dishFocus'
 import { useAuth } from '@/lib/auth'
 import { errorMessage, isNotFound } from '@/lib/errors'
 import { formatPhone, mapHref, telHref } from '@/lib/format'
@@ -24,6 +25,8 @@ export function RestaurantDetailPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const { isAuthenticated } = useAuth()
   const navigate = useNavigate()
+  // arrivée depuis la recherche (?plat=<id>) : défile jusqu'au plat et le met en évidence
+  useDishFocus(!!menu.data)
 
   const startParty = () => {
     if (!isAuthenticated) {

@@ -1,3 +1,4 @@
+import type { RecordModel } from 'pocketbase'
 import { pb } from './pb'
 import type {
   AdminSettings,
@@ -24,6 +25,8 @@ import type {
   MenuItem,
   NearbyQuery,
   NearbyRestaurant,
+  SearchQuery,
+  SearchResult,
   OrderItem,
   OrderItemInput,
   Party,
@@ -46,6 +49,15 @@ import type {
   User,
   Vote,
   WalletKind,
+  PushPrefsResponse,
+  PushPublicKey,
+  NotifyPrefs,
+  GuestAuthResponse,
+  InvitePreview,
+  PartyTeamInfo,
+  Team,
+  TeamHistoryPage,
+  TeamRecord,
 } from './types'
 
 const json = (body: unknown) => ({ method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } })
@@ -65,6 +77,17 @@ export const occ = {
     if (q.cuisine) query.cuisine = q.cuisine
     const res = await pb.send<{ items: NearbyRestaurant[] | null }>('/api/occ/restaurants/nearby', { method: 'GET', query })
     return res.items ?? []
+  },
+
+  /** Recherche globale (restos, plats, collègues, raccourcis). `signal` : requête annulée si la saisie change. */
+  search: (q: SearchQuery, signal?: AbortSignal) => {
+    const query: Record<string, string | number> = { q: q.q }
+    if (q.limit) query.limit = q.limit
+    if (q.lat !== undefined && q.lng !== undefined) {
+      query.lat = q.lat
+      query.lng = q.lng
+    }
+    return pb.send<SearchResult>('/api/occ/search', { method: 'GET', query, signal })
   },
 
   /** Idempotent : `alreadyMember` si on faisait déjà partie de la commande (quel que soit son statut). */
@@ -284,6 +307,8 @@ export interface CreatePartyInput {
   delivery_address?: string
   notes?: string
   candidates?: string[]
+  /** Commande « Pour l'équipe … » : adresse, candidats et partage par défaut de l'équipe si vides. */
+  team?: string
 }
 
 export interface PartyFeesInput {
@@ -298,7 +323,7 @@ export const partiesApi = {
 
   /** Le hook serveur force host, members, code et status. */
   create: (input: CreatePartyInput, hostId: string) =>
-    pb.collection('parties').create<Party>({ ...input, host: hostId, split_mode: 'equal' }, { expand: PARTY_EXPAND }),
+    pb.collection('parties').create<Party>({ ...input, host: hostId, ...(input.team ? {} : { split_mode: 'equal' }) }, { expand: PARTY_EXPAND }),
 
   mineActive: (userId: string) =>
     pb.collection('parties').getFullList<Party>({
@@ -311,7 +336,7 @@ export const partiesApi = {
   setCandidates: (id: string, candidates: string[]) =>
     pb.collection('parties').update<Party>(id, { candidates }, { expand: PARTY_EXPAND }),
 
-  update: (id: string, data: Partial<Pick<Party, 'title' | 'delivery_address' | 'notes' | 'voting_ends_at' | 'ordering_ends_at'>> & PartyFeesInput) =>
+  update: (id: string, data: Partial<Pick<Party, 'title' | 'delivery_address' | 'notes' | 'voting_ends_at' | 'ordering_ends_at' | 'auto_close_disabled'>> & PartyFeesInput) =>
     pb.collection('parties').update<Party>(id, data, { expand: PARTY_EXPAND }),
 
   members: (partyId: string) =>
@@ -324,8 +349,9 @@ export const partiesApi = {
   votes: (partyId: string) =>
     pb.collection('votes').getFullList<Vote>({ filter: pb.filter('party = {:p}', { p: partyId }), sort: 'created' }),
 
-  vote: (partyId: string, userId: string, restaurantId: string) =>
-    pb.collection('votes').create<Vote>({ party: partyId, user: userId, restaurant: restaurantId }),
+  /** `clientKey` : idempotence (un rejeu de la file hors ligne renvoie le vote existant). */
+  vote: (partyId: string, userId: string, restaurantId: string, clientKey?: string) =>
+    pb.collection('votes').create<Vote>({ party: partyId, user: userId, restaurant: restaurantId, ...(clientKey ? { client_key: clientKey } : {}) }),
 
   unvote: (voteId: string) => pb.collection('votes').delete(voteId),
 
@@ -457,4 +483,69 @@ export const payoutApi = {
     const token = await pb.files.getToken()
     return pb.files.getURL(profile as unknown as { id: string; collectionId: string; collectionName: string }, filename, { token })
   },
+}
+
+/* ------------------------------------------- équipes & invités (1760000016) */
+
+export type TeamSettingsInput = Partial<
+  Pick<TeamRecord, 'name' | 'emoji' | 'color' | 'address' | 'lat' | 'lng' | 'usual_time' | 'usual_days' | 'default_candidates' | 'default_split' | 'archived' | 'admins'>
+>
+
+export const teamsApi = {
+  mine: async () => (await pb.send<{ items: Team[] }>('/api/occ/me/teams', { method: 'GET' })).items ?? [],
+  get: async (id: string) => (await pb.send<{ team: Team }>(`/api/occ/teams/${id}`, { method: 'GET' })).team,
+  /** Création par la collection : le serveur force propriétaire, membres et code. */
+  create: (data: TeamSettingsInput & { name: string }) => pb.collection('teams').create<TeamRecord>(data),
+  update: (id: string, data: TeamSettingsInput) => pb.collection('teams').update<TeamRecord>(id, data),
+  /** Lien fixe /e/:code — idempotent (`alreadyMember`). */
+  join: (code: string) => pb.send<{ team: Team; alreadyMember: boolean }>('/api/occ/teams/join', json({ code: code.toUpperCase() })),
+  leave: (id: string) => pb.send<{ ok: true }>(`/api/occ/teams/${id}/leave`, json({})),
+  removeMember: (id: string, userId: string) => pb.send<{ team: Team }>(`/api/occ/teams/${id}/members/${userId}`, { method: 'DELETE' }),
+  newCode: (id: string) => pb.send<{ code: string }>(`/api/occ/teams/${id}/code`, json({})),
+  /** « Lancer la commande du jour » — renvoie la commande en cours si elle existe (`created: false`). */
+  launch: (id: string, title?: string) => pb.send<{ party: Party; created: boolean }>(`/api/occ/teams/${id}/launch`, json(title ? { title } : {})),
+  history: (id: string, page = 1, perPage = 10) =>
+    pb.send<TeamHistoryPage>(`/api/occ/teams/${id}/parties`, { method: 'GET', query: { page, perPage } }),
+  /** Rejoindre en un geste la commande de son équipe (sans code). */
+  joinParty: (partyId: string) => pb.send<{ party: Party; alreadyMember: boolean }>(`/api/occ/parties/${partyId}/join`, json({})),
+  partyTeam: (partyId: string) => pb.send<PartyTeamInfo>(`/api/occ/parties/${partyId}/team`, { method: 'GET' }),
+}
+
+export const guestApi = {
+  /** Aperçu public d'un lien /j/:code (6 caractères) ou /e/:code (8). */
+  preview: (code: string) => pb.send<InvitePreview>(`/api/occ/invites/${encodeURIComponent(code.toUpperCase())}`, { method: 'GET' }),
+  /** Crée l'invité·e, le connecte (jeton enregistré) et le fait rejoindre la commande / l'équipe. */
+  join: async (input: { name: string; color?: string; partyCode?: string; teamCode?: string }) => {
+    const res = await pb.send<GuestAuthResponse>('/api/occ/guest', json(input))
+    pb.authStore.save(res.token, res.record as unknown as RecordModel)
+    return res
+  },
+  /** Transforme le compte invité en compte complet (même enregistrement : historique conservé). */
+  upgrade: async (input: { email: string; password: string; name?: string }) => {
+    const res = await pb.send<{ token: string; record: User }>('/api/occ/me/upgrade', json({ ...input, passwordConfirm: input.password }))
+    pb.authStore.save(res.token, res.record as unknown as RecordModel)
+    return res
+  },
+}
+
+/* --------------------------------------------- notifications push (1760000015) */
+
+export interface PushSubscriptionInput {
+  endpoint: string
+  keys: { p256dh: string; auth: string }
+}
+
+export const pushApi = {
+  publicKey: () => pb.send<PushPublicKey>('/api/occ/push/public-key', { method: 'GET' }),
+  subscribe: (sub: PushSubscriptionInput) => pb.send<{ ok: boolean; id: string }>('/api/occ/push/subscribe', json(sub)),
+  unsubscribe: (endpoint: string) =>
+    pb.send<{ ok: boolean; deleted: number }>('/api/occ/push/subscribe', {
+      method: 'DELETE',
+      body: JSON.stringify({ endpoint }),
+      headers: { 'Content-Type': 'application/json' },
+    }),
+  test: () => pb.send<{ queued: boolean; devices: number }>('/api/occ/push/test', json({})),
+  prefs: () => pb.send<PushPrefsResponse>('/api/occ/push/prefs', { method: 'GET' }),
+  setPrefs: (prefs: Partial<NotifyPrefs>) =>
+    pb.send<{ prefs: NotifyPrefs }>('/api/occ/push/prefs', { method: 'PATCH', body: JSON.stringify(prefs), headers: { 'Content-Type': 'application/json' } }),
 }

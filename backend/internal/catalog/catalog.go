@@ -19,6 +19,7 @@ import (
 
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/domain"
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/providers"
+	"github.com/fs0ciety7000/occ-deliveries/backend/internal/search"
 )
 
 // Collection names.
@@ -401,7 +402,10 @@ func Import(app core.App, in RestaurantImport) (string, int, error) {
 			}
 		}
 		// the restaurant record was saved before its new menu
-		return RefreshItemsCount(tx, rest.Id)
+		if err := RefreshItemsCount(tx, rest.Id); err != nil {
+			return err
+		}
+		return search.Reindex(tx, rest.Id)
 	})
 	if err != nil {
 		return "", 0, err

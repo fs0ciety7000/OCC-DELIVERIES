@@ -25,6 +25,8 @@ const ForgotPasswordPage = lazy(() => import('@/features/auth/EmailPages').then(
 const ResetPasswordPage = lazy(() => import('@/features/auth/EmailPages').then((m) => ({ default: m.ResetPasswordPage })))
 const VerifyEmailPage = lazy(() => import('@/features/auth/EmailPages').then((m) => ({ default: m.VerifyEmailPage })))
 const ConfirmEmailChangePage = lazy(() => import('@/features/auth/EmailPages').then((m) => ({ default: m.ConfirmEmailChangePage })))
+const TeamPage = lazy(() => import('@/features/teams/TeamPage').then((m) => ({ default: m.TeamPage })))
+const TeamJoinPage = lazy(() => import('@/features/teams/TeamJoinPage').then((m) => ({ default: m.TeamJoinPage })))
 const ProfilePage = lazy(() => import('@/features/profile/ProfilePage').then((m) => ({ default: m.ProfilePage })))
 
 export const router = createBrowserRouter([
@@ -42,11 +44,14 @@ export const router = createBrowserRouter([
       { path: '/auth/changer-email/:token', element: <ConfirmEmailChangePage /> },
       { path: '/restaurants', element: <RestaurantsPage /> },
       { path: '/restaurants/:id', element: <RestaurantDetailPage /> },
+      // invitation : sans session, page « Se connecter / Continuer en invité·e » (InviteGate)
+      { path: '/j/:code', element: <JoinPage /> },
+      { path: '/e/:code', element: <TeamJoinPage /> },
       {
-        path: '/j/:code',
+        path: '/equipes/:id',
         element: (
           <RequireAuth>
-            <JoinPage />
+            <TeamPage />
           </RequireAuth>
         ),
       },

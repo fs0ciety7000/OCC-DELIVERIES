@@ -159,6 +159,63 @@ serveur) → **« Envoyer un e-mail de test »** : il arrive à l'adresse de l'a
 oublié ? » depuis la page de connexion. Les e-mails partent en `text/html` (modèles français
 `backend/internal/app/mailtemplates.go`) ; vérifier qu'ils n'arrivent pas en indésirables (SPF/DKIM).
 
+## 3 quater. Équipes et invités (rien à configurer)
+
+Fonctions livrées par la migration `1760000016` (appliquée automatiquement au démarrage) — **aucune variable,
+aucun réglage Coolify** :
+
+* **Salons d'équipe** — Accueil → *Mes équipes* → « Créer une équipe » (nom, adresse du bureau, heure habituelle).
+  Chaque équipe a un **lien fixe** `https://eat.fs0ciety.org/e/<code>` (à épingler dans Teams / Slack / WhatsApp ;
+  « Nouveau lien » l'invalide en cas de fuite). Page d'équipe : membres, **« Lancer la commande du jour »**
+  (titre « Midi du lundi », adresse du bureau, restos candidats et partage par défaut), commande en cours mise en
+  avant (les membres la rejoignent en un geste, sans code ; toast « Rejoindre » en direct), historique, réglages
+  (propriétaire / admins d'équipe). Une équipe s'**archive** (jamais supprimée : l'historique reste).
+* **Invités sans compte** — sur un lien `/j/<code>` ou `/e/<code>`, « Continuer en invité·e » : juste un prénom.
+  Un invité vote, commande, se déclare prêt et rembourse sa part ; il ne peut pas lancer de commande, créer
+  d'équipe, être admin ni enregistrer de coordonnées de remboursement tant qu'il n'a pas **créé son compte**
+  (Profil → « Créer mon compte » : e-mail + mot de passe, ou Google — même compte, historique conservé).
+  Session de 30 jours renouvelée à chaque visite. Limite : 10 créations d'invités par heure et par adresse IP
+  (mémoire du serveur, remise à zéro au redéploiement).
+* **Nettoyage automatique** — chaque nuit (03:40 UTC), les invités inactifs depuis 60 jours sont anonymisés
+  comme une suppression de compte (« Compte supprimé », historique et montants conservés). *Admin → Utilisateurs*
+  → filtre **Invités** (badge « Invité ») pour les voir.
+* Les notifications push d'un lancement d'équipe passent par le point d'extension `app.SetTeamNotifier`
+  (voir `docs/ARCHITECTURE.md`, `teams`) ; sans lui, toast en direct dans l'app seulement.
+
+## 3 quinquies. Notifications push, heures limites, mode hors ligne
+
+**Notifications (Web Push).** Rien d'obligatoire : sans variables, le serveur génère au premier démarrage une paire
+de clés VAPID et la garde dans la collection `server_secrets` (superusers seulement) du volume `/pb/pb_data` — les
+abonnements survivent aux redémarrages et aux déploiements. Pour fixer les clés (recommandé si `pb_data` peut être
+recréé) :
+
+```bash
+cd backend && go run ./cmd/vapid
+# OCC_VAPID_PUBLIC_KEY=B…   OCC_VAPID_PRIVATE_KEY=…   OCC_VAPID_SUBJECT=mailto:…
+```
+
+Dans Coolify → *Environment Variables* : `OCC_VAPID_PUBLIC_KEY`, `OCC_VAPID_PRIVATE_KEY` (secret, **jamais** commité),
+`OCC_VAPID_SUBJECT` (défaut `mailto:` + `OCC_MAIL_FROM`, par ex. `mailto:noreply@fs0ciety.org`). Les deux clés vont
+ensemble. **Changer de clés invalide tous les abonnements** : chacun devra réactiver les notifications (Profil → Mes
+infos → Notifications). `OCC_PUSH_ENABLED=false` coupe tout (abonnements refusés, aucun envoi).
+
+Le serveur doit pouvoir joindre les services push des navigateurs en HTTPS sortant (`fcm.googleapis.com`,
+`updates.push.services.mozilla.com`, `*.notify.windows.com`, `web.push.apple.com`). Test : Profil → Mes infos →
+*Activer les notifications* puis *Envoyer un test*.
+
+**iPhone / iPad** : le push n'existe que pour une app **ajoutée à l'écran d'accueil** (iOS / iPadOS 16.4+) : Safari →
+Partager → « Sur l'écran d'accueil », ouvrir OCC depuis l'icône, puis activer dans le profil (la carte l'explique).
+Une notification non lue est remplacée par la suivante de la même commande (`tag`).
+
+**Heures limites automatiques** : rien à configurer (job cron interne chaque minute, heure de Bruxelles pour
+l'affichage). Les commandes ouvertes au moment de la mise à jour gardent leurs heures « indicatives » (clôture
+automatique désactivée par la migration `1760000015`).
+
+**Hors ligne / installation** : le service worker (`/sw.js`) et le manifeste sont servis par le binaire avec le SPA ;
+le HTTPS de Coolify est requis (service workers et push n'existent qu'en contexte sécurisé, ou `localhost`). Après un
+déploiement, la nouvelle version s'active au chargement suivant (anciennes coquilles supprimées). Icônes : régénérer
+avec `cd frontend && node scripts/generate-icons.mjs` (Chromium de Playwright, `cd e2e && npm ci`) si le logo change.
+
 ## 4. Gérer les restaurants
 
 **Panneau d'administration : `https://eat.fs0ciety.org/admin`** (en plus de l'admin
@@ -175,8 +232,9 @@ PocketBase `/_/`). Le lien « Admin » apparaît dans la navigation des comptes 
 * Un utilisateur ne peut jamais changer son propre rôle (refusé par le serveur).
 
 ### Gérer les comptes (*Admin → Utilisateurs*)
-* Filtres **Tous / Admins / Suspendus / Non vérifiés**, recherche nom / e-mail ; badges Admin, Suspendu
-  (avec motif), Non vérifié, Google ; date d'inscription et de dernière connexion.
+* Filtres **Tous / Admins / Suspendus / Non vérifiés / Invités**, recherche nom / e-mail ; badges Admin, Suspendu
+  (avec motif), Non vérifié, Invité, Google ; date d'inscription et de dernière connexion. Un invité ne peut pas
+  être promu admin (il doit d'abord créer son compte).
 * Menu « … » d'un compte : promouvoir / retirer admin, **envoyer un lien de réinitialisation** (e-mail ;
   personne ne voit jamais de mot de passe ; nécessite SMTP), **forcer la déconnexion** (tous appareils),
   **suspendre** (motif facultatif ; sessions coupées, connexion refusée « Compte suspendu ») / réactiver,

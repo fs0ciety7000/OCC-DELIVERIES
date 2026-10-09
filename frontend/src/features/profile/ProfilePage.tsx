@@ -17,9 +17,12 @@ import type { PayoutProfile, User } from '@/lib/types'
 import { checkQrFile, isValidMobile, isValidWeroId, normalizeMobile, normalizePaymentLink, normalizePayPalMe, normalizeRevolutTag, normalizeWeroId } from '@/lib/wallet'
 import { OrderHistory } from './OrderHistory'
 import { panelId, tabId, type ProfileTab } from './tabs'
+import { MotionPrefRow } from './MotionPrefRow'
 import { ProfileTabs } from './ProfileTabs'
 import { SecurityCard } from './SecurityCard'
+import { NotificationsCard } from '@/features/notifications/NotificationsCard'
 import { VerifyEmailBanner } from './VerifyEmailBanner'
+import { UpgradeCard } from '@/features/teams/UpgradeCard'
 
 export function ProfilePage() {
   const { user } = useAuth()
@@ -35,7 +38,7 @@ export function ProfilePage() {
         <Avatar user={user} size={56} />
         <div className="min-w-0 flex-1">
           <h1 className="truncate font-display text-[32px] leading-9 font-bold">{user.name || 'Mon profil'}</h1>
-          <p className="truncate text-sm text-muted">{user.email}</p>
+          <p className="truncate text-sm text-muted">{user.is_guest ? 'Invité·e — sans compte' : user.email}</p>
         </div>
         <Button
           variant="secondary"
@@ -58,9 +61,12 @@ export function ProfilePage() {
         </div>
       ) : (
       <div role="tabpanel" id={panelId('infos')} aria-labelledby={tabId('infos')} className="space-y-6">
+      {user.is_guest && <UpgradeCard user={user} />}
       <IdentityCard key={user.id} user={user} />
-      <PayoutCard userId={user.id} />
-      <SecurityCard user={user} />
+      {/* Invité·e : pas de coordonnées de remboursement ni de sécurité avant de créer son compte (refusé côté serveur). */}
+      {!user.is_guest && <PayoutCard userId={user.id} />}
+      {!user.is_guest && <SecurityCard user={user} />}
+      <NotificationsCard userId={user.id} />
       <Card>
         <CardBody className="space-y-3">
           <h2 className="font-display text-lg font-semibold">Apparence</h2>
@@ -75,6 +81,7 @@ export function ProfilePage() {
               { value: 'system', label: 'Système' },
             ]}
           />
+          <MotionPrefRow />
         </CardBody>
       </Card>
       <Button

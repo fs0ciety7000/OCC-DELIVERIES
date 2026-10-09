@@ -3,6 +3,7 @@ import { ArrowLeft, LogOut, MoreHorizontal, Share2, XCircle } from 'lucide-react
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
+import { PulseOnChange } from '@/components/food/PulseOnChange'
 import { AvatarStack, Badge, Button, CopyButton, Sheet, Stepper } from '@/components/ui'
 import { occ } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
@@ -64,10 +65,20 @@ export function PartyHeader({ ctx }: { ctx: PartyCtx }) {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <AvatarStack users={users} size={32} max={6} showReady={showReady} />
+          {/* Cible du « panier vivant » (vols de plats des collègues vers leur avatar). */}
+          <div data-party-avatars>
+            <AvatarStack users={users} size={32} max={6} showReady={showReady} />
+          </div>
           <span className="text-sm text-muted tabular" aria-live="polite">
             {members.length} {members.length > 1 ? 'membres' : 'membre'}
-            {showReady && ` · ${readyCount} prêt${readyCount > 1 ? 's' : ''}`}
+            {showReady && (
+              <>
+                {' · '}
+                <PulseOnChange value={readyCount}>
+                  {readyCount} prêt{readyCount > 1 ? 's' : ''}
+                </PulseOnChange>
+              </>
+            )}
           </span>
         </div>
         {active && (

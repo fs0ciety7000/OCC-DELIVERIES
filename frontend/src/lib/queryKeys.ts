@@ -2,6 +2,7 @@ export const qk = {
   config: ['config'] as const,
   nearby: (lat: number, lng: number, radiusKm: number, q: string) => ['nearby', lat, lng, radiusKm, q] as const,
   restaurant: (id: string) => ['restaurant', id] as const,
+  search: (q: string, lat: number | null, lng: number | null, userId: string, limit: number) => ['search', q, lat, lng, userId, limit] as const,
   menu: (id: string) => ['menu', id] as const,
   party: (id: string) => ['party', id] as const,
   partyDetail: (id: string) => ['party', id, 'detail'] as const,

@@ -35,6 +35,7 @@ type adminUser struct {
 	PasswordSet  bool     `json:"passwordSet"`
 	Providers    []string `json:"providers"`
 	LastLoginAt  string   `json:"lastLoginAt"`
+	IsGuest      bool     `json:"isGuest"`
 }
 
 func dateString(r *core.Record, field string) string {
@@ -57,7 +58,7 @@ func toAdminUser(app core.App, r *core.Record) adminUser {
 		Created: r.GetDateTime("created").String(), Parties: int(n),
 		Banned: r.GetBool(fieldBanned), BannedReason: r.GetString(fieldBannedReason), BannedAt: dateString(r, fieldBannedAt),
 		Deleted: isDeleted(r), DeletedAt: dateString(r, fieldDeletedAt), PasswordSet: r.GetBool(fieldPasswordSet),
-		Providers: []string{},
+		Providers: []string{}, IsGuest: isGuestRecord(r),
 	}
 	if list, err := app.FindAllExternalAuthsByRecord(r); err == nil {
 		for _, ea := range list {
@@ -73,7 +74,7 @@ func toAdminUser(app core.App, r *core.Record) adminUser {
 }
 
 // adminUsers lists the accounts. Filters: q (name / e-mail), role
-// (user|admin), status (banned|unverified|deleted).
+// (user|admin), status (banned|unverified|deleted|guest).
 func (h *handlers) adminUsers(e *core.RequestEvent) error {
 	q := e.Request.URL.Query()
 	page, _ := strconv.Atoi(q.Get("page"))
@@ -100,6 +101,8 @@ func (h *handlers) adminUsers(e *core.RequestEvent) error {
 		conds = append(conds, dbx.HashExp{"verified": false}, notDeleted)
 	case "deleted":
 		conds = append(conds, dbx.Not(notDeleted))
+	case "guest":
+		conds = append(conds, dbx.HashExp{fieldIsGuest: true}, notDeleted)
 	}
 	users, err := e.App.FindCachedCollectionByNameOrId(colUsers)
 	if err != nil {
@@ -186,6 +189,9 @@ func (h *handlers) adminSetRole(e *core.RequestEvent) error {
 	}
 	if t.Deleted {
 		return badRequest("Ce compte a été supprimé.")
+	}
+	if body.Role == roleAdmin && isGuestRecord(u) {
+		return badRequest("Un·e invité·e doit d'abord créer son compte pour devenir administrateur·rice.")
 	}
 	if body.Role == roleUser && t.IsAdmin {
 		if u, err = h.moderate(e, domain.ActionDemote); err != nil {
