@@ -1,0 +1,2518 @@
+[
+  {
+    "slug": "la-pizza-mons",
+    "name": "La Pizza",
+    "description": "Pizzeria familiale aux pizzas cuites au feu de bois, chaussée de Binche.",
+    "emoji": "🍕",
+    "cover_url": "",
+    "cuisines": [
+      "pizza",
+      "italien"
+    ],
+    "address": "Chaussée de Binche 50/06, 7000 Mons",
+    "lat": 50.45142,
+    "lng": 3.98173,
+    "phone": "+32 492 95 11 98",
+    "rating": 0,
+    "rating_count": 0,
+    "price_level": 2,
+    "eta_min": 30,
+    "eta_max": 60,
+    "delivery_fee": 0,
+    "min_order": 0,
+    "providers": [
+      {
+        "id": "takeaway",
+        "url": "https://www.takeaway.com/be-fr/menu/la-pizza-3"
+      }
+    ],
+    "active": true,
+    "categories": [
+      {
+        "name": "Pizzas",
+        "items": [
+          {
+            "name": "Provola e Pepe",
+            "description": "Provola fumée, poivre, basilic",
+            "price": 1350,
+            "emoji": "🍕",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": true
+          },
+          {
+            "name": "Lombarda",
+            "description": "Base crème : mozzarella, crème, gorgonzola, jambon",
+            "price": 1450,
+            "emoji": "🍕",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Vesuvio",
+            "description": "Tomate, mozzarella, friarielli, ail, porchetta, piment croustillant à l'huile",
+            "price": 1700,
+            "emoji": "🌶️",
+            "tags": [
+              "spicy"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Tartuffo",
+            "description": "Base crème : mozzarella, crème de truffe, champignons, parmesan, huile de truffe, burrata",
+            "price": 1700,
+            "emoji": "🍄",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": true
+          },
+          {
+            "name": "Milo",
+            "description": "Tomate, mozzarella, burrata, tomate cerise, parmesan, crème de balsamique, roquette, jambon de Parme",
+            "price": 1750,
+            "emoji": "🍕",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Mortadella e Pistacchio",
+            "description": "Base crème : crème, mozzarella, mortadelle, burrata, crème de pistache, pistaches, huile d'olive extra vierge",
+            "price": 1750,
+            "emoji": "🍕",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Antipasti",
+        "items": [
+          {
+            "name": "Calamari alla Romana",
+            "description": "Calamars frits (6 pièces), citron, roquette, sauce tartare",
+            "price": 650,
+            "emoji": "🦑",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Arancino Bolo",
+            "description": "Arancino bolo frit, coupé en 2, nappé de sauce bolognaise, gratiné au feu de bois",
+            "price": 750,
+            "emoji": "🍙",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Croquettes parmesan",
+            "description": "Mini croquettes au parmesan",
+            "price": 900,
+            "emoji": "🧀",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Insalata di Burrata",
+            "description": "Roquette, burrata, tomates cerise, tomates séchées, copeaux de parmesan, noix, crème de balsamique, huile d'olive extra vierge",
+            "price": 1250,
+            "emoji": "🥗",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Scampi Diavola",
+            "description": "8 scampis, sauce tomate, crème, peperoncino, ail, basilic, vodka, servi avec pain à l'ail",
+            "price": 1450,
+            "emoji": "🍤",
+            "tags": [
+              "spicy"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Scampi Lapizza",
+            "description": "8 scampis, flambés à la Sambuca, sauce pesto crémée, servi avec pain à l'ail",
+            "price": 1450,
+            "emoji": "🍤",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      }
+    ],
+    "source_urls": [
+      "https://www.lapizza-mons.com/",
+      "https://www.lapizza-mons.com/carte",
+      "https://www.takeaway.com/be-fr/menu/la-pizza-3"
+    ],
+    "menu_checked_at": "2026-10-09"
+  },
+  {
+    "slug": "adriatica-mons",
+    "name": "Adriatica",
+    "description": "Pizzeria italienne au feu de bois, avec pâtes et escalopes, chaussée du Roeulx.",
+    "emoji": "🍕",
+    "cover_url": "",
+    "cuisines": [
+      "pizza",
+      "italien",
+      "pâtes"
+    ],
+    "address": "Chaussée du Roeulx 385, 7000 Mons",
+    "lat": 50.45796,
+    "lng": 3.99251,
+    "phone": "",
+    "rating": 0,
+    "rating_count": 0,
+    "price_level": 2,
+    "eta_min": 30,
+    "eta_max": 50,
+    "delivery_fee": 0,
+    "min_order": 0,
+    "providers": [
+      {
+        "id": "takeaway",
+        "url": "https://www.takeaway.com/be/menu/adriatica-mons"
+      }
+    ],
+    "active": true,
+    "categories": [
+      {
+        "name": "Pizzas (medium)",
+        "items": [
+          {
+            "name": "Pizza margherita (M)",
+            "description": "Sauce tomate, mozzarella.",
+            "price": 950,
+            "emoji": "🍕",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": true
+          },
+          {
+            "name": "Pizza 4 fromages (M)",
+            "description": "Sauce tomate, mozzarella, gorgonzola, parmesan, taleggio.",
+            "price": 1250,
+            "emoji": "🧀",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Pizza végetarienne (M)",
+            "description": "Sauce tomate, mozzarella, aubergines, poivrons, champignons, olives, artichauts.",
+            "price": 1200,
+            "emoji": "🥦",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Pizza prosciuto (M)",
+            "description": "Sauce tomate, mozzarella, jambon.",
+            "price": 1150,
+            "emoji": "🍕",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Pizza Parma (M)",
+            "description": "Sauce tomate, mozzarella, jambon de parme, roquette.",
+            "price": 1250,
+            "emoji": "🍕",
+            "tags": [],
+            "option_groups": [],
+            "popular": true
+          },
+          {
+            "name": "Pizza du chef (M)",
+            "description": "Sauce tomate, mozzarella, merguez, boeuf haché, salami, jambon.",
+            "price": 1350,
+            "emoji": "🍕",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Pizza chèvre (M)",
+            "description": "Sauce tomate, mozzarella, chèvre, lardons, miel.",
+            "price": 1250,
+            "emoji": "🐐",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Pizza savoyarde (M)",
+            "description": "Crème, mozzarella, pomme de terre, reblochon, lardons, oignons.",
+            "price": 1400,
+            "emoji": "🧀",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Pizza burrata (M)",
+            "description": "Sauce tomate, mozzarella, jambon de parme, roquette, burrata",
+            "price": 1500,
+            "emoji": "🍕",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Pizzas (géantes)",
+        "items": [
+          {
+            "name": "Pizza margherita (XL)",
+            "description": "Sauce tomate, mozzarella.",
+            "price": 1900,
+            "emoji": "🍕",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Pizza Parma (XL)",
+            "description": "Sauce tomate, mozzarella, jambon de parme, roquette.",
+            "price": 2500,
+            "emoji": "🍕",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Pâtes",
+        "items": [
+          {
+            "name": "Pâtes bolognaise",
+            "description": "",
+            "price": 1250,
+            "emoji": "🍝",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Pâtes carbonara",
+            "description": "",
+            "price": 1250,
+            "emoji": "🍝",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Lasagnes",
+            "description": "",
+            "price": 1250,
+            "emoji": "🍝",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Pâtes 4 fromages",
+            "description": "",
+            "price": 1250,
+            "emoji": "🧀",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Desserts",
+        "items": [
+          {
+            "name": "Tiramisu",
+            "description": "",
+            "price": 500,
+            "emoji": "🍰",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      }
+    ],
+    "source_urls": [
+      "https://www.ladriaticamons.be/",
+      "https://www.takeaway.com/be/menu/adriatica-mons"
+    ],
+    "menu_checked_at": "2026-10-09"
+  },
+  {
+    "slug": "o-sando-mons",
+    "name": "Ô Sando",
+    "description": "Sandwichs japonais (sando) et poke bowls, rue de la Coupe.",
+    "emoji": "🥪",
+    "cover_url": "",
+    "cuisines": [
+      "japonais",
+      "sandwichs",
+      "poké"
+    ],
+    "address": "Rue de la Coupe 7, 7000 Mons",
+    "lat": 50.45356,
+    "lng": 3.95218,
+    "phone": "",
+    "rating": 0,
+    "rating_count": 0,
+    "price_level": 1,
+    "eta_min": 20,
+    "eta_max": 40,
+    "delivery_fee": 0,
+    "min_order": 0,
+    "providers": [
+      {
+        "id": "takeaway",
+        "url": "https://www.takeaway.com/be/menu/o-sando"
+      }
+    ],
+    "active": true,
+    "categories": [
+      {
+        "name": "Sandwichs japonais",
+        "items": [
+          {
+            "name": "Sando poulet pané sauce teriyaki",
+            "description": "Poulet pané, salade guacamole, chou rouge, carottes, sésame.",
+            "price": 800,
+            "emoji": "🥪",
+            "tags": [],
+            "option_groups": [],
+            "popular": true
+          },
+          {
+            "name": "Sando poulet grillé sauce curry",
+            "description": "Poulet grillé, salade, guacamole, chou rouge, concombre, sésame.",
+            "price": 900,
+            "emoji": "🥪",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Sando canard grillé sauce teriyaki",
+            "description": "Canard grillé guacamole, chou rouge, cébette, concombre sésame, salade.",
+            "price": 1000,
+            "emoji": "🦆",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Sando tempura crevettes sauce teriyaki",
+            "description": "Tempura crevettes, guacamole, sésame, cébette, chou rouge, carottes salade.",
+            "price": 1000,
+            "emoji": "🍤",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Sando tofu sauce curry",
+            "description": "Tofu, salade, avocat chou rouge carottes, sésame, cébette.",
+            "price": 900,
+            "emoji": "🥪",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Poke bowls",
+        "items": [
+          {
+            "name": "Poké poulet",
+            "description": "Poulet mariné, edamame avocat carottes, wakamé chou rouge, mangue, sésame, graines de chia, cébette, oignons frits, sauce teriyaki.",
+            "price": 1050,
+            "emoji": "🥗",
+            "tags": [],
+            "option_groups": [],
+            "popular": true
+          },
+          {
+            "name": "Poké crevettes",
+            "description": "Crevettes, avocat edamame carottes wakamé, chou rouge, mangue sésame, graines de chia, cébette, oignons frits, sauce teriyaki.",
+            "price": 1250,
+            "emoji": "🍤",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Poké tofu",
+            "description": "Tofu, avocat wakamé, mangue, chou rouge, carottes, edamame, cébette, sésame, oignons frits, graines de chia, sauce teriyaki.",
+            "price": 1050,
+            "emoji": "🥗",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Poké egg",
+            "description": "Salade d'œufs avocat chou rouge, carottes, mangue, edamame, wakamé, sésame, cébette, noix raisins secs sauce teriyaki.",
+            "price": 950,
+            "emoji": "🥚",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Sides & desserts",
+        "items": [
+          {
+            "name": "Gyozas",
+            "description": "",
+            "price": 550,
+            "emoji": "🥟",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Brochette de poulet yakitori",
+            "description": "",
+            "price": 500,
+            "emoji": "🍢",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Mochis classiques noix de coco",
+            "description": "",
+            "price": 200,
+            "emoji": "🍡",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      }
+    ],
+    "source_urls": [
+      "https://www.o-sando-mons.be/",
+      "https://www.takeaway.com/be/menu/o-sando"
+    ],
+    "menu_checked_at": "2026-10-09"
+  },
+  {
+    "slug": "tomo-mons",
+    "name": "Tomo",
+    "description": "Bar à ramen japonais, rue d'Enghien.",
+    "emoji": "🍜",
+    "cover_url": "",
+    "cuisines": [
+      "japonais",
+      "ramen"
+    ],
+    "address": "Rue d'Enghien 11, 7000 Mons",
+    "lat": 50.45436,
+    "lng": 3.95122,
+    "phone": "",
+    "rating": 0,
+    "rating_count": 0,
+    "price_level": 2,
+    "eta_min": 25,
+    "eta_max": 45,
+    "delivery_fee": 0,
+    "min_order": 0,
+    "providers": [
+      {
+        "id": "takeaway",
+        "url": "https://www.takeaway.com/be/menu/tomo-mons"
+      }
+    ],
+    "active": true,
+    "categories": [
+      {
+        "name": "Ramen",
+        "items": [
+          {
+            "name": "Classique ramen",
+            "description": "Bouillon de porc signature, riche et crémeux.",
+            "price": 1400,
+            "emoji": "🍜",
+            "tags": [],
+            "option_groups": [],
+            "popular": true
+          },
+          {
+            "name": "Miso ramen",
+            "description": "Saveur du miso japonais légèrement piquant.",
+            "price": 1450,
+            "emoji": "🍜",
+            "tags": [
+              "spicy"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Shio ramen",
+            "description": "Bouillon doux légèrement salé.",
+            "price": 1450,
+            "emoji": "🍜",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Veggie ramen",
+            "description": "Choix entre classic, miso ou shio.",
+            "price": 1400,
+            "emoji": "🥬",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Menu classique ramen",
+            "description": "1 ramen classique et 1 boisson.",
+            "price": 1600,
+            "emoji": "🍱",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Sides",
+        "items": [
+          {
+            "name": "Gyozas (6 pièces)",
+            "description": "",
+            "price": 700,
+            "emoji": "🥟",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Gyozas (3 pièces)",
+            "description": "",
+            "price": 500,
+            "emoji": "🥟",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Edamame",
+            "description": "",
+            "price": 450,
+            "emoji": "🫛",
+            "tags": [
+              "vegan"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Bol de riz chashu",
+            "description": "",
+            "price": 650,
+            "emoji": "🍚",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Salade wakame",
+            "description": "",
+            "price": 350,
+            "emoji": "🥗",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Suppléments",
+        "items": [
+          {
+            "name": "Œuf mollet",
+            "description": "",
+            "price": 250,
+            "emoji": "🥚",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Tranche de chashu",
+            "description": "",
+            "price": 200,
+            "emoji": "🥓",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Desserts",
+        "items": [
+          {
+            "name": "Mochi glacé",
+            "description": "Par pièce.",
+            "price": 250,
+            "emoji": "🍡",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      }
+    ],
+    "source_urls": [
+      "https://www.tomomons.be/",
+      "https://www.takeaway.com/be/menu/tomo-mons"
+    ],
+    "menu_checked_at": "2026-10-09"
+  },
+  {
+    "slug": "papou-mons",
+    "name": "Papou",
+    "description": "Street food grecque : pittas gyros, plateaux et mezze, Grand-Rue.",
+    "emoji": "🥙",
+    "cover_url": "",
+    "cuisines": [
+      "grec",
+      "pitta"
+    ],
+    "address": "Grand Rue 70, 7000 Mons",
+    "lat": 50.45046,
+    "lng": 3.94928,
+    "phone": "",
+    "rating": 0,
+    "rating_count": 0,
+    "price_level": 2,
+    "eta_min": 25,
+    "eta_max": 45,
+    "delivery_fee": 0,
+    "min_order": 0,
+    "providers": [
+      {
+        "id": "takeaway",
+        "url": "https://www.takeaway.com/be/menu/papou-mons"
+      }
+    ],
+    "active": true,
+    "categories": [
+      {
+        "name": "Pittas",
+        "items": [
+          {
+            "name": "Pitta gyros poulet",
+            "description": "",
+            "price": 1090,
+            "emoji": "🥙",
+            "tags": [],
+            "option_groups": [],
+            "popular": true
+          },
+          {
+            "name": "Pitta gyros porc",
+            "description": "",
+            "price": 1090,
+            "emoji": "🥙",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Pitta agneau",
+            "description": "",
+            "price": 1190,
+            "emoji": "🥙",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Pitta halloumi",
+            "description": "",
+            "price": 1090,
+            "emoji": "🧀",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Street box & plateaux",
+        "items": [
+          {
+            "name": "Street box gyros poulet",
+            "description": "Servi avec une portion de frites, du gyros de poulet, des oignons rouges, du persil, une sauce au choix en topping.",
+            "price": 1590,
+            "emoji": "🍟",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Street box halloumi",
+            "description": "Servi avec une portion de frites, du halloumi, des oignons rouges, du persil, une sauce au choix en topping.",
+            "price": 1590,
+            "emoji": "🍟",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Plateau Gyros de porc",
+            "description": "inclus : frites, mini salade grecque, pain, sauce papou, tzatziki",
+            "price": 1990,
+            "emoji": "🍽️",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Plateau Brochettes d'agneau",
+            "description": "inclus : frites, mini salade grecque, pain, sauce papou, tzatziki",
+            "price": 2190,
+            "emoji": "🍢",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Mezze & salades",
+        "items": [
+          {
+            "name": "Mezze",
+            "description": "Assortiment de tzatziki, tarama, fetaria, ktipiti, olives de Kalamata, piments doux, dolmas, féta, pain grillé.",
+            "price": 1650,
+            "emoji": "🫒",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Salade grecque",
+            "description": "Concombres, tomates cerises, oignons rouges, feta A.O.P., olives de Kalamata, pain crétois, huile d'olive, sel, origan, tzatziki et un pain grillé.",
+            "price": 1500,
+            "emoji": "🥗",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Tzatziki",
+            "description": "Yaourt à la grecque, concombres, ail.",
+            "price": 460,
+            "emoji": "🥒",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Halloumi (4pc)",
+            "description": "Bâtonnets de fromage chypriote frits.",
+            "price": 550,
+            "emoji": "🧀",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Accompagnements & desserts",
+        "items": [
+          {
+            "name": "Frites et sauce",
+            "description": "Frites origan & sauce Papou.",
+            "price": 490,
+            "emoji": "🍟",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Assortiment de pâtisseries grecques",
+            "description": "",
+            "price": 800,
+            "emoji": "🍯",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      }
+    ],
+    "source_urls": [
+      "https://www.papoumons.be/",
+      "https://www.takeaway.com/be/menu/papou-mons"
+    ],
+    "menu_checked_at": "2026-10-09"
+  },
+  {
+    "slug": "cup-pasta-mons",
+    "name": "Cup Pasta",
+    "description": "Pâtes fraîches servies en cup, pizzettas et piadinas, rue de la Chaussée.",
+    "emoji": "🍝",
+    "cover_url": "",
+    "cuisines": [
+      "pâtes",
+      "italien"
+    ],
+    "address": "Rue de la Chaussée 17, 7000 Mons",
+    "lat": 50.45327,
+    "lng": 3.95173,
+    "phone": "",
+    "rating": 0,
+    "rating_count": 0,
+    "price_level": 1,
+    "eta_min": 20,
+    "eta_max": 40,
+    "delivery_fee": 0,
+    "min_order": 0,
+    "providers": [
+      {
+        "id": "takeaway",
+        "url": "https://www.takeaway.com/be/menu/cup-1"
+      }
+    ],
+    "active": true,
+    "categories": [
+      {
+        "name": "Cups",
+        "items": [
+          {
+            "name": "Cup Chuck Norris",
+            "description": "Tortellini ricotta épinard, sauce spicy cheddar, bolognese, emmenthal et parmesan.",
+            "price": 1350,
+            "emoji": "🍝",
+            "tags": [
+              "spicy"
+            ],
+            "option_groups": [],
+            "popular": true
+          },
+          {
+            "name": "Cup Balboa",
+            "description": "Tortellini gruyère, sauce mascarpone rosso, sauce 4 fromages, roquette, emmenthal et parmesan.",
+            "price": 1350,
+            "emoji": "🍝",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Cup Van Damme",
+            "description": "Ravioli viande, sauce carbonara, napolitana, sauce piquante, emmenthal et parmesan.",
+            "price": 1350,
+            "emoji": "🍝",
+            "tags": [
+              "spicy"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Cup L'Embrouille",
+            "description": "Tortellini ricotta & épinards, tortellini gruyère, ravioli viande, sauce bolognèse, 4 fromages, carbonara, emmenthal et parmesan.",
+            "price": 1350,
+            "emoji": "🍝",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Cup à composer – Medium (300 g)",
+            "description": "",
+            "price": 1100,
+            "emoji": "🍝",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Cup menu",
+            "description": "Small cup, sauce classique, boisson (33 cl) et un cookie.",
+            "price": 1050,
+            "emoji": "🥤",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Plats traiteur",
+        "items": [
+          {
+            "name": "Tagliatelles carbonara",
+            "description": "Tagliatelles fraîches, sauce crème lardons, parmesan. Possibilité de modifier le choix des pâtes en renseignement.",
+            "price": 1450,
+            "emoji": "🍝",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Spaghetti bolognaise",
+            "description": "",
+            "price": 1250,
+            "emoji": "🍝",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Tagliatelles vol-au-vent",
+            "description": "Tagliatelles fraîches, sauce crème champignons, filets de poulet et parmesan.",
+            "price": 1450,
+            "emoji": "🍝",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Prosty Crousty",
+        "items": [
+          {
+            "name": "Korean Crousty",
+            "description": "Le Korean Crousty est composé d'une base de pennes fraîches, sauce thai curry, poulet croustillant, oignons frits et sauce teriyaki.",
+            "price": 1300,
+            "emoji": "🍗",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Mexican Crousty",
+            "description": "Le Mexican Crousty est composé d'une base de pennes fraîches, sauce spicy cheddar, poulet croustillant, oignons frits, jalapenos, sauce aigre-doux et quelques gouttes de sriracha.",
+            "price": 1300,
+            "emoji": "🌶️",
+            "tags": [
+              "spicy"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Pizzettas & piadinas",
+        "items": [
+          {
+            "name": "Pizzetta Margharita",
+            "description": "Sauce tomate, mozzarella, roquette et tomate cerise.",
+            "price": 950,
+            "emoji": "🍕",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Pizzetta Italiano",
+            "description": "Sauce tomate, mozzarella, jambon de parme, roquette et tomate cerise.",
+            "price": 1050,
+            "emoji": "🍕",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Piadinas Polo",
+            "description": "Sauce au poivre, poulet, emmenthal, parmesan, tomate cerise et roquette.",
+            "price": 1200,
+            "emoji": "🌯",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Desserts",
+        "items": [
+          {
+            "name": "Cookie chocolat noir",
+            "description": "",
+            "price": 300,
+            "emoji": "🍪",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      }
+    ],
+    "source_urls": [
+      "https://www.cup-pasta-mons.be/",
+      "https://www.takeaway.com/be/menu/cup-1"
+    ],
+    "menu_checked_at": "2026-10-09"
+  },
+  {
+    "slug": "sushi-lover-mons",
+    "name": "Sushi Lover",
+    "description": "Sushis, makis, poke bowls et plats chauds japonais, rue de la Chaussée.",
+    "emoji": "🍣",
+    "cover_url": "",
+    "cuisines": [
+      "sushi",
+      "japonais",
+      "poké"
+    ],
+    "address": "Rue de la Chaussée 4, 7000 Mons",
+    "lat": 50.45372,
+    "lng": 3.95181,
+    "phone": "",
+    "rating": 0,
+    "rating_count": 0,
+    "price_level": 2,
+    "eta_min": 30,
+    "eta_max": 50,
+    "delivery_fee": 0,
+    "min_order": 0,
+    "providers": [
+      {
+        "id": "takeaway",
+        "url": "https://www.takeaway.com/be/menu/sushi-lover"
+      }
+    ],
+    "active": true,
+    "categories": [
+      {
+        "name": "Lunch & plateaux",
+        "items": [
+          {
+            "name": "Lunch A (12 pièces)",
+            "description": "6 sushi saumon, 6 california saumon avocat.",
+            "price": 1290,
+            "emoji": "🍱",
+            "tags": [],
+            "option_groups": [],
+            "popular": true
+          },
+          {
+            "name": "Lunch B (18 pièces)",
+            "description": "6 california saumon avocat, 6 california surimi avocat, 6 maki hot thon.",
+            "price": 1290,
+            "emoji": "🍱",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Business mix (12 pièces)",
+            "description": "6 california saumon avocat, 6 sushi saumon.",
+            "price": 1380,
+            "emoji": "🍣",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Salmon lovers (24 pièces)",
+            "description": "6 california saumon avocat, 6 cristal roll saumon avocat , 6 maki saumon , 6 pink roll cheese.",
+            "price": 1980,
+            "emoji": "🍣",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Mix roll (24 pièces)",
+            "description": "6 california saumon avocat, 6 maki saumon, 6 maki thon cuit, 6 maki concombre.",
+            "price": 1680,
+            "emoji": "🍣",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Makis & California",
+        "items": [
+          {
+            "name": "Maki saumon",
+            "description": "6 pièces",
+            "price": 500,
+            "emoji": "🍣",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Maki hot thon",
+            "description": "Thon, jeune oignon, sauce épicée.",
+            "price": 650,
+            "emoji": "🌶️",
+            "tags": [
+              "spicy"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "California surimi avocat",
+            "description": "Surimi, avocat, masago.",
+            "price": 600,
+            "emoji": "🍣",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "California chicken onion",
+            "description": "Poulet pâné, concombre, sauce épicée, oignon.",
+            "price": 650,
+            "emoji": "🍣",
+            "tags": [
+              "spicy"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Poke bowls",
+        "items": [
+          {
+            "name": "Poke saumon",
+            "description": "Saumon, avocat, edamame, wakame, maïs, comcombre, carotte, sauce.",
+            "price": 1400,
+            "emoji": "🥗",
+            "tags": [],
+            "option_groups": [],
+            "popular": true
+          },
+          {
+            "name": "Poke bowl au poulet",
+            "description": "Poulet, wakame, edamame, concombre, avocat, carotte, sauce chilli.",
+            "price": 1400,
+            "emoji": "🥗",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Poke veggie",
+            "description": "Avocat, maïs, wakame, concombre, carotte, radis japonais.",
+            "price": 1200,
+            "emoji": "🥗",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Plats chauds",
+        "items": [
+          {
+            "name": "Ramen poulet",
+            "description": "Poulet, oeuf, maïs, légumes, oignons nouveaux, naruto (poisson), algue (miro).",
+            "price": 1400,
+            "emoji": "🍜",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Don poulet",
+            "description": "Riz nature, poulet pané et légumes.",
+            "price": 1400,
+            "emoji": "🍚",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Gyoza",
+            "description": "Poulet, légumes.",
+            "price": 680,
+            "emoji": "🥟",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      }
+    ],
+    "source_urls": [
+      "https://www.sushi-lover.be/",
+      "https://www.takeaway.com/be/menu/sushi-lover"
+    ],
+    "menu_checked_at": "2026-10-09"
+  },
+  {
+    "slug": "snack-alibaba-mons",
+    "name": "Snack Alibaba",
+    "description": "Snack turc : pittas, dürüms, mitraillettes et assiettes grillades, rue de Nimy.",
+    "emoji": "🌯",
+    "cover_url": "",
+    "cuisines": [
+      "kebab",
+      "snack",
+      "turc"
+    ],
+    "address": "Rue de Nimy 17, 7000 Mons",
+    "lat": 50.45547,
+    "lng": 3.95331,
+    "phone": "",
+    "rating": 0,
+    "rating_count": 0,
+    "price_level": 1,
+    "eta_min": 20,
+    "eta_max": 40,
+    "delivery_fee": 0,
+    "min_order": 0,
+    "providers": [
+      {
+        "id": "takeaway",
+        "url": "https://www.takeaway.com/be/menu/snack-alibaba"
+      }
+    ],
+    "active": true,
+    "categories": [
+      {
+        "name": "Dürüms",
+        "items": [
+          {
+            "name": "Dürüm pita agneau",
+            "description": "",
+            "price": 850,
+            "emoji": "🌯",
+            "tags": [],
+            "option_groups": [],
+            "popular": true
+          },
+          {
+            "name": "Dürüm blancs de poulet",
+            "description": "",
+            "price": 880,
+            "emoji": "🌯",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Dürüm mixte",
+            "description": "",
+            "price": 900,
+            "emoji": "🌯",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Dürüm falafel",
+            "description": "",
+            "price": 780,
+            "emoji": "🧆",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Sandwichs & mitraillettes",
+        "items": [
+          {
+            "name": "Sandwich pitta agneau",
+            "description": "",
+            "price": 830,
+            "emoji": "🥖",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Mitraillette pitta agneau",
+            "description": "",
+            "price": 1030,
+            "emoji": "🥖",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Mitraillette brochette de dinde (maison)",
+            "description": "",
+            "price": 1030,
+            "emoji": "🥖",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Hamburgers",
+        "items": [
+          {
+            "name": "Hamburger pur boeuf",
+            "description": "",
+            "price": 730,
+            "emoji": "🍔",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Double hamburger boeuf",
+            "description": "",
+            "price": 880,
+            "emoji": "🍔",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Assiettes",
+        "items": [
+          {
+            "name": "Assiette mixte",
+            "description": "",
+            "price": 1250,
+            "emoji": "🍽️",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Assiette brochette de dinde",
+            "description": "Avec crudités, frites et sauce.",
+            "price": 1650,
+            "emoji": "🍢",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Assiette falafel (5 pièces)",
+            "description": "Avec crudités, frites et sauce.",
+            "price": 1600,
+            "emoji": "🧆",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Frites & desserts",
+        "items": [
+          {
+            "name": "Frites",
+            "description": "",
+            "price": 500,
+            "emoji": "🍟",
+            "tags": [
+              "vegan"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Tiramisu Speculoos",
+            "description": "",
+            "price": 450,
+            "emoji": "🍰",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      }
+    ],
+    "source_urls": [
+      "https://www.snack-alibaba.be/",
+      "https://www.takeaway.com/be/menu/snack-alibaba"
+    ],
+    "menu_checked_at": "2026-10-09"
+  },
+  {
+    "slug": "le-bosphore-mons",
+    "name": "Le Bosphore",
+    "description": "Snack turc : dürüms, pitas, kapsalons et hamburgers du monde, rue de la Clef.",
+    "emoji": "🥙",
+    "cover_url": "",
+    "cuisines": [
+      "kebab",
+      "turc",
+      "burger"
+    ],
+    "address": "Rue de la Clef 32, 7000 Mons",
+    "lat": 50.453,
+    "lng": 3.95294,
+    "phone": "",
+    "rating": 0,
+    "rating_count": 0,
+    "price_level": 1,
+    "eta_min": 20,
+    "eta_max": 40,
+    "delivery_fee": 0,
+    "min_order": 0,
+    "providers": [
+      {
+        "id": "takeaway",
+        "url": "https://www.takeaway.com/be/menu/le-bosphore-mons"
+      }
+    ],
+    "active": true,
+    "categories": [
+      {
+        "name": "Dürüms & pitas",
+        "items": [
+          {
+            "name": "Dürüm agneau",
+            "description": "Galette turque, agneau.",
+            "price": 900,
+            "emoji": "🌯",
+            "tags": [],
+            "option_groups": [],
+            "popular": true
+          },
+          {
+            "name": "Dürüm poulet",
+            "description": "Galette turque, poulet.",
+            "price": 850,
+            "emoji": "🌯",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Dürüm du chef agneau",
+            "description": "Galette turque, agneau, feta.",
+            "price": 1000,
+            "emoji": "🌯",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Dürüm falafel (végétarien)",
+            "description": "Galette turque, falafel.",
+            "price": 500,
+            "emoji": "🧆",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Assiette pita mixte",
+            "description": "Pain pita agneau et poulet, crudités et sauce.",
+            "price": 2000,
+            "emoji": "🍽️",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Kapsalon & tacos",
+        "items": [
+          {
+            "name": "Petit kapsalon",
+            "description": "Frites, viande, sauce fromagère, mozzarella et crudités.",
+            "price": 1300,
+            "emoji": "🍟",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Grand kapsalon",
+            "description": "Frites, viande, sauce fromagère, mozzarella et crudités.",
+            "price": 1500,
+            "emoji": "🍟",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Tacos royal",
+            "description": "Nuggets + cordon bleu + sauce fromagère + frites + mozzarella.",
+            "price": 800,
+            "emoji": "🌮",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Hamburgers",
+        "items": [
+          {
+            "name": "Hamburger bosphore",
+            "description": "Boeuf, oignons sauté au beurre, fromage, lardon halal, sauce barbecue fumé.",
+            "price": 1200,
+            "emoji": "🍔",
+            "tags": [],
+            "option_groups": [],
+            "popular": true
+          },
+          {
+            "name": "Hamburger grec",
+            "description": "Pain brioché, boeuf, feta, olives, fromage, tomate, concombre, sauce au yaourt.",
+            "price": 1200,
+            "emoji": "🍔",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Hamburger belge",
+            "description": "Double hamburger de boeuf, ration de fromage, crudités et sauce au choix.",
+            "price": 1300,
+            "emoji": "🍔",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Hamburger boeuf",
+            "description": "",
+            "price": 700,
+            "emoji": "🍔",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Menus étudiants",
+        "items": [
+          {
+            "name": "Dürüm + frites + boisson",
+            "description": "",
+            "price": 700,
+            "emoji": "🎓",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Frites",
+        "items": [
+          {
+            "name": "Frites (grande)",
+            "description": "",
+            "price": 600,
+            "emoji": "🍟",
+            "tags": [
+              "vegan"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      }
+    ],
+    "source_urls": [
+      "https://www.lebosphore-mons.be/",
+      "https://www.takeaway.com/be/menu/le-bosphore-mons"
+    ],
+    "menu_checked_at": "2026-10-09"
+  },
+  {
+    "slug": "baalbeck-mons",
+    "name": "Baalbeck",
+    "description": "Restaurant libanais : mezzés, grillades et sandwichs, rue de la Clef.",
+    "emoji": "🧆",
+    "cover_url": "",
+    "cuisines": [
+      "libanais",
+      "grillades"
+    ],
+    "address": "Rue de la Clef 16, 7000 Mons",
+    "lat": 50.45332,
+    "lng": 3.95271,
+    "phone": "",
+    "rating": 0,
+    "rating_count": 0,
+    "price_level": 2,
+    "eta_min": 30,
+    "eta_max": 50,
+    "delivery_fee": 0,
+    "min_order": 0,
+    "providers": [
+      {
+        "id": "takeaway",
+        "url": "https://www.takeaway.com/be/menu/baalbeck"
+      }
+    ],
+    "active": true,
+    "categories": [
+      {
+        "name": "Sandwichs",
+        "items": [
+          {
+            "name": "Sandwich chiche taouk",
+            "description": "Grillade de brochette de poulet mariné avec sauce à l'ail et crudités.",
+            "price": 850,
+            "emoji": "🥙",
+            "tags": [],
+            "option_groups": [],
+            "popular": true
+          },
+          {
+            "name": "Sandwich shoarma poulet",
+            "description": "Sandwich de poulet mariné émincé avec sauce à l'ail et crudités.",
+            "price": 850,
+            "emoji": "🥙",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Sandwich kefta mechwi",
+            "description": "Grillade de brochette de viande hachée avec houmous et crudités.",
+            "price": 850,
+            "emoji": "🥙",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Sandwich kefta pimenté",
+            "description": "Grillade de brochette de viande hachée pimentée avec houmous et crudités.",
+            "price": 850,
+            "emoji": "🌶️",
+            "tags": [
+              "spicy"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Assiettes",
+        "items": [
+          {
+            "name": "Assiette shoarma",
+            "description": "Poulet mariné accompagné de salade orientale et houmous.",
+            "price": 2150,
+            "emoji": "🍽️",
+            "tags": [],
+            "option_groups": [],
+            "popular": true
+          },
+          {
+            "name": "Assiette grillade",
+            "description": "Deux brochettes au choix accompagné de bourghoul, taboulé et houmous.",
+            "price": 2200,
+            "emoji": "🍢",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Assiette végétarienne",
+            "description": "Houmous, moutabal, labneh, taboulé, mouhamara, falafel et chausson.",
+            "price": 1900,
+            "emoji": "🥗",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Assiette falafel",
+            "description": "4 falafels accompagnés de 2 mezzés froids au choix.",
+            "price": 1850,
+            "emoji": "🧆",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Mezzés",
+        "items": [
+          {
+            "name": "Houmous",
+            "description": "Purée de pois chiches à l'huile de sésame et citron.",
+            "price": 750,
+            "emoji": "🫘",
+            "tags": [
+              "vegan"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Taboulé libanais",
+            "description": "Persil, menthe, blé, oignons, huile d'olive, citron.",
+            "price": 750,
+            "emoji": "🥗",
+            "tags": [
+              "vegan"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Moutabal",
+            "description": "Purée d'aubergines, crème de sésame, citron, huile d'olive.",
+            "price": 850,
+            "emoji": "🍆",
+            "tags": [
+              "vegan"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Batata harra",
+            "description": "Pomme de terre sauté à l'ail et coriandre.",
+            "price": 400,
+            "emoji": "🥔",
+            "tags": [
+              "vegan"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Desserts",
+        "items": [
+          {
+            "name": "Baklava",
+            "description": "Pâtisserie libanaise, à base de pâte à crêpe, garnie de crème de lait et de pistaches concassées.",
+            "price": 650,
+            "emoji": "🍯",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      }
+    ],
+    "source_urls": [
+      "https://www.baalbeckmons.be/",
+      "https://www.takeaway.com/be/menu/baalbeck",
+      "https://www.takeaway.com/be-fr/menu/baalbeck"
+    ],
+    "menu_checked_at": "2026-10-09"
+  },
+  {
+    "slug": "pacific-traiteur-mons",
+    "name": "Pacific Traiteur Asiatique",
+    "description": "Traiteur chinois et asiatique fondé en 1992, livraison sur Mons, rue de Nimy.",
+    "emoji": "🥡",
+    "cover_url": "",
+    "cuisines": [
+      "chinois",
+      "asiatique"
+    ],
+    "address": "Rue de Nimy 45, 7000 Mons",
+    "lat": 50.45657,
+    "lng": 3.95471,
+    "phone": "+32 65 84 14 23",
+    "rating": 0,
+    "rating_count": 0,
+    "price_level": 2,
+    "eta_min": 40,
+    "eta_max": 50,
+    "delivery_fee": 0,
+    "min_order": 2500,
+    "providers": [
+      {
+        "id": "takeaway",
+        "url": "https://www.takeaway.com/be-fr/menu/pacific-traiteur-asiatique-mons"
+      }
+    ],
+    "active": true,
+    "categories": [
+      {
+        "name": "Plats (avec riz, nouilles ou riz cantonais)",
+        "items": [
+          {
+            "name": "Le Poulet au curry jaune",
+            "description": "Servi avec riz, nouilles ou riz cantonais et un biscuit porte-bonheur.",
+            "price": 1650,
+            "emoji": "🍛",
+            "tags": [],
+            "option_groups": [],
+            "popular": true
+          },
+          {
+            "name": "Le Poulet aigre-doux",
+            "description": "Servi avec riz, nouilles ou riz cantonais et un biscuit porte-bonheur.",
+            "price": 1650,
+            "emoji": "🍗",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Le Poulet piquant",
+            "description": "Servi avec riz, nouilles ou riz cantonais et un biscuit porte-bonheur.",
+            "price": 1650,
+            "emoji": "🌶️",
+            "tags": [
+              "spicy"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Le Poulet au basilic",
+            "description": "Servi avec riz, nouilles ou riz cantonais et un biscuit porte-bonheur.",
+            "price": 1650,
+            "emoji": "🍗",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Le Porc aigre-doux",
+            "description": "Servi avec riz, nouilles ou riz cantonais et un biscuit porte-bonheur.",
+            "price": 1750,
+            "emoji": "🥢",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Le Bœuf à l'oignon",
+            "description": "Servi avec riz, nouilles ou riz cantonais et un biscuit porte-bonheur.",
+            "price": 1850,
+            "emoji": "🥩",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Les Scampis piquant",
+            "description": "Servi avec riz, nouilles ou riz cantonais et un biscuit porte-bonheur.",
+            "price": 1900,
+            "emoji": "🍤",
+            "tags": [
+              "spicy"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Le Canard sauté aux légumes",
+            "description": "Servi avec riz, nouilles ou riz cantonais et un biscuit porte-bonheur.",
+            "price": 2350,
+            "emoji": "🦆",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Les sautés",
+        "items": [
+          {
+            "name": "Nouilles sautés au poulet",
+            "description": "",
+            "price": 1350,
+            "emoji": "🍜",
+            "tags": [],
+            "option_groups": [],
+            "popular": true
+          },
+          {
+            "name": "Riz Sauté au poulet",
+            "description": "",
+            "price": 1350,
+            "emoji": "🍚",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Nouilles sautés végétarien",
+            "description": "",
+            "price": 1350,
+            "emoji": "🥬",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Nouilles sautés au scampis",
+            "description": "",
+            "price": 1750,
+            "emoji": "🍤",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Entrées & potages",
+        "items": [
+          {
+            "name": "Les Nems au poulet",
+            "description": "",
+            "price": 650,
+            "emoji": "🥟",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Les Beignets de scampis",
+            "description": "",
+            "price": 850,
+            "emoji": "🍤",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Le Potage piquant",
+            "description": "",
+            "price": 600,
+            "emoji": "🍲",
+            "tags": [
+              "spicy"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Soupe Wantan",
+            "description": "",
+            "price": 700,
+            "emoji": "🥟",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      }
+    ],
+    "source_urls": [
+      "https://www.pacific-traiteur.be/service-livraison-a-domicile.html",
+      "https://pacificmons.wikeo.net/",
+      "https://www.takeaway.com/be-fr/menu/pacific-traiteur-asiatique-mons"
+    ],
+    "menu_checked_at": "2026-10-09"
+  },
+  {
+    "slug": "thai-cafe-grands-pres",
+    "name": "Thai Café Grands Prés",
+    "description": "Enseigne de cuisine thaïe (currys, woks) au centre commercial des Grands Prés.",
+    "emoji": "🍜",
+    "cover_url": "",
+    "cuisines": [
+      "thaï",
+      "asiatique"
+    ],
+    "address": "Place des Grands Prés 1, 7000 Mons",
+    "lat": 50.45658,
+    "lng": 3.93422,
+    "phone": "+32 2 888 80 80",
+    "rating": 0,
+    "rating_count": 0,
+    "price_level": 3,
+    "eta_min": 30,
+    "eta_max": 50,
+    "delivery_fee": 0,
+    "min_order": 0,
+    "active": true,
+    "categories": [
+      {
+        "name": "Currys",
+        "items": [
+          {
+            "name": "Panang",
+            "description": "Curry rouge légèrement piquant aux pousses de bambou",
+            "price": 2040,
+            "emoji": "🍛",
+            "tags": [
+              "spicy"
+            ],
+            "option_groups": [],
+            "popular": true
+          },
+          {
+            "name": "Kang Karee",
+            "description": "Curry jaune doux, oignons confits & dés de pommes de terre",
+            "price": 2040,
+            "emoji": "🍛",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Kio Wan",
+            "description": "Curry vert piquant aux aubergines thaïes",
+            "price": 2040,
+            "emoji": "🍛",
+            "tags": [
+              "spicy"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Masaman",
+            "description": "Curry brun doux, ananas, dés de pomme de terre & cacahuètes",
+            "price": 2040,
+            "emoji": "🍛",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Wok",
+        "items": [
+          {
+            "name": "Pad Thai",
+            "description": "Nouilles sautées au tamarin, œuf & cacahuètes grillées",
+            "price": 1980,
+            "emoji": "🍜",
+            "tags": [],
+            "option_groups": [],
+            "popular": true
+          },
+          {
+            "name": "Pad See Yu",
+            "description": "Nouilles sautées à la sauce soja, œuf & légumes croquants",
+            "price": 1980,
+            "emoji": "🍜",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Khao Pad",
+            "description": "Riz sauté aux légumes, servi avec un œuf sur le plat",
+            "price": 1980,
+            "emoji": "🍚",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Med Mamuang",
+            "description": "Noix de cajou grillées, piments séchés, jeunes oignons",
+            "price": 1980,
+            "emoji": "🥜",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Grillés ou sautés",
+        "items": [
+          {
+            "name": "Pio Wan Kai",
+            "description": "beignets de poulet frits, sauce aigre-douce, poivrons, ananas, concombres",
+            "price": 1980,
+            "emoji": "🍗",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Kai Manao",
+            "description": "beignets de poulet frits, accompagnés d'une sauce au citron & ananas",
+            "price": 1980,
+            "emoji": "🍋",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Entrées",
+        "items": [
+          {
+            "name": "Nem Kai Crispy",
+            "description": "Nems croustillants au poulet, sauce aigre-douce",
+            "price": 1220,
+            "emoji": "🥟",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Kai Satay",
+            "description": "Brochettes de poulet mariné au curry jaune, sauce cacahuète",
+            "price": 1180,
+            "emoji": "🍢",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Dim Sum",
+            "description": "Assortiment d'entrées vapeur (12 pièces)",
+            "price": 2180,
+            "emoji": "🥟",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Street Box",
+        "items": [
+          {
+            "name": "Box Pad Thai Kai",
+            "description": "Pad Thai au poulet",
+            "price": 1000,
+            "emoji": "🥡",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Box Panang Kai",
+            "description": "Curry rouge au poulet",
+            "price": 1000,
+            "emoji": "🥡",
+            "tags": [
+              "spicy"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      }
+    ],
+    "source_urls": [
+      "https://thai.cafe/fr/menu",
+      "https://thai.cafe/fr/restaurants",
+      "https://thai.cafe/en"
+    ],
+    "menu_checked_at": "2026-10-09"
+  },
+  {
+    "slug": "la-frite-mayo-havre",
+    "name": "La Frite Mayo",
+    "description": "Friterie belge : frites, mitraillettes et burgers maison, à Havré (Mons).",
+    "emoji": "🍟",
+    "cover_url": "",
+    "cuisines": [
+      "friterie",
+      "snack belge",
+      "burger"
+    ],
+    "address": "Chaussée du Roeulx 1210, 7021 Havré (Mons)",
+    "lat": 50.46387,
+    "lng": 4.04548,
+    "phone": "",
+    "rating": 0,
+    "rating_count": 0,
+    "price_level": 1,
+    "eta_min": 30,
+    "eta_max": 50,
+    "delivery_fee": 0,
+    "min_order": 0,
+    "providers": [
+      {
+        "id": "takeaway",
+        "url": "https://www.takeaway.com/be/menu/la-frite-mayo-mons"
+      }
+    ],
+    "active": true,
+    "categories": [
+      {
+        "name": "Frites",
+        "items": [
+          {
+            "name": "Petite frite",
+            "description": "Une petite portion de délicieuses frites belges, parfaites pour un en-cas.",
+            "price": 380,
+            "emoji": "🍟",
+            "tags": [
+              "vegan"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Grande frite",
+            "description": "",
+            "price": 490,
+            "emoji": "🍟",
+            "tags": [
+              "vegan"
+            ],
+            "option_groups": [],
+            "popular": true
+          },
+          {
+            "name": "Maxi frite",
+            "description": "Une portion géante de frites belges dorées et croustillantes pour les grandes faims.",
+            "price": 650,
+            "emoji": "🍟",
+            "tags": [
+              "vegan"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Mitraillettes",
+        "items": [
+          {
+            "name": "Mitraillette fricadelle",
+            "description": "L'incontournable snack belge : une fricadelle savoureuse dans un pain garni de frites fraîches.",
+            "price": 850,
+            "emoji": "🥖",
+            "tags": [],
+            "option_groups": [],
+            "popular": true
+          },
+          {
+            "name": "Mitraillette brochette de dinde",
+            "description": "Une tendre brochette de dinde grillée, servie dans un pain avec des frites croustillantes et votre sauce préférée.",
+            "price": 980,
+            "emoji": "🥖",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Mitraillette croquette de fromages",
+            "description": "Une option gourmande et fondante avec de délicieuses croquettes de fromage et des frites dans un pain frais.",
+            "price": 860,
+            "emoji": "🧀",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Burgers spéciaux avec frites",
+        "items": [
+          {
+            "name": "Le confidentiel avec frites",
+            "description": "Viande de bœuf 180gr, roquette, copeaux de parmesan, mayo truffee.",
+            "price": 1340,
+            "emoji": "🍔",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Le montagnard avec frites",
+            "description": "Viande de bœuf 180gr, fromage raclette, lardons, cornichons, sauce thaïlandaise",
+            "price": 1340,
+            "emoji": "🍔",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Le chti avec frites",
+            "description": "Viande de bœuf 180gr, oignons cuits, maroile, salade, tomate, sauce poivre.",
+            "price": 1390,
+            "emoji": "🍔",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Le liégeois avec frites",
+            "description": "pain brioché ,boeuf 180 gr , pain d épices , fromage de Herve , sirop, de liège , oignons caramélisés , frites et sauce",
+            "price": 1390,
+            "emoji": "🍔",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Snacks",
+        "items": [
+          {
+            "name": "Mexicano",
+            "description": "",
+            "price": 370,
+            "emoji": "🌭",
+            "tags": [
+              "spicy"
+            ],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Cheese crack",
+            "description": "Un délicieux snack croquant à l'extérieur et avec un cœur fondant de fromage.",
+            "price": 350,
+            "emoji": "🧀",
+            "tags": [],
+            "option_groups": [],
+            "popular": false
+          },
+          {
+            "name": "Fricadelle végétarienne",
+            "description": "Le goût unique de la fricadelle classique dans une version 100% végétarienne.",
+            "price": 420,
+            "emoji": "🌭",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      },
+      {
+        "name": "Sauces",
+        "items": [
+          {
+            "name": "Sauce joppie",
+            "description": "La sauce Joppie originale, sucrée-salée aux oignons et au curry.",
+            "price": 120,
+            "emoji": "🥫",
+            "tags": [
+              "veggie"
+            ],
+            "option_groups": [],
+            "popular": false
+          }
+        ]
+      }
+    ],
+    "source_urls": [
+      "https://www.lafritemayomons-mons.be/",
+      "https://www.takeaway.com/be/menu/la-frite-mayo-mons"
+    ],
+    "menu_checked_at": "2026-10-09"
+  }
+]
