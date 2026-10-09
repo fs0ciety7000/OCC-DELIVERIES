@@ -16,7 +16,7 @@ import { qk } from '@/lib/queryKeys'
 import type { DeclareMethod, Payment } from '@/lib/types'
 import type { PartyCtx } from '../context'
 import { usePaymentAction, usePayments, useSetPayer, useTransition } from '../hooks'
-import { availableMethods, declareLabel, METHOD_BADGE, METHOD_LABELS, methodHint, orderForDevice, payoutMethods } from '../labels'
+import { availableMethods, declareLabel, isLinkMethod, linkFor, METHOD_BADGE, METHOD_LABELS, methodHint, orderForDevice, payoutMethods } from '../labels'
 import { DispatchedBanner } from './DispatchedBanner'
 import { MethodDetails, MethodMark, MethodTiles, StatusBadge } from './PaymentMethods'
 
@@ -197,7 +197,8 @@ function MyShare({ ctx, payment }: { ctx: PartyCtx; payment: Payment }) {
                   <Button
                     block
                     size="lg"
-                    variant={method === 'later' ? 'secondary' : 'primary'}
+                    // Un seul primary par moyen : le lien prérempli (Revolut, PayPal…) passe avant « J'ai payé ».
+                    variant={method === 'later' || (isLinkMethod(method) && !!linkFor(qr.data, method)?.amountPrefilled) ? 'secondary' : 'primary'}
                     loading={action.isPending}
                     onClick={() =>
                       action.mutate(
@@ -278,7 +279,7 @@ function PaymentsList({ ctx, payments, canManage }: { ctx: PartyCtx; payments: P
         <h2 className="font-display text-lg font-semibold">Les parts</h2>
         <ul className="divide-y divide-border">
           {payments.map((p) => {
-            const u = p.expand?.debtor ?? ctx.people.get(p.debtor) ?? { id: p.debtor, name: '' }
+            const u = ctx.people.get(p.debtor) ?? p.expand?.debtor ?? { id: p.debtor, name: '' }
             return (
               <li key={p.id} className="flex flex-wrap items-center gap-3 py-2.5">
                 <Avatar user={u} size={40} />

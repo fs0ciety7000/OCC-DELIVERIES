@@ -150,7 +150,7 @@ export function usePaymentAction(partyId: string) {
 export const STATUS_LABELS: Record<PartyStatus, string> = {
   lobby: 'Salon',
   voting: 'Vote en cours',
-  ordering: 'Commande en cours',
+  ordering: 'Paniers ouverts',
   review: 'Récap',
   paying: 'Remboursements',
   closed: 'Terminée',

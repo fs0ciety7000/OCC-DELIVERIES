@@ -42,6 +42,12 @@ describe('PartyDeadlines', () => {
     const update = vi.spyOn(partiesApi, 'update').mockImplementation(async (_id, data) => party({ ...(data as Partial<Party>) }))
     renderIt(party({ status: 'ordering', ordering_ends_at: '2026-10-09 10:10:00.000Z' }), true)
     expect(screen.getByText(/Fin de la commande à/)).toHaveTextContent('12:10')
+    // Réglages repliés hors desktop.
+    expect(screen.queryByRole('button', { name: '+10 min' })).not.toBeInTheDocument()
+    const toggle = screen.getByRole('button', { name: 'Modifier' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await userEvent.click(toggle)
+    expect(screen.getByRole('button', { name: 'Masquer' })).toHaveAttribute('aria-expanded', 'true')
     await userEvent.click(screen.getByRole('button', { name: '+10 min' }))
     expect(update).toHaveBeenLastCalledWith('p1', { ordering_ends_at: expect.stringMatching(/:00\.000Z$/) })
     await userEvent.click(screen.getByRole('switch', { name: 'Clôturer automatiquement à l’heure limite' }))

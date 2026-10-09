@@ -27,7 +27,7 @@ export function PartyHeader({ ctx }: { ctx: PartyCtx }) {
   })
 
   const showReady = party.status === 'ordering' || party.status === 'review'
-  const users = members.map((m) => ({ ...(m.expand?.user ?? { id: m.user, name: ctx.people.get(m.user)?.name ?? '' }), ready: m.ready }))
+  const users = members.map((m) => ({ ...(m.expand?.user ?? ctx.people.get(m.user) ?? { id: m.user, name: '' }), ready: m.ready }))
   const readyCount = members.filter((m) => m.ready).length
   const active = party.status !== 'closed' && party.status !== 'cancelled'
   const canLeave = !isHost && ['lobby', 'voting', 'ordering'].includes(party.status)
@@ -71,7 +71,7 @@ export function PartyHeader({ ctx }: { ctx: PartyCtx }) {
           </div>
           <span className="text-sm text-muted tabular" aria-live="polite">
             {members.length} {members.length > 1 ? 'membres' : 'membre'}
-            {showReady && (
+            {party.status === 'ordering' && (
               <>
                 {' · '}
                 <PulseOnChange value={readyCount}>

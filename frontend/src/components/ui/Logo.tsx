@@ -13,7 +13,7 @@ export function LogoMark({ className }: { className?: string }) {
 
 export function Logo({ className }: { className?: string }) {
   return (
-    <span className={cn('inline-flex items-center gap-2.5', className)}>
+    <span className={cn('inline-flex shrink-0 items-center gap-2.5 whitespace-nowrap', className)}>
       <LogoMark />
       <span className="font-display text-lg leading-none font-bold tracking-tight">
         OCC <span className="text-muted font-semibold">Deliveries</span>

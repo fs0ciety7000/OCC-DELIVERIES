@@ -396,9 +396,11 @@ sautent à la valeur finale, cœur / coche à l'état final.
   ajout au panier restent actifs (toast « … sera ajouté dès le retour du réseau »).
 * **Heures limites** (`features/deadlines/PartyDeadlines.tsx`, sous l'en-tête de la party, en vote / commande) :
   carte compacte « Fin du vote à **11:45** » (heure de Bruxelles, `tabular`) + `Countdown` + badge `info`
-  « Clôture automatique » ou neutre « Clôture par l'hôte ». Hôte : chips `+5/+10/+15/+20 min`, champ « à HH:MM »
-  + « Fixer », chip « Retirer », interrupteur « Clôturer automatiquement » avec son explication. Les membres ne voient
-  que la ligne (rien sans heure limite).
+  « Clôture automatique » ou neutre « Clôture par l'hôte ». Hôte : réglages **repliés** derrière un bouton `ghost`
+  « Modifier » / « Fixer une heure limite » (`aria-expanded`, ouverts d'office seulement ≥ 1024 px) : chips
+  `+5/+10/+15/+20 min` (`min-h-11 px-4`), champ « ou à HH:MM » (`h-11`) + « Fixer » (`md`), chip « Retirer »,
+  interrupteur « Clôturer automatiquement » (ligne `flex items-center justify-between gap-3`). Les membres ne voient
+  que la ligne (rien sans heure limite). C'est le **seul** `Countdown` de l'écran (le vote n'en affiche pas d'autre).
 * **Chips d'évènements automatiques** (journal `AutoEvents`, sous la carte, toutes étapes) : encadré `fg/[0.03]`,
   3 dernières lignes (la plus récente en `text-fg`, les autres `text-muted`), « Tout afficher (n) ». Icônes :
   rappel `BellRing` `info`, clôture `CheckCircle2` `success`, prolongation `Hourglass` `warning`, décision de l'hôte
@@ -449,6 +451,38 @@ Captures de référence : `docs/screenshots/<écran>-<mobile|desktop>-<dark|ligh
 * Sheet d'options : groupes avec badge « Obligatoire » / « Jusqu'à n », lignes de 48 px,
   prix de supplément alignés à droite, CTA collant en pied.
 * États vides illustrés (assiette + couverts) avec une action secondaire.
+
+### Patterns — passe 2 (2026-10-09)
+* **Grilles mobiles explicites** : toute grille de cartes s'écrit `grid grid-cols-1 … sm:grid-cols-2` (jamais `grid`
+  seul : la piste implicite `auto` s'élargit au contenu et fait déborder l'écran) ; les enfants ont `min-w-0`, les
+  badges `shrink-0`, les textes tronqués `min-w-0 truncate`.
+* **En-tête desktop sans débordement à 1024 et 1280 px** : logo `shrink-0 whitespace-nowrap`, libellés longs
+  (« Rechercher… », « Lancer une commande ») seulement dès `xl:` (icône + `aria-label` en dessous), pastille
+  « Reprendre » `max-w-28 xl:max-w-44`.
+* **Commande en cours, une seule mise en avant** : sur `/`, la pastille d'en-tête et le dock mobile sont masqués dès
+  que l'accueil liste des commandes (héros ou cartes) ; masqués aussi sur `/j/…`, `/e/…`, l'auth et dans la party ;
+  pas de dock sur `/admin`. Le « + » de la tab bar n'apparaît que pour un compte (pas un invité), hors `/j/` et `/e/`.
+* **Invités** : jamais de `primary` « Lancer une commande » ; à la place un `secondary`
+  « Créer mon compte pour lancer une commande » → `/profile?onglet=infos`.
+* **Libellés d'état distincts** : l'étape `ordering` s'appelle « Paniers ouverts » ; « Commande en cours » est réservé
+  au bandeau / dock de reprise (toutes étapes confondues). Le titre de la carte d'équipe est le titre de la party
+  (« Commande du jour » par défaut). « n prêts » n'apparaît dans l'en-tête qu'à l'étape `ordering` ; « + … de frais »
+  seulement si la part de frais est > 0.
+* **Paiements : un primary par moyen** : quand le moyen choisi a un lien à montant pré-rempli (Revolut, PayPal…),
+  ce lien est le `primary` et « J'ai payé » passe en `secondary`, en dessous.
+* **Barres d'action collantes** : en desktop, le `primary` est `sm:min-w-56 sm:flex-none` aligné à droite ; pas de
+  raccourci qui double une action déjà présente dans la colonne latérale (≥ 1024 px). Au salon, la durée du vote
+  (mêmes valeurs que les heures limites : Sans limite, 5, 10, 15, 20 min, même arrondi) est un `select` sur une ligne
+  **au-dessus** de la barre, qui ne garde que « Choisir directement » + « Lancer le vote ».
+* **AvatarStack** : chevauchement `-space-x-1` à 24 px (`-space-x-2` au-delà) pour ne pas rogner les initiales.
+  Avatars côte à côte (pile, membres d'une party ou d'une équipe) : couleurs passées par `distinctColors`
+  (`lib/colors.ts`) — chacun garde la sienne sauf si un membre précédent l'a déjà. Dans une party, c'est appliqué
+  une fois dans le contexte (`PartyPage`), donc une personne a la même couleur à toutes les étapes.
+* **Bas de page** : `<main>` en `flex min-h-[calc(100dvh-4rem)] flex-col`, footer `mt-auto` (jamais caché sous le dock
+  sur une page courte ; le padding du dock est conservé).
+* **Bandeaux** (invité, e-mail à confirmer) : texte et action en `flex-wrap` (le texte garde au moins 14rem à 390 px),
+  bouton de fermeture `size-11` (44 px), comme toutes les croix de fermeture.
+* **Profil « Mes infos »** : la zone de danger (suppression du compte) est toujours la dernière carte.
 
 ### Idées P2 restantes
 * Accueil desktop : le carrousel « À deux pas » est coupé net à 1 240 px — ajouter un

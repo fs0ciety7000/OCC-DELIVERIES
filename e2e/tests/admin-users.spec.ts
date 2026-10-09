@@ -67,9 +67,9 @@ test('un·e admin suspend puis réactive un compte', async ({ browser, baseURL }
   await signIn(victim, victimEmail)
   await expect(victim.getByText('Content de te revoir').first()).toBeVisible()
 
-  // l'e-mail de test sans SMTP : bouton désactivé, état affiché
+  // sans SMTP : état affiché, pas de bouton d'e-mail de test (masqué)
   await expect(admin.getByText('Désactivés')).toBeVisible()
-  await expect(admin.getByRole('button', { name: 'Envoyer un e-mail de test' })).toBeDisabled()
+  await expect(admin.getByRole('button', { name: 'Envoyer un e-mail de test' })).toHaveCount(0)
 
   await adminCtx.close()
   await userCtx.close()

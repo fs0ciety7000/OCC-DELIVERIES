@@ -255,7 +255,7 @@ export function OrderingStep({ ctx }: { ctx: PartyCtx }) {
           <Button
             size="lg"
             variant={amReady ? 'secondary' : 'primary'}
-            className={cn('flex-1', amReady && 'border-success/40 text-success')}
+            className={cn('flex-1 sm:ml-auto sm:min-w-56 sm:flex-none', amReady && 'border-success/40 text-success')}
             loading={ready.isPending}
             disabled={!amReady && myStats.count === 0}
             onClick={() => toggleReady(() => toast(amReady ? 'OK, tu peux encore modifier' : 'Top, t’es prêt·e ! ✅'))}
@@ -263,8 +263,9 @@ export function OrderingStep({ ctx }: { ctx: PartyCtx }) {
           >
             {amReady ? 'Prêt·e — modifier' : myStats.count === 0 ? 'Ajoute un article' : 'Je suis prêt·e'}
           </Button>
+          {/* ≥ 1024 px : « Passer au récap » est déjà dans la colonne de droite. */}
           {isHost && (
-            <Button size="lg" variant="ghost" className="hidden md:inline-flex" onClick={() => setReviewOpen(true)} disabled={allItems.length === 0 || !online} title={online ? undefined : OFFLINE_HINT}>
+            <Button size="lg" variant="ghost" className="hidden md:inline-flex lg:hidden" onClick={() => setReviewOpen(true)} disabled={allItems.length === 0 || !online} title={online ? undefined : OFFLINE_HINT}>
               Récap
             </Button>
           )}

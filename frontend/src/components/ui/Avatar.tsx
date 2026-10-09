@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { cn } from '@/lib/cn'
-import { fallbackColor, isHexColor, readableOn } from '@/lib/colors'
+import { distinctColors, fallbackColor, isHexColor, readableOn } from '@/lib/colors'
 import { initials } from '@/lib/format'
 import { fileUrl } from '@/lib/pb'
 import { usePulse } from '@/lib/pulse'
@@ -78,13 +78,15 @@ export interface AvatarStackProps {
 }
 
 export function AvatarStack({ users, size = 32, max = 5, className, showReady }: AvatarStackProps) {
+  // Avatars côte à côte : deux collègues de même couleur stockée reçoivent des teintes distinctes.
+  const colors = distinctColors(users)
   const shown = users.slice(0, max)
   const rest = users.length - shown.length
   const names = users.map((u) => u.name || 'Membre').join(', ')
   return (
-    <div className={cn('flex items-center -space-x-2', className)} role="group" aria-label={`${users.length} participant·es : ${names}`}>
+    <div className={cn('flex items-center', size <= 24 ? '-space-x-1' : '-space-x-2', className)} role="group" aria-label={`${users.length} participant·es : ${names}`}>
       {shown.map((u) => (
-        <Avatar key={u.id} user={u} size={size} ready={showReady && u.ready} decorative />
+        <Avatar key={u.id} user={{ ...u, color: colors.get(u.id) ?? u.color }} size={size} ready={showReady && u.ready} decorative />
       ))}
       {rest > 0 && (
         <span aria-hidden data-avatar-more className={cn('relative inline-grid place-items-center rounded-full bg-elevated font-semibold text-muted ring-2 ring-bg tabular', sizeClass[size])}>

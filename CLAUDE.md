@@ -73,6 +73,14 @@ docker compose up --build         # http://localhost:8090
 Les apprentissages importants (pièges PocketBase, décisions d'UX) sont ajoutés
 ci-dessous, du plus récent au plus ancien.
 
+* 2026-10-09 — **Revue design complète** (product-designer, 108 captures 390/1280 × clair/sombre, 28 points corrigés ;
+  patterns dans `DESIGN_SYSTEM.md` « Patterns — passe 2 »). Pièges : une grille mobile sans `grid-cols-1` explicite
+  laisse la piste implicite s'élargir au contenu (accueil à 480 px) ; un `<table className="sr-only">` ne rétrécit pas
+  sous son contenu → `sr-only` sur un `div` parent ; `main` en flex colonne rétrécit les pages `mx-auto max-w-…` → contenu
+  dans un bloc, footer `mt-auto`. Statut `ordering` = « Paniers ouverts » (≠ « commande en cours »), couleurs d'avatar
+  rendues distinctes par groupe (`distinctColors`, couleurs stockées tirées parmi 12 à l'inscription), un seul `primary`
+  par moyen de paiement. Contrôle de débordement : `document.documentElement.scrollWidth` sur 375/390/1024/1280.
+
 * 2026-10-09 — **Notifications push, heures limites automatiques, hors ligne** (migration `1760000015`, `internal/notify`,
   `app/push.go`, `app/deadlines.go`, `frontend/pwa/`). Web Push VAPID (`webpush-go` v1.4.0) : clés `OCC_VAPID_*` ou
   générées une fois dans `server_secrets` (superuser) ; envoi asynchrone (4 workers), 404/410 → abonnement supprimé ;

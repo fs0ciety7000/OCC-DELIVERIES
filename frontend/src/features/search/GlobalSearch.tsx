@@ -7,7 +7,7 @@ import { Kbd } from './Kbd'
 import { useSearchShortcuts } from './shortcuts'
 import { openSearch, useSearchPalette } from './store'
 
-/** Bouton d'en-tête : icône en mobile, pastille « Rechercher… ⌘K » dès 1024 px. */
+/** Bouton d'en-tête : icône en mobile, pastille « Rechercher… ⌘K » dès 1280 px. */
 export function SearchButton({ className }: { className?: string }) {
   const { open } = useSearchPalette()
   const hint = shortcutLabel()
@@ -21,13 +21,13 @@ export function SearchButton({ className }: { className?: string }) {
       aria-label={`Rechercher (${hint})`}
       className={cn(
         buttonClass('ghost', 'icon'),
-        'lg:w-auto lg:justify-start lg:gap-2 lg:rounded-full lg:border lg:border-border lg:bg-surface lg:px-3 lg:text-sm lg:font-medium lg:text-subtle lg:hover:border-border-strong lg:hover:text-fg',
+        'xl:w-auto xl:justify-start xl:gap-2 xl:rounded-full xl:border xl:border-border xl:bg-surface xl:px-3 xl:text-sm xl:font-medium xl:text-subtle xl:hover:border-border-strong xl:hover:text-fg',
         className,
       )}
     >
-      <Search className="size-5 lg:size-4" aria-hidden />
-      <span className="hidden lg:inline">Rechercher…</span>
-      <span className="ml-3 hidden lg:inline-flex" aria-hidden>
+      <Search className="size-5 xl:size-4" aria-hidden />
+      <span className="hidden xl:inline">Rechercher…</span>
+      <span className="ml-3 hidden xl:inline-flex" aria-hidden>
         <Kbd>{hint}</Kbd>
       </span>
     </button>

@@ -79,7 +79,7 @@ export function ClosedStep({ ctx }: { ctx: PartyCtx }) {
               {(payments.data ?? [])
                 .filter((p) => p.debtor !== p.creditor)
                 .map((p) => {
-                  const u = p.expand?.debtor ?? ctx.people.get(p.debtor) ?? { id: p.debtor, name: '' }
+                  const u = ctx.people.get(p.debtor) ?? p.expand?.debtor ?? { id: p.debtor, name: '' }
                   return (
                     <li key={p.id} className="flex items-center gap-3 py-2.5">
                       <Avatar user={u} size={32} />

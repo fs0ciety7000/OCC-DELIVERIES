@@ -6,7 +6,7 @@ import { VoteBurst, WaitingRider } from '@/components/food'
 import { LiquidHeart } from '@/components/food/LiquidHeart'
 import { PulseOnChange } from '@/components/food/PulseOnChange'
 import { toast } from 'sonner'
-import { AvatarStack, Badge, Button, Card, Countdown, EmptyState, Sheet, Skeleton } from '@/components/ui'
+import { AvatarStack, Badge, Button, Card, EmptyState, Sheet, Skeleton } from '@/components/ui'
 import { PartialMenuBadge } from '@/features/restaurants/PartialMenu'
 import { RestaurantMeta } from '@/features/restaurants/RestaurantCard'
 import { RestaurantCover } from '@/features/restaurants/RestaurantCover'
@@ -86,7 +86,6 @@ export function VotingStep({ ctx }: { ctx: PartyCtx }) {
           <p className="text-sm text-muted">Tu peux liker plusieurs restos. Le plus aimé l'emporte.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Countdown to={party.voting_ends_at} label="Fin du vote" />
           <PulseOnChange value={voters.size}>
             <Badge className="tabular" aria-live="polite">
               {voters.size}/{members.length} ont voté

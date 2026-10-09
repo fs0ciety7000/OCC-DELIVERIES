@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 import { Avatar, Badge, Button, buttonClass, Card, CardBody, EmptyState, Money, Skeleton } from '@/components/ui'
 import { STATUS_LABELS } from '@/features/party/hooks'
+import { distinctColors } from '@/lib/colors'
 import { teamsApi } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import { errorMessage, isNotFound } from '@/lib/errors'
@@ -117,10 +118,10 @@ export function TeamView({ team }: { team: Team }) {
         <Card variant="selected" aria-labelledby="h-team-active">
           <CardBody className="space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <h2 id="h-team-active" className="font-display text-lg font-semibold">
-                Commande en cours
+              <h2 id="h-team-active" className="min-w-0 truncate font-display text-lg font-semibold">
+                {active.title || 'Commande du jour'}
               </h2>
-              <Badge variant="brand" dot>
+              <Badge variant="brand" dot className="shrink-0">
                 {STATUS_LABELS[active.status]}
               </Badge>
             </div>
@@ -129,8 +130,7 @@ export function TeamView({ team }: { team: Team }) {
                 {active.restaurant?.emoji || '🗳️'}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold">{active.title || 'Commande du jour'}</p>
-                <p className="truncate text-sm text-muted">
+                <p className="text-sm text-muted">
                   Lancée par {active.host.name} · {plural(active.memberCount, 'participant')}
                   {active.restaurant ? ` · ${active.restaurant.name}` : ''}
                 </p>
@@ -189,6 +189,8 @@ function MembersCard({ team, meId }: { team: Team; meId?: string }) {
     },
     onError: (e) => toast.error(errorMessage(e)),
   })
+  // Liste d'avatars : couleurs rendues distinctes au sein de l'équipe.
+  const colors = distinctColors(team.members)
   return (
     <Card aria-labelledby="h-team-members">
       <CardBody className="space-y-3">
@@ -197,11 +199,12 @@ function MembersCard({ team, meId }: { team: Team; meId?: string }) {
         </h2>
         <ul className="divide-y divide-border">
           {team.members.map((m) => {
+            const color = colors.get(m.id) ?? m.color
             const canRemove = m.id !== meId && m.role !== 'owner' && (team.myRole === 'owner' || (team.myRole === 'admin' && m.role === 'member'))
             const canToggleAdmin = team.myRole === 'owner' && m.role !== 'owner' && !m.isGuest
             return (
               <li key={m.id} className="flex items-center gap-3 py-2.5">
-                <Avatar user={m} size={40} decorative />
+                <Avatar user={{ ...m, color }} size={40} decorative />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold">
                     {m.name}

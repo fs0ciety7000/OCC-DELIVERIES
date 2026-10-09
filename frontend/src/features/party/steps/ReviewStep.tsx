@@ -50,7 +50,7 @@ export function ReviewStep({ ctx }: { ctx: PartyCtx }) {
           <h2 id="h-parts" className="font-display text-xl font-semibold">
             Qui a pris quoi
           </h2>
-          <ParticipantsList summary={s} meId={me.id} />
+          <ParticipantsList summary={s} meId={me.id} people={ctx.people} />
         </section>
         <ConsolidatedCard summary={s} />
       </div>

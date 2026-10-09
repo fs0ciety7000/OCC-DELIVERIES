@@ -1,7 +1,7 @@
 import { Check, Search, Vote as VoteIcon, Zap } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { WaitingDots } from '@/components/food/WaitingDots'
-import { Badge, Button, Card, CardBody, Chip, EmptyState, Input, Sheet, Skeleton } from '@/components/ui'
+import { Badge, Button, Card, CardBody, EmptyState, Input, Sheet, Skeleton } from '@/components/ui'
 import { useNearby } from '@/features/restaurants/hooks'
 import { LocationBar } from '@/features/restaurants/LocationBar'
 import { RestaurantCard } from '@/features/restaurants/RestaurantCard'
@@ -9,7 +9,7 @@ import { RestaurantCover } from '@/features/restaurants/RestaurantCover'
 import { partiesApi } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { errorMessage } from '@/lib/errors'
-import { isoInMinutes } from '@/lib/format'
+import { DEADLINE_MINUTES, isoInMinutesRounded } from '@/lib/brussels'
 import { useDebounced } from '@/lib/hooks'
 import type { Restaurant } from '@/lib/types'
 import { toast } from 'sonner'
@@ -18,12 +18,8 @@ import { useSetCandidates, useTransition } from '../hooks'
 import { InviteCard } from '../InviteCard'
 import { MemberList } from '../MemberList'
 
-const DURATIONS = [
-  { min: 0, label: 'Sans limite' },
-  { min: 3, label: '3 min' },
-  { min: 5, label: '5 min' },
-  { min: 10, label: '10 min' },
-] as const
+/** Mêmes durées que les heures limites de la party (et même arrondi à la minute). */
+const DURATIONS = [{ min: 0, label: 'Sans limite' }, ...DEADLINE_MINUTES.map((m) => ({ min: m, label: `${m} min` }))]
 
 export function LobbyStep({ ctx }: { ctx: PartyCtx }) {
   const { party, isHost } = ctx
@@ -35,6 +31,7 @@ export function LobbyStep({ ctx }: { ctx: PartyCtx }) {
   const [duration, setDuration] = useState<number>(5)
   const [directOpen, setDirectOpen] = useState(false)
   const [launching, setLaunching] = useState(false)
+  const durationId = useId()
 
   const candidateIds = party.candidates ?? []
   const known = useMemo(() => {
@@ -54,7 +51,7 @@ export function LobbyStep({ ctx }: { ctx: PartyCtx }) {
     setLaunching(true)
     if (duration > 0) {
       try {
-        await partiesApi.update(party.id, { voting_ends_at: isoInMinutes(duration) })
+        await partiesApi.update(party.id, { voting_ends_at: isoInMinutesRounded(duration) })
       } catch (err) {
         toast.error(errorMessage(err))
         setLaunching(false)
@@ -178,16 +175,28 @@ export function LobbyStep({ ctx }: { ctx: PartyCtx }) {
       </aside>
 
       {isHost && (
+        <div className="order-3 flex items-center justify-between gap-3 lg:col-span-2 lg:justify-end">
+          <label htmlFor={durationId} className="text-sm text-muted">
+            Durée du vote
+          </label>
+          <select
+            id={durationId}
+            value={duration}
+            onChange={(e) => setDuration(Number(e.target.value))}
+            className="h-11 rounded-md border border-border-strong bg-surface px-3 text-[15px] font-semibold text-fg focus-visible:outline-2 focus-visible:outline-brand"
+          >
+            {DURATIONS.map((d) => (
+              <option key={d.min} value={d.min}>
+                {d.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {isHost && (
         <div className="sticky bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom)+12px)] z-20 order-3 lg:col-span-2">
-          <Card className="space-y-3 border-border-strong bg-elevated/95 p-3 backdrop-blur-xl sm:p-4">
-            <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Durée du vote">
-              <span className="text-sm text-muted">Durée du vote</span>
-              {DURATIONS.map((d) => (
-                <Chip key={d.min} selected={duration === d.min} onClick={() => setDuration(d.min)} className="min-h-8 px-3">
-                  {d.label}
-                </Chip>
-              ))}
-            </div>
+          <Card className="border-border-strong bg-elevated/95 p-3 backdrop-blur-xl sm:p-4">
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button variant="secondary" className="sm:flex-1" leftIcon={<Zap className="size-4" />} onClick={() => setDirectOpen(true)}>
                 {candidates.length === 1 ? `Commander chez ${candidates[0]!.name}` : 'Choisir directement'}

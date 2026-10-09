@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
+import { AvatarStack } from '../Avatar'
 import { Button } from '../Button'
 import { Money } from '../Money'
 import { Stepper } from '../Stepper'
@@ -58,5 +59,22 @@ describe('Stepper', () => {
   it('tout est terminé quand la party est close', () => {
     render(<Stepper status="closed" />)
     screen.getAllByRole('listitem').forEach((li) => expect(li).toHaveAttribute('data-state', 'done'))
+  })
+})
+
+describe('AvatarStack', () => {
+  it('donne des couleurs distinctes à deux collègues de même couleur, et se resserre à 24 px', () => {
+    const { container } = render(
+      <AvatarStack
+        size={24}
+        users={[
+          { id: 'u1', name: 'Bob Dupont', color: '#FF6A3D' },
+          { id: 'u2', name: 'Chloé Lambert', color: '#ff6a3d' },
+        ]}
+      />,
+    )
+    const [bob, chloe] = Array.from(container.querySelectorAll<HTMLElement>('[data-avatar-user]'))
+    expect(bob!.style.backgroundColor).not.toBe(chloe!.style.backgroundColor)
+    expect(screen.getByRole('group')).toHaveClass('-space-x-1')
   })
 })

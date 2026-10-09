@@ -20,18 +20,20 @@ export function GuestBanner({ user, className }: { user: User | null; className?
   const [dismissed, setDismissed] = useState(readDismissed)
   if (!user?.is_guest || dismissed) return null
   return (
-    <aside aria-label="Compte invité" className={cn('flex items-start gap-3 rounded-md border border-info/30 bg-info/10 px-3 py-2.5 text-sm sm:items-center', className)}>
-      <UserPlus aria-hidden className="mt-0.5 size-5 shrink-0 text-info sm:mt-0" />
-      <p className="min-w-0 flex-1">
-        <span className="font-semibold">Tu es invité·e</span> <span className="text-muted">— crée un compte pour garder ton historique.</span>
-      </p>
-      <Link to="/profile?onglet=infos" className={buttonClass('ghost', 'sm')}>
-        Créer mon compte
-      </Link>
+    <aside aria-label="Compte invité" className={cn('flex items-start gap-3 rounded-md border border-info/30 bg-info/10 py-1.5 pr-1.5 pl-3 text-sm', className)}>
+      <UserPlus aria-hidden className="mt-2.5 size-5 shrink-0 text-info" />
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 py-1">
+        <p className="min-w-[min(100%,14rem)] flex-1 py-1">
+          <span className="font-semibold">Tu es invité·e</span> <span className="text-muted">— crée un compte pour garder ton historique.</span>
+        </p>
+        <Link to="/profile?onglet=infos" className={buttonClass('ghost', 'sm', false, 'min-h-11')}>
+          Créer mon compte
+        </Link>
+      </div>
       <button
         type="button"
         aria-label="Masquer ce rappel"
-        className="grid size-9 shrink-0 place-items-center rounded-full text-muted hover:bg-fg/[0.06] hover:text-fg"
+        className="grid size-11 shrink-0 place-items-center rounded-full text-muted hover:bg-fg/[0.06] hover:text-fg"
         onClick={() => {
           setDismissed(true)
           try {

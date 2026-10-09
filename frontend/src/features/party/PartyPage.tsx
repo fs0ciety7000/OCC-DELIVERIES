@@ -18,6 +18,7 @@ import { ReviewStep } from './steps/ReviewStep'
 import { StepTransition } from './steps/StepTransition'
 import { VotingStep } from './steps/VotingStep'
 import { PartyDeadlines } from '@/features/deadlines/PartyDeadlines'
+import { distinctColors } from '@/lib/colors'
 import { TeamMissingMembers } from '@/features/teams/TeamMissingMembers'
 
 const STATUS_TOASTS: Partial<Record<PartyStatus, string>> = {
@@ -70,7 +71,13 @@ export function PartyPage() {
     for (const u of party.data.expand?.members ?? []) people.set(u.id, u)
     for (const m of members.data ?? []) if (m.expand?.user) people.set(m.user, m.expand.user)
     people.set(user.id, { ...people.get(user.id), ...user })
-    return { party: party.data, members: members.data ?? [], me: user, isHost: party.data.host === user.id, people }
+    // Couleurs d'avatar distinctes dans la party (deux collègues avec la même couleur stockée
+    // ne se confondent pas) : appliquées une fois ici, donc identiques sur toutes les étapes.
+    const order = [...(members.data ?? []).map((m) => m.user), ...people.keys()]
+    const colors = distinctColors(order.map((uid) => people.get(uid) ?? { id: uid }))
+    for (const [uid, u] of people) people.set(uid, { ...u, color: colors.get(uid) ?? u.color })
+    const list = (members.data ?? []).map((m) => (m.expand?.user ? { ...m, expand: { ...m.expand, user: people.get(m.user) ?? m.expand.user } } : m))
+    return { party: party.data, members: list, me: user, isHost: party.data.host === user.id, people }
   }, [party.data, members.data, user])
 
   if (party.isError) {

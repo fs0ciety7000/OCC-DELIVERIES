@@ -53,6 +53,9 @@ export function brusselsTimeToISO(hhmm: string, now: Date = new Date()): string 
   return new Date(guess).toISOString()
 }
 
+/** Durées proposées pour les heures limites (raccourcis de l'hôte, durée du vote au salon). */
+export const DEADLINE_MINUTES = [5, 10, 15, 20] as const
+
 /** ISO dans `minutes` minutes, arrondi à la minute suivante (le planificateur tourne à chaque minute). */
 export function isoInMinutesRounded(minutes: number, now: Date = new Date()): string {
   const t = now.getTime() + minutes * 60_000

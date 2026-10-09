@@ -1,12 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { AlarmClock, AlertTriangle, BellRing, CheckCircle2, Hourglass, Timer } from 'lucide-react'
+import { AlarmClock, AlertTriangle, BellRing, CheckCircle2, ChevronDown, Hourglass, Timer } from 'lucide-react'
 import { useId, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { Badge, Button, Card, CardBody, Chip, Countdown } from '@/components/ui'
 import { Toggle } from '@/features/admin/Toggle'
 import { partiesApi } from '@/lib/api'
-import { brusselsTimeToISO, formatClock, isoInMinutesRounded } from '@/lib/brussels'
+import { brusselsTimeToISO, DEADLINE_MINUTES, formatClock, isoInMinutesRounded } from '@/lib/brussels'
 import { cn } from '@/lib/cn'
+import { useMediaQuery } from '@/lib/hooks'
 import { errorMessage } from '@/lib/errors'
 import { OFFLINE_HINT, useOnline } from '@/lib/online'
 import { qk } from '@/lib/queryKeys'
@@ -61,7 +62,12 @@ export function DeadlineControl({ party, kind, isHost }: { party: Party; kind: K
   const online = useOnline()
   const [time, setTime] = useState('')
   const timeId = useId()
+  const panelId = useId()
   const auto = !party.auto_close_disabled
+  // Réglages repliés en mobile (la ligne d'état suffit), ouverts d'office dès 1024 px.
+  const desktop = useMediaQuery('(min-width: 1024px)')
+  const [userOpen, setOpen] = useState<boolean | null>(null)
+  const open = userOpen ?? desktop
 
   if (!deadline && !isHost) return null
 
@@ -98,45 +104,51 @@ export function DeadlineControl({ party, kind, isHost }: { party: Party; kind: K
               {auto ? 'Clôture automatique' : 'Clôture par l’hôte'}
             </Badge>
           )}
+          {isHost && (
+            <Button variant="ghost" size="sm" className="ml-auto min-h-11" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen(!open)}>
+              {open ? 'Masquer' : deadline ? 'Modifier' : 'Fixer une heure limite'}
+              <ChevronDown aria-hidden className={cn('size-4 transition-transform motion-reduce:transition-none', open && 'rotate-180')} />
+            </Button>
+          )}
         </div>
-        {isHost && (
-          <div className="space-y-3">
+        {isHost && open && (
+          <div id={panelId} className="space-y-3">
             <div className="flex flex-wrap items-center gap-2" role="group" aria-label={`${LABEL[kind]} : raccourcis`}>
-              {[5, 10, 15, 20].map((m) => (
-                <Chip key={m} className="min-h-9 px-3 disabled:opacity-50" disabled={disabled} title={offlineTitle} onClick={() => setDeadline(isoInMinutesRounded(m), `${LABEL[kind]} dans ${m} min`)}>
+              {DEADLINE_MINUTES.map((m) => (
+                <Chip key={m} className="min-h-11 px-4 disabled:opacity-50" disabled={disabled} title={offlineTitle} onClick={() => setDeadline(isoInMinutesRounded(m), `${LABEL[kind]} dans ${m} min`)}>
                   +{m} min
                 </Chip>
               ))}
-              <form
-                className="flex items-center gap-1.5"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  setAt()
-                }}
-              >
-                <label htmlFor={timeId} className="text-sm text-muted">
-                  à
-                </label>
-                <input
-                  id={timeId}
-                  type="time"
-                  step={60}
-                  value={time}
-                  onChange={(e) => setTime(e.target.value)}
-                  className="h-9 rounded-full border border-border-strong bg-surface px-3 text-sm tabular focus-visible:outline-2 focus-visible:outline-brand"
-                  aria-label={`${LABEL[kind]} à (heure de Bruxelles)`}
-                />
-                <Button type="submit" size="sm" variant="secondary" disabled={disabled || !time} title={offlineTitle}>
-                  Fixer
-                </Button>
-              </form>
               {deadline && (
-                <Chip className="min-h-9 px-3 disabled:opacity-50" disabled={disabled} title={offlineTitle} onClick={() => save.mutate({ [field]: '' }, { onSuccess: () => toast('Heure limite retirée') })}>
+                <Chip className="min-h-11 px-4 disabled:opacity-50" disabled={disabled} title={offlineTitle} onClick={() => save.mutate({ [field]: '' }, { onSuccess: () => toast('Heure limite retirée') })}>
                   Retirer
                 </Chip>
               )}
             </div>
-            <div className="flex items-start justify-between gap-3">
+            <form
+              className="flex flex-wrap items-center gap-2"
+              onSubmit={(e) => {
+                e.preventDefault()
+                setAt()
+              }}
+            >
+              <label htmlFor={timeId} className="text-sm text-muted">
+                ou à
+              </label>
+              <input
+                id={timeId}
+                type="time"
+                step={60}
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                className="h-11 rounded-md border border-border-strong bg-surface px-3 text-[15px] tabular focus-visible:outline-2 focus-visible:outline-brand"
+                aria-label={`${LABEL[kind]} à (heure de Bruxelles)`}
+              />
+              <Button type="submit" size="md" variant="secondary" disabled={disabled || !time} title={offlineTitle}>
+                Fixer
+              </Button>
+            </form>
+            <div className="flex items-center justify-between gap-3">
               <p className="text-xs text-muted">
                 <span className="font-medium text-fg">Clôturer automatiquement</span> — {AUTO[kind]} Un rappel part 2 minutes avant.
               </p>

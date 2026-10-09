@@ -10,8 +10,8 @@ import { stepText, type ActiveParty } from './resume'
 function LiveDot({ className }: { className?: string }) {
   return (
     <span aria-hidden className={cn('relative flex size-2.5 shrink-0', className)}>
-      <span className="absolute inline-flex size-full animate-ping rounded-full bg-brand opacity-60 motion-reduce:animate-none" />
-      <span className="relative inline-flex size-2.5 rounded-full bg-brand" />
+      <span className="absolute inset-0 animate-ping rounded-full bg-brand opacity-60 motion-reduce:animate-none" />
+      <span className="relative size-full rounded-full bg-brand" />
     </span>
   )
 }
@@ -43,8 +43,8 @@ export function ResumeBanner({ parties, variant }: ResumeBannerProps) {
     variant === 'header' ? (
       <>
         <LiveDot />
-        <span className="max-w-44 truncate">{single ? single.title : `${parties.length} commandes en cours`}</span>
-        {single && <span className="hidden text-muted lg:inline">· {STATUS_LABELS[single.status]}</span>}
+        <span className="max-w-28 truncate xl:max-w-44">{single ? single.title : `${parties.length} commandes en cours`}</span>
+        {single && <span className="hidden text-muted xl:inline">· {STATUS_LABELS[single.status]}</span>}
         <span className="text-brand">Reprendre</span>
         <ArrowRight aria-hidden className="size-4 text-brand" />
       </>
@@ -65,7 +65,7 @@ export function ResumeBanner({ parties, variant }: ResumeBannerProps) {
 
   const cls =
     variant === 'header'
-      ? 'hidden h-9 items-center gap-2 rounded-full border border-brand/30 bg-brand/10 pr-3 pl-3 text-sm font-semibold transition-colors hover:bg-brand/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand md:inline-flex'
+      ? 'hidden h-9 min-w-0 shrink items-center gap-2 rounded-full border border-brand/30 bg-brand/10 pr-3 pl-3 text-sm font-semibold transition-colors hover:bg-brand/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand md:inline-flex'
       : 'flex w-full items-center gap-3 rounded-lg border border-brand/30 bg-elevated/95 p-2 pl-2.5 shadow-card backdrop-blur-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand'
 
   const trigger = single ? (

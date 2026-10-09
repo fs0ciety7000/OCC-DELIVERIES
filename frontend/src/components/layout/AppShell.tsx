@@ -43,7 +43,7 @@ export function AppShell() {
   // Une seule action principale par écran : le raccourci d'en-tête est secondaire et
   // masqué là où l'écran porte déjà son propre CTA (héros d'accueil, auth, party).
   const inAuth = ['/login', '/register'].includes(location.pathname) || location.pathname.startsWith('/auth/')
-  const showHeaderCta = !inParty && !inAuth && location.pathname !== '/'
+  const showHeaderCta = !inParty && !inAuth && location.pathname !== '/' && !user?.is_guest
   const launch = () => (user ? setCreateOpen(true) : navigate(`/login?next=${encodeURIComponent(location.pathname)}`))
   const shellStyle = inParty ? ({ '--tabbar-h': '0px' } as CSSProperties) : undefined
 
@@ -67,9 +67,15 @@ export function AppShell() {
     [navigate],
   )
   useMyPartiesRealtime(user?.id, onStatusChange)
-  const hideResume = inParty || location.pathname.startsWith('/j/') || inAuth || (location.pathname === '/' && active.length === 1)
+  const path = location.pathname
+  const inInvite = path.startsWith('/j/') || path.startsWith('/e/')
+  // L'accueil liste déjà les commandes en cours (héros ou cartes) : pas de pastille ni de dock en double.
+  const hideResume = inParty || inInvite || inAuth || (path === '/' && active.length > 0)
   const resume = user && !hideResume ? active : []
-  const showDock = resume.length > 0
+  // Le dock mobile masquerait les tableaux et barres d'action de l'administration.
+  const showDock = resume.length > 0 && !path.startsWith('/admin')
+  // « + » de la tab bar : seulement pour un compte qui peut lancer, hors pages d'invitation.
+  const showTabLaunch = !!user && !user.is_guest && !inInvite
 
   return (
     <div className={cn('relative min-h-dvh', showDock && 'has-resume-dock')} style={shellStyle}>
@@ -81,7 +87,7 @@ export function AppShell() {
       {/* En-tête : barre complète desktop, compacte mobile */}
       <header className="pt-safe sticky top-0 z-40 border-b border-border bg-bg/75 backdrop-blur-xl md:h-16">
         <div className="mx-auto flex h-14 max-w-[1200px] items-center gap-4 px-4 md:h-16 md:px-8">
-          <Link to="/" className="rounded-md" aria-label="OCC Deliveries — accueil">
+          <Link to="/" className="shrink-0 rounded-md" aria-label="OCC Deliveries — accueil">
             <Logo />
           </Link>
           <nav aria-label="Navigation principale" className="ml-4 hidden items-center gap-1 md:flex">
@@ -104,7 +110,7 @@ export function AppShell() {
               </NavLink>
             )}
           </nav>
-          <div className="ml-auto flex items-center gap-1">
+          <div className="ml-auto flex min-w-0 items-center gap-1">
             <ResumeBanner parties={resume} variant="header" />
             <GlobalSearch onLaunch={launch} />
             {isAdmin && (
@@ -114,8 +120,8 @@ export function AppShell() {
             )}
             <ThemeToggle />
             {showHeaderCta && (
-              <button type="button" onClick={launch} className={cn(buttonClass('secondary', 'sm'), 'hidden md:inline-flex')}>
-                <Plus className="size-4" /> Lancer une commande
+              <button type="button" onClick={launch} aria-label="Lancer une commande" className={cn(buttonClass('secondary', 'sm'), 'hidden shrink-0 md:inline-flex')}>
+                <Plus className="size-4" aria-hidden /> <span className="hidden xl:inline">Lancer une commande</span>
               </button>
             )}
             {user ? (
@@ -129,15 +135,19 @@ export function AppShell() {
         </div>
       </header>
 
-      <main id="main" className="relative z-10 mx-auto w-full max-w-[1200px] px-4 pt-4 pb-[calc(var(--tabbar-h)+env(safe-area-inset-bottom)+32px)] md:px-8 md:pt-8">
-        {!inParty && !inAuth && location.pathname !== '/profile' && <VerifyEmailBanner user={user} dismissible className="mb-4" />}
-        {!inParty && !inAuth && location.pathname !== '/profile' && <GuestBanner user={user} className="mb-4" />}
-        <TeamLaunchListener user={user} />
-        <PwaRuntime />
-        <Suspense fallback={<FoodLoader className="py-24" />}>
-          <Outlet />
-        </Suspense>
-        <footer className="mt-16 border-t border-border pt-6 text-xs text-subtle">
+      <main id="main" className="relative z-10 mx-auto flex min-h-[calc(100dvh-4rem)] w-full flex-col max-w-[1200px] px-4 pt-4 pb-[calc(var(--tabbar-h)+env(safe-area-inset-bottom)+32px)] md:px-8 md:pt-8">
+        {/* Bloc normal (pas un item flex à marges auto) : les pages en `mx-auto max-w-…` gardent toute la largeur. */}
+        <div className="mb-16">
+          {!inParty && !inAuth && location.pathname !== '/profile' && <VerifyEmailBanner user={user} dismissible className="mb-4" />}
+          {!inParty && !inAuth && location.pathname !== '/profile' && <GuestBanner user={user} className="mb-4" />}
+          <TeamLaunchListener user={user} />
+          <PwaRuntime />
+          <Suspense fallback={<FoodLoader className="py-24" />}>
+            <Outlet />
+          </Suspense>
+        </div>
+        {/* mt-auto : sur une page courte, le pied reste en bas (au-dessus du dock grâce au padding). */}
+        <footer className="mt-auto border-t border-border pt-6 text-xs text-subtle">
           <a
             href="https://studios.fs0ciety.org/"
             target="_blank"
@@ -158,7 +168,7 @@ export function AppShell() {
       {/* Barre d'onglets mobile */}
       {!inParty && (
         <nav aria-label="Navigation" className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/85 backdrop-blur-xl md:hidden">
-          <div className="mx-auto grid h-16 max-w-md grid-cols-4 items-center">
+          <div className={cn('mx-auto grid h-16 max-w-md items-center', showTabLaunch ? 'grid-cols-4' : 'grid-cols-3')}>
             {NAV.map((n) => (
               <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => cn('flex h-full flex-col items-center justify-center gap-0.5 text-[11px] font-semibold', isActive ? 'text-fg' : 'text-subtle')}>
                 {({ isActive }) => (
@@ -169,11 +179,13 @@ export function AppShell() {
                 )}
               </NavLink>
             ))}
-            <button type="button" onClick={launch} className="flex h-full flex-col items-center justify-center gap-0.5 text-[11px] font-semibold text-subtle" aria-label="Lancer une commande">
-              <span className="grid size-9 place-items-center rounded-full bg-ember text-brand-fg shadow-glow">
-                <Plus className="size-5" aria-hidden />
-              </span>
-            </button>
+            {showTabLaunch && (
+              <button type="button" onClick={launch} className="flex h-full flex-col items-center justify-center gap-0.5 text-[11px] font-semibold text-subtle" aria-label="Lancer une commande">
+                <span className="grid size-9 place-items-center rounded-full bg-ember text-brand-fg shadow-glow">
+                  <Plus className="size-5" aria-hidden />
+                </span>
+              </button>
+            )}
             <NavLink to={user ? '/profile' : '/login'} className={({ isActive }) => cn('flex h-full flex-col items-center justify-center gap-0.5 text-[11px] font-semibold', isActive ? 'text-fg' : 'text-subtle')}>
               {user ? <Avatar user={user} size={24} decorative /> : <User className="size-5" aria-hidden />}
               {user ? 'Profil' : 'Connexion'}

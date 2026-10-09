@@ -47,7 +47,7 @@ export function VerifyEmailBanner({ user, dismissible = false, className }: { us
         <button
           type="button"
           aria-label="Masquer ce rappel"
-          className="grid size-9 shrink-0 place-items-center rounded-full text-muted hover:bg-fg/[0.06] hover:text-fg"
+          className="-my-1.5 grid size-11 shrink-0 place-items-center rounded-full text-muted hover:bg-fg/[0.06] hover:text-fg"
           onClick={() => {
             try {
               sessionStorage.setItem(DISMISS_KEY, '1')

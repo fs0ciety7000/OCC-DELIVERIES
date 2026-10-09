@@ -30,7 +30,7 @@ describe('ResumeBanner', () => {
   it('une commande : lien direct « Reprendre »', async () => {
     renderAt(<ResumeBanner parties={[one]} variant="dock" />)
     expect(screen.getByRole('complementary', { name: 'Commande en cours' })).toBeInTheDocument()
-    const link = screen.getByRole('link', { name: 'Reprendre la commande « Midi du vendredi » — Commande en cours' })
+    const link = screen.getByRole('link', { name: 'Reprendre la commande « Midi du vendredi » — Paniers ouverts' })
     expect(link).toHaveAttribute('href', '/party/p1')
     expect(screen.getByText('Étape 3/5 · Commande')).toBeInTheDocument()
     fireEvent.click(link)

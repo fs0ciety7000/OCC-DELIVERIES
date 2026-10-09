@@ -1,9 +1,9 @@
-import { ArrowRight, ChevronRight, Plus, Users } from 'lucide-react'
+import { ArrowRight, ChevronRight, Plus, UserPlus, Users } from 'lucide-react'
 import { motion } from 'motion/react'
 import { Suspense, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { FoodHero } from '@/components/food'
-import { AvatarStack, Badge, Button, Card, EmptyState, Skeleton } from '@/components/ui'
+import { AvatarStack, Badge, Button, buttonClass, Card, EmptyState, Skeleton } from '@/components/ui'
 import { ResumeHero } from '@/features/party/ActiveParties'
 import { CreatePartySheet } from '@/features/party/CreatePartySheet'
 import { STATUS_LABELS, useMyParties } from '@/features/party/hooks'
@@ -27,6 +27,8 @@ export function HomePage() {
   const parties = useMyParties(user?.id)
 
   const launch = () => (user ? setCreateOpen(true) : navigate('/login?next=/'))
+  // Un invité (sans compte) peut rejoindre, pas lancer : on l'invite à créer son compte.
+  const isGuest = !!user?.is_guest
   // Une seule commande en cours (ex. retour après connexion) : on la met en avant tout en haut.
   const only = parties.data?.length === 1 ? parties.data[0]! : null
 
@@ -44,9 +46,15 @@ export function HomePage() {
         </Suspense>
         <p className="max-w-xl text-lg text-muted">On vote pour le resto, chacun compose son panier, et on se rembourse en un scan. Fini les tableurs du midi.</p>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-          <Button size="lg" onClick={launch} leftIcon={<Plus className="size-5" />} className="sm:min-w-60">
-            Lancer une commande
-          </Button>
+          {isGuest ? (
+            <Link to="/profile?onglet=infos" className={buttonClass('secondary', 'lg', false, 'py-2 text-center whitespace-normal sm:min-w-60')}>
+              <UserPlus aria-hidden className="size-5" /> Créer mon compte pour lancer une commande
+            </Link>
+          ) : (
+            <Button size="lg" onClick={launch} leftIcon={<Plus className="size-5" />} className="sm:min-w-60">
+              Lancer une commande
+            </Button>
+          )}
           <div className="w-full sm:max-w-sm">
             <JoinByCode />
           </div>
@@ -59,7 +67,7 @@ export function HomePage() {
             Mes commandes en cours
           </h2>
           {parties.isPending ? (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Skeleton className="h-24 rounded-lg" />
               <Skeleton className="h-24 rounded-lg" />
             </div>
@@ -77,9 +85,9 @@ export function HomePage() {
               />
             </Card>
           ) : (
-            <motion.ul variants={listVariants} initial="hidden" animate="show" className="grid gap-3 sm:grid-cols-2">
+            <motion.ul variants={listVariants} initial="hidden" animate="show" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {parties.data!.map((p) => (
-                <motion.li key={p.id} variants={itemVariants}>
+                <motion.li key={p.id} variants={itemVariants} className="min-w-0">
                   <Link to={`/party/${p.id}`} className="block rounded-lg">
                     <Card variant="interactive" className="flex items-center gap-3 p-3.5">
                       {p.expand?.restaurant ? (
@@ -91,15 +99,15 @@ export function HomePage() {
                       )}
                       <div className="min-w-0 flex-1 space-y-1">
                         <p className="truncate font-semibold">{p.title || 'Commande groupée'}</p>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="brand" dot>
+                        <div className="flex min-w-0 items-center gap-2">
+                          <Badge variant="brand" dot className="shrink-0">
                             {STATUS_LABELS[p.status]}
                           </Badge>
-                          <span className="truncate text-xs text-subtle">{formatRelativeTime(p.updated)}</span>
+                          <span className="min-w-0 truncate text-xs text-subtle">{formatRelativeTime(p.updated)}</span>
                         </div>
                       </div>
-                      <AvatarStack users={p.expand?.members ?? []} size={24} max={3} />
-                      <ChevronRight aria-hidden className="size-5 text-subtle" />
+                      <AvatarStack users={p.expand?.members ?? []} size={24} max={3} className="shrink-0" />
+                      <ChevronRight aria-hidden className="size-5 shrink-0 text-subtle" />
                     </Card>
                   </Link>
                 </motion.li>

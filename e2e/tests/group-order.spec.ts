@@ -356,7 +356,7 @@ test('commande groupée complète : vote → paniers → récap → dispatch →
         const who = (await s.locator('p').first().textContent())!.trim()
         const detail = (await s.locator('p').nth(1).textContent())!
         const [, feeText] = detail.split('+')
-        byName[who === 'Toi' ? 'Alice' : who] = { total: cents((await s.locator('span.font-display').textContent())!), fee: cents(feeText!) }
+        byName[who === 'Toi' ? 'Alice' : who] = { total: cents((await s.locator('span.font-display').textContent())!), fee: feeText ? cents(feeText) : 0 } // « + … de frais » absent quand les frais sont nuls
       }
       const grandTotal = cents((await ap.locator('dl > div').filter({ has: ap.locator('dt', { hasText: /^Total$/ }) }).locator('dd').textContent())!)
       const itemsSubtotal = expected.Alice + expected.Bob + expected.Chloé

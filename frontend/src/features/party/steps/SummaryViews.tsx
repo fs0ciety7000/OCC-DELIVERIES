@@ -49,7 +49,8 @@ export function TotalsCard({ summary, className }: { summary: Summary; className
   )
 }
 
-export function ParticipantsList({ summary, meId }: { summary: Summary; meId: string }) {
+/** `people` : utilisateurs de la party (couleurs d'avatar déjà rendues distinctes). */
+export function ParticipantsList({ summary, meId, people }: { summary: Summary; meId: string; people?: Map<string, { color?: string }> }) {
   const withItems = summary.participants.filter((p) => p.items.length > 0)
   const empty = summary.participants.filter((p) => p.items.length === 0)
   return (
@@ -57,11 +58,17 @@ export function ParticipantsList({ summary, meId }: { summary: Summary; meId: st
       {withItems.map((p) => (
         <details key={p.user.id} className="group rounded-lg border border-border bg-surface shadow-card" open={p.user.id === meId}>
           <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4 py-2.5 [&::-webkit-details-marker]:hidden">
-            <Avatar user={p.user} size={40} ready={p.ready} />
+            <Avatar user={{ ...p.user, color: people?.get(p.user.id)?.color ?? p.user.color }} size={40} ready={p.ready} />
             <div className="min-w-0 flex-1">
               <p className="truncate font-semibold">{p.user.id === meId ? 'Toi' : p.user.name}</p>
               <p className="text-xs text-muted tabular">
-                {plural(p.items.reduce((n, i) => n + i.quantity, 0), 'article')} · <Money cents={p.subtotal} /> + <Money cents={p.sharedFees} /> de frais
+                {plural(p.items.reduce((n, i) => n + i.quantity, 0), 'article')} · <Money cents={p.subtotal} />
+                {p.sharedFees > 0 && (
+                  <>
+                    {' + '}
+                    <Money cents={p.sharedFees} /> de frais
+                  </>
+                )}
               </p>
             </div>
             <Money cents={p.total} className="font-display text-lg font-semibold" />

@@ -115,7 +115,7 @@ describe('TeamView', () => {
         })}
       />,
     )
-    expect(screen.getByRole('heading', { name: 'Commande en cours' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Midi du lundi' })).toBeInTheDocument()
     expect(screen.getByText(/Lancée par Bob · 2 participants/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Lancer la commande du jour' })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Rejoindre la commande' }))
