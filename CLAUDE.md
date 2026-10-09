@@ -73,6 +73,14 @@ docker compose up --build         # http://localhost:8090
 Les apprentissages importants (pièges PocketBase, décisions d'UX) sont ajoutés
 ci-dessous, du plus récent au plus ancien.
 
+* 2026-10-09 — E2E Playwright (`e2e/`) : parcours complet hôte + 2 invités + non-membre,
+  vert sur PocketBase v0.36 puis v0.40.5. Exception de version : `@playwright/test`
+  épinglé en **1.56.1** pour correspondre au Chromium préinstallé de l'environnement
+  cloud (chromium-1194) ; à monter avec l'image navigateur.
+* 2026-10-09 — Docker Hub limite les pulls (429) dans l'environnement cloud : utiliser
+  `mirror.gcr.io/library/<image>` + `docker tag`. Les builds Docker n'y ont pas de
+  réseau : valider l'étape runtime avec les artefacts construits localement ;
+  la CI GitHub fait le build complet.
 * 2026-10-09 — Mise à niveau complète vers les dernières versions stables :
   Go 1.24.7 → **1.27.2** · PocketBase v0.36.6 → **v0.40.5** (+ `go get -u ./...`) ·
   Node 22 → **24 LTS** · `golang:1.27-alpine`, `node:24-alpine`, `alpine:3.24` ·
