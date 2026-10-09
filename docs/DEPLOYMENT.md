@@ -116,6 +116,43 @@ Fournisseurs conseillés :
   un **mot de passe d'application** ; hôte `smtp.gmail.com`, port `587`, identifiant = l'adresse Gmail,
   `OCC_MAIL_FROM` = cette même adresse (ou un alias vérifié).
 
+### Configuration retenue : Resend (domaine `fs0ciety.org` déjà configuré)
+Resend est déjà utilisé pour `fs0ciety.org` : le domaine y est vérifié (SPF/DKIM), il n'y a **rien à changer
+dans le DNS**. Il suffit d'une clé dédiée à OCC Deliveries.
+
+1. **Vérifier le domaine** : <https://resend.com/domains> → `fs0ciety.org` doit être **Verified**.
+   Si c'est un sous-domaine qui est vérifié (ex. `send.fs0ciety.org` ou `mail.fs0ciety.org`), l'expéditeur
+   doit utiliser **ce** sous-domaine (`noreply@send.fs0ciety.org`), sinon Resend refuse l'envoi.
+2. **Créer une clé API dédiée** : <https://resend.com/api-keys> → *Create API key* →
+   nom `occ-deliveries-eat`, permission **Sending access**, domaine **`fs0ciety.org`** uniquement.
+   Copier la clé `re_…` (elle n'est affichée qu'une fois). Une clé par application = révocable sans
+   casser le reste de fs0ciety.org.
+3. **Coolify** → app *OCC Deliveries* → *Environment variables* — ajouter **toutes** les lignes d'un coup
+   (c'est `OCC_SMTP_HOST` qui active l'envoi au démarrage : ne pas le définir sans le mot de passe) :
+
+   | variable | valeur |
+   |---|---|
+   | `OCC_SMTP_HOST` | `smtp.resend.com` |
+   | `OCC_SMTP_PORT` | `465` |
+   | `OCC_SMTP_USERNAME` | `resend` |
+   | `OCC_SMTP_PASSWORD` | la clé `re_…` — cocher **Is secret** |
+   | `OCC_MAIL_FROM` | `noreply@fs0ciety.org` (ou une adresse du (sous-)domaine vérifié) |
+   | `OCC_MAIL_FROM_NAME` | `OCC Deliveries` |
+
+   `OCC_SMTP_TLS` est inutile : le port `465` active le TLS implicite. Si le serveur Coolify bloque le 465
+   en sortie, utiliser `587` (STARTTLS) ; Resend accepte aussi `2465` (TLS) et `2587` (STARTTLS).
+4. **Redeploy** (les variables ne sont lues qu'au démarrage). Le journal du conteneur affiche
+   « SMTP configured from env » (sans secret) et `https://eat.fs0ciety.org/api/occ/config` renvoie
+   `"mailEnabled": true`.
+5. **Tester** : *Admin → Utilisateurs* → carte « E-mails » → **« Envoyer un e-mail de test »**, puis
+   « Mot de passe oublié ? » depuis la page de connexion. Chaque envoi est visible dans
+   <https://resend.com/emails> (statut *Delivered* / *Bounced*, en-têtes, aperçu).
+
+Limites de l'offre gratuite Resend : 100 e-mails/jour, 3 000/mois — très large pour l'usage (vérifications,
+réinitialisations, alertes de connexion). Dépannage : `535 Authentication failed` = clé erronée ou révoquée ;
+`domain is not verified` / `403` = `OCC_MAIL_FROM` hors du domaine vérifié ; délai d'attente = port sortant
+bloqué (essayer `587` ou `2587`).
+
 **Tester** : redéployer, puis *Admin → Utilisateurs* → carte « E-mails » (badge **Actifs**, expéditeur,
 serveur) → **« Envoyer un e-mail de test »** : il arrive à l'adresse de l'admin connecté. En cas d'erreur
 (identifiants, port, TLS), le message du serveur SMTP s'affiche dans le toast. Ensuite : « Mot de passe
