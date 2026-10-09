@@ -33,10 +33,22 @@ export function ProfilePage() {
     <div className="mx-auto max-w-[680px] space-y-6">
       <header className="flex items-center gap-4">
         <Avatar user={user} size={56} />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h1 className="truncate font-display text-[32px] leading-9 font-bold">{user.name || 'Mon profil'}</h1>
           <p className="truncate text-sm text-muted">{user.email}</p>
         </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          leftIcon={<LogOut className="size-4" />}
+          onClick={() => {
+            logout()
+            toast('À bientôt !')
+            navigate('/')
+          }}
+        >
+          <span className="max-sm:sr-only">Se déconnecter</span>
+        </Button>
       </header>
       <VerifyEmailBanner user={user} />
       <ProfileTabs value={tab} onChange={(t) => setParams(t === 'infos' ? { onglet: 'infos' } : {}, { replace: true })} />

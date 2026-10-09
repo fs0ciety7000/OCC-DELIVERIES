@@ -7,6 +7,7 @@ import { Avatar, buttonClass, Logo, ThemeToggle } from '@/components/ui'
 import { ResumeBanner } from '@/features/party/ActiveParties'
 import { useActiveParties } from '@/features/party/resume'
 import { VerifyEmailBanner } from '@/features/profile/VerifyEmailBanner'
+import { UserMenu } from './UserMenu'
 import { CreatePartySheet } from '@/features/party/CreatePartySheet'
 import { useAuth } from '@/lib/auth'
 import { cn } from '@/lib/cn'
@@ -113,9 +114,7 @@ export function AppShell() {
               </button>
             )}
             {user ? (
-              <Link to="/profile" className="hidden rounded-full p-1.5 md:block" aria-label="Mon profil">
-                <Avatar user={user} size={32} decorative />
-              </Link>
+              <UserMenu user={user} />
             ) : (
               <Link to="/login" className={cn(buttonClass('ghost', 'sm'), 'hidden md:inline-flex')}>
                 Connexion
