@@ -56,6 +56,9 @@ func curatedTomo() *Restaurant {
 	}
 }
 
+// applySeq numbers the invented ids (unique across apply calls).
+var applySeq int
+
 // apply simulates the database writes of a plan (ids are invented).
 func apply(t *testing.T, db []*Restaurant, p Plan) []*Restaurant {
 	t.Helper()
@@ -63,13 +66,13 @@ func apply(t *testing.T, db []*Restaurant, p Plan) []*Restaurant {
 	for _, r := range db {
 		byID[r.ID] = r
 	}
-	n := 0
+	n := &applySeq
 	for _, rp := range p.Restaurants {
 		r := rp.Restaurant
 		cur := byID[r.ID]
 		if r.ID == "" {
-			n++
-			r.ID = fmt.Sprintf("r_new%d", n)
+			*n++
+			r.ID = fmt.Sprintf("r_new%d", *n)
 			cur = &Restaurant{}
 			db = append(db, cur)
 			byID[r.ID] = cur
@@ -79,9 +82,9 @@ func apply(t *testing.T, db []*Restaurant, p Plan) []*Restaurant {
 		cur.Categories, cur.Items = cats, items
 		ids := map[string]string{}
 		for _, c := range rp.NewCategories {
-			n++
+			*n++
 			cc := *c
-			cc.ID = fmt.Sprintf("c_new%d", n)
+			cc.ID = fmt.Sprintf("c_new%d", *n)
 			ids[c.Name] = cc.ID
 			cur.Categories = append(cur.Categories, &cc)
 		}
@@ -94,8 +97,8 @@ func apply(t *testing.T, db []*Restaurant, p Plan) []*Restaurant {
 				}
 			}
 			if cp.ID == "" {
-				n++
-				cp.ID = fmt.Sprintf("i_new%d", n)
+				*n++
+				cp.ID = fmt.Sprintf("i_new%d", *n)
 				cur.Items = append(cur.Items, &cp)
 				continue
 			}

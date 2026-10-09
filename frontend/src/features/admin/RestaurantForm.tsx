@@ -34,6 +34,8 @@ interface FormState {
   deliveroo: string
   weloveat: string
   active: boolean
+  partial_menu: boolean
+  geo_approx: boolean
   locked: boolean
 }
 
@@ -66,6 +68,8 @@ function initial(r: Restaurant | null): FormState {
     deliveroo: providerUrl(r, 'deliveroo'),
     weloveat: providerUrl(r, 'weloveat'),
     active: r?.active ?? true,
+    partial_menu: r?.partial_menu ?? false,
+    geo_approx: r?.geo_approx ?? false,
     // enregistrer une modification verrouille la fiche (comme le serveur le
     // ferait) : l'interrupteur montre ce qui sera enregistré
     locked: true,
@@ -127,6 +131,8 @@ function toRestaurantData(f: FormState): { data?: Partial<Restaurant>; errors: E
     min_order: money('min_order', f.min_order),
     providers,
     active: f.active,
+    partial_menu: f.partial_menu,
+    geo_approx: f.geo_approx,
   }
   if (!errors.eta_max && data.eta_min && data.eta_max && data.eta_min > data.eta_max) errors.eta_max = 'Doit dépasser le minimum.'
   return Object.keys(errors).length ? { errors } : { data, errors }
@@ -232,6 +238,7 @@ export function RestaurantForm({ restaurant, open, onClose, onSaved }: { restaur
             {text('lng', 'Longitude', { inputMode: 'decimal', placeholder: '3,9567' })}
           </div>
           <p className="text-xs text-subtle">Géocodage par OpenStreetMap (Nominatim). Sans coordonnées, le resto n'apparaît pas dans « À proximité ».</p>
+          <Toggle checked={form.geo_approx} onChange={(v) => set('geo_approx', v)} label="Position approximative (distance masquée)" showLabel />
           {text('phone', 'Téléphone', { inputMode: 'tel', optional: true })}
         </fieldset>
 
@@ -267,6 +274,8 @@ export function RestaurantForm({ restaurant, open, onClose, onSaved }: { restaur
           {text('takeaway', 'Lien Takeaway', { inputMode: 'url', optional: true, placeholder: 'https://www.takeaway.com/be-fr/…' })}
           {text('deliveroo', 'Lien Deliveroo', { inputMode: 'url', optional: true, placeholder: 'https://deliveroo.be/fr/menu/…' })}
           {text('weloveat', 'Lien weloveat', { inputMode: 'url', optional: true, placeholder: 'https://weloveat.be/…' })}
+          <Toggle checked={form.partial_menu} onChange={(v) => set('partial_menu', v)} label="Carte partielle (aperçu du menu)" showLabel />
+          <p className="text-xs text-subtle">Affiche le badge « Aperçu du menu » et renvoie vers la carte complète sur Uber Eats.</p>
         </fieldset>
 
         {restaurant && (

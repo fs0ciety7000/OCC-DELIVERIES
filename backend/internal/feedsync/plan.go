@@ -14,7 +14,10 @@
 //     name / cuisines already set are kept;
 //   - items missing from the feed become unavailable (never deleted) and come
 //     back when the feed lists them again;
-//   - a restaurant no source returns anymore is marked stale (never deleted).
+//   - a restaurant no source returns anymore is marked stale (never deleted);
+//   - the Uber Eats snapshot (snapshot.go) is applied after the feeds: it adds
+//     links / fills missing notes, or creates restaurants with a partial menu
+//     that a feed supplying a full menu (≥ FullMenuMinItems items) replaces.
 package feedsync
 
 import (
@@ -63,6 +66,10 @@ type Restaurant struct {
 	Locked      bool
 	Active      bool
 	StaleSince  string // "" = not stale
+	// PartialMenu: only a few sample items are known (Uber Eats snapshot).
+	PartialMenu bool
+	// GeoApprox: Lat / Lng are approximate (default office location).
+	GeoApprox bool
 
 	Categories []*Category
 	Items      []*Item
@@ -141,7 +148,9 @@ type Plan struct {
 	Matched int
 	// Locked counts feed restaurants matched to a locked one (skipped).
 	Locked int
-	Log    []string
+	// SnapshotMatched counts snapshot restaurants matched to a known one.
+	SnapshotMatched int
+	Log             []string
 }
 
 // Options tune Reconcile.
@@ -151,9 +160,25 @@ type Options struct {
 	// Incomplete holds the providers whose fetch failed or was blocked in
 	// this run: their absent restaurants are not marked stale.
 	Incomplete map[string]bool
+	// Snapshot is the Uber Eats snapshot read in this run (nil = none).
+	Snapshot []SnapshotEntry
+	// DefaultLat / DefaultLng locate the snapshot restaurants without
+	// coordinates (OCC_DEFAULT_LAT / LNG; the city centre when 0).
+	DefaultLat, DefaultLng float64
 }
 
 func (o Options) today() string { return o.Now.Format(time.DateOnly) }
+
+func (o Options) defaultLocation() (float64, float64) {
+	if o.DefaultLat != 0 || o.DefaultLng != 0 {
+		return o.DefaultLat, o.DefaultLng
+	}
+	c, ok := menusync.Cities[o.City]
+	if !ok {
+		c = menusync.Cities["mons"]
+	}
+	return c.Lat, c.Lng
+}
 
 // Reconcile computes the writes that bring the stored catalogue in line with
 // the merged feed. existing is not modified.
@@ -182,7 +207,7 @@ func Reconcile(existing []*Restaurant, feed []menusync.Restaurant, o Options) Pl
 	}
 	for i, in := range feed {
 		if matches[i] == nil && in.Name != "" {
-			if r := matchByPlace(existing, in, claimed); r != nil {
+			if r := matchByPlace(existing, in, claimed, o.City); r != nil {
 				matches[i], claimed[r.ID] = r, true
 			}
 		}
@@ -210,8 +235,10 @@ func Reconcile(existing []*Restaurant, feed []menusync.Restaurant, o Options) Pl
 		plan.Restaurants = append(plan.Restaurants, createRestaurant(in, o, slugs))
 	}
 
+	seen := reconcileSnapshot(&plan, existing, o, slugs)
+
 	for _, r := range existing {
-		if claimed[r.ID] || r.Locked || r.StaleSince != "" || len(r.Sources) == 0 {
+		if claimed[r.ID] || seen[r.ID] || r.Locked || r.StaleSince != "" || len(r.Sources) == 0 {
 			continue
 		}
 		if slices.ContainsFunc(r.Sources, func(s SourceRef) bool { return o.Incomplete[s.Provider] }) {
@@ -245,7 +272,10 @@ func feedKeys(in menusync.Restaurant) []string {
 
 func (r *Restaurant) asFeed() menusync.Restaurant {
 	m := menusync.Restaurant{}
-	m.Name, m.Address, m.Lat, m.Lng, m.Providers = r.Name, r.Address, r.Lat, r.Lng, r.Providers
+	m.Name, m.Address, m.Providers = r.Name, r.Address, r.Providers
+	if !r.GeoApprox {
+		m.Lat, m.Lng = r.Lat, r.Lng
+	}
 	for _, s := range r.Sources {
 		m.SourceURLs = append(m.SourceURLs, s.URL)
 	}
@@ -265,15 +295,25 @@ func matchByKey(existing []*Restaurant, in menusync.Restaurant, claimed map[stri
 
 // matchByPlace finds the unclaimed stored restaurant with the same platform
 // link / source page, or the same name at the same place (nearest first).
-func matchByPlace(existing []*Restaurant, in menusync.Restaurant, claimed map[string]bool) *Restaurant {
+// A partial-menu restaurant (Uber Eats snapshot, often without a real
+// position) is also recognised by a loose name match (menusync.NameMatch).
+func matchByPlace(existing []*Restaurant, in menusync.Restaurant, claimed map[string]bool, city string) *Restaurant {
 	var best *Restaurant
 	bestD := 1e9
 	for _, r := range existing {
-		if claimed[r.ID] || !menusync.SameRestaurant(r.asFeed(), in) {
+		if claimed[r.ID] {
 			continue
 		}
+		if !menusync.SameRestaurant(r.asFeed(), in) {
+			if !r.PartialMenu || menusync.NameMatch(r.Name, in.Name, city) == menusync.NameNoMatch {
+				continue
+			}
+			if ok, _ := snapshotPlaceOK(r, in.Lat, in.Lng, in.Lat != 0 || in.Lng != 0); !ok {
+				continue
+			}
+		}
 		d := 0.0
-		if (r.Lat != 0 || r.Lng != 0) && (in.Lat != 0 || in.Lng != 0) {
+		if hasGeo(r) && (in.Lat != 0 || in.Lng != 0) {
 			d = domain.HaversineKm(r.Lat, r.Lng, in.Lat, in.Lng)
 		}
 		if best == nil || d < bestD {
@@ -475,15 +515,40 @@ func updateRestaurant(cur *Restaurant, in menusync.Restaurant, o Options) *Resta
 		}
 	}
 
+	// a partial menu (Uber Eats snapshot) is replaced by the first feed
+	// supplying a full one; a smaller feed menu leaves it alone
+	fromSnapshot := in.Source == ProviderUberEatsSnapshot
+	takeover := cur.PartialMenu && !fromSnapshot && in.ItemCount() >= FullMenuMinItems
+	keepMenu := cur.PartialMenu && !fromSnapshot && !takeover
+
 	// provenance: always refreshed (checked_at), not counted as a change
 	srcs := origins(in, o)
-	if k := in.SourceKey(); k != "" && r.SourceKey != k {
-		r.SourceKey = k
-		p.Save = true
+	if keepMenu || fromSnapshot {
+		// the menu still comes from the snapshot: snapshot key, the refs of
+		// both the snapshot and the feeds listing the restaurant
+		if k := in.SourceKey(); fromSnapshot && k != "" && r.SourceKey != k {
+			r.SourceKey = k
+			p.Save = true
+		}
+		if u := unionSources(r.Sources, srcs); !sourcesEqual(r.Sources, u) {
+			r.Sources = u
+			p.Save = true
+		}
+	} else {
+		if k := in.SourceKey(); k != "" && r.SourceKey != k {
+			r.SourceKey = k
+			p.Save = true
+		}
+		if !sourcesEqual(r.Sources, srcs) && len(srcs) > 0 {
+			r.Sources = srcs
+			p.Save = true
+		}
 	}
-	if !sourcesEqual(r.Sources, srcs) && len(srcs) > 0 {
-		r.Sources = srcs
+	if takeover {
+		r.PartialMenu = false
 		p.Save = true
+		p.Changes = append(p.Changes, fmt.Sprintf("%s : carte complète reçue (%d plats), fin de l'aperçu Uber Eats", r.Name, in.ItemCount()))
+		note(true, "carte complète")
 	}
 	if r.StaleSince != "" {
 		r.StaleSince = ""
@@ -498,8 +563,12 @@ func updateRestaurant(cur *Restaurant, in menusync.Restaurant, o Options) *Resta
 	note(fill(&r.CoverURL, in.CoverURL), "image")
 	note(fill(&r.Address, in.Address), "adresse")
 	note(fill(&r.Phone, in.Phone), "téléphone")
-	if r.Lat == 0 && r.Lng == 0 && (in.Lat != 0 || in.Lng != 0) {
-		r.Lat, r.Lng = in.Lat, in.Lng
+	if (r.GeoApprox || (r.Lat == 0 && r.Lng == 0)) && (in.Lat != 0 || in.Lng != 0) {
+		// a real position replaces an approximate one
+		if r.GeoApprox && strings.TrimSpace(in.Address) != "" {
+			r.Address = strings.TrimSpace(in.Address)
+		}
+		r.Lat, r.Lng, r.GeoApprox = in.Lat, in.Lng, false
 		note(true, "coordonnées")
 	}
 	if len(r.Cuisines) == 0 && len(in.Cuisines) > 0 {
@@ -512,19 +581,32 @@ func updateRestaurant(cur *Restaurant, in menusync.Restaurant, o Options) *Resta
 			note(true, "liens")
 		}
 	}
-	// live fields: follow the feed when it has a value
-	if in.Rating > 0 && (in.Rating != r.Rating || (in.RatingCount > 0 && in.RatingCount != r.RatingCount)) {
-		r.Rating = in.Rating
-		if in.RatingCount > 0 {
-			r.RatingCount = in.RatingCount
+	// live fields: follow the feed when it has a value — except the snapshot
+	// when a feed also lists the restaurant (the feed wins, the snapshot only
+	// fills what is missing)
+	if fromSnapshot && slices.ContainsFunc(r.Sources, func(s SourceRef) bool { return s.Provider != ProviderUberEatsSnapshot }) {
+		if r.Rating == 0 && in.Rating > 0 {
+			r.Rating, r.RatingCount = in.Rating, max(r.RatingCount, in.RatingCount)
+			note(true, "note")
 		}
-		note(true, "note")
-	}
-	note(setPositive(&r.DeliveryFee, in.DeliveryFee), "frais de livraison")
-	note(setPositive(&r.MinOrder, in.MinOrder), "minimum")
-	if in.EtaMin > 0 && in.EtaMax >= in.EtaMin && (in.EtaMin != r.EtaMin || in.EtaMax != r.EtaMax) {
-		r.EtaMin, r.EtaMax = in.EtaMin, in.EtaMax
-		note(true, "délai")
+		if r.EtaMin == 0 && in.EtaMin > 0 {
+			r.EtaMin, r.EtaMax = in.EtaMin, max(r.EtaMax, in.EtaMax)
+			note(true, "délai")
+		}
+	} else {
+		if in.Rating > 0 && (in.Rating != r.Rating || (in.RatingCount > 0 && in.RatingCount != r.RatingCount)) {
+			r.Rating = in.Rating
+			if in.RatingCount > 0 {
+				r.RatingCount = in.RatingCount
+			}
+			note(true, "note")
+		}
+		note(setPositive(&r.DeliveryFee, in.DeliveryFee), "frais de livraison")
+		note(setPositive(&r.MinOrder, in.MinOrder), "minimum")
+		if in.EtaMin > 0 && in.EtaMax >= in.EtaMin && (in.EtaMin != r.EtaMin || in.EtaMax != r.EtaMax) {
+			r.EtaMin, r.EtaMax = in.EtaMin, in.EtaMax
+			note(true, "délai")
+		}
 	}
 	restChanged := len(what) > 0
 	if restChanged {
@@ -534,7 +616,10 @@ func updateRestaurant(cur *Restaurant, in menusync.Restaurant, o Options) *Resta
 		}
 	}
 
-	itemsChanged := reconcileItems(cur, r, in, srcs, p)
+	itemsChanged := false
+	if !keepMenu {
+		itemsChanged = reconcileItems(cur, r, in, srcs, p)
+	}
 	if restChanged || itemsChanged {
 		p.Stats.RestaurantsUpdated = 1
 	}
@@ -543,6 +628,23 @@ func updateRestaurant(cur *Restaurant, in menusync.Restaurant, o Options) *Resta
 
 func sourcesEqual(a, b []SourceRef) bool {
 	return slices.Equal(a, b)
+}
+
+// unionSources returns a with the refs of b added or refreshed (same
+// provider and URL).
+func unionSources(a, b []SourceRef) []SourceRef {
+	out := slices.Clone(a)
+	for _, s := range b {
+		i := slices.IndexFunc(out, func(x SourceRef) bool {
+			return x.Provider == s.Provider && menusync.NormURL(x.URL) == menusync.NormURL(s.URL)
+		})
+		if i >= 0 {
+			out[i] = s
+		} else {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 // reconcileItems plans the menu writes of a matched restaurant. It reports

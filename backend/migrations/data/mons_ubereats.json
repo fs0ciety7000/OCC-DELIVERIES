@@ -1,0 +1,1402 @@
+[
+ {
+  "name": "Altaj (Quaregnon)",
+  "url": "https://www.ubereats.com/store/altaj-quaregnon/oZv0iWiHXrKsDTPCwx9dCQ",
+  "rating": 4.4,
+  "rating_count": 98,
+  "eta_min": 21,
+  "categories": [
+   "Halal",
+   "Libanaise",
+   "Syrienne"
+  ],
+  "promo": "",
+  "lat": 0,
+  "lng": 0,
+  "address": "",
+  "geo_approx": true,
+  "items": [
+   {
+    "name": "Kefta",
+    "price": 690
+   },
+   {
+    "name": "Burger Bicky Geant",
+    "price": 650
+   },
+   {
+    "name": "Poulet Maison",
+    "price": 690
+   },
+   {
+    "name": "Bicky",
+    "price": 400
+   },
+   {
+    "name": "Agneau et Dinde",
+    "price": 690
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "BON (Mons)",
+  "url": "https://www.ubereats.com/store/bon-mons/ZtMEAFxUWCGpAy-CoIZjwQ",
+  "rating": 4.4,
+  "rating_count": 22,
+  "eta_min": 10,
+  "categories": [
+   "Cuisine saine",
+   "Salades",
+   "Petit-déj' et brunch"
+  ],
+  "promo": "",
+  "lat": 50.45367,
+  "lng": 3.94257,
+  "address": "Place Léopold, 7000 Mons",
+  "geo_approx": false,
+  "items": [
+   {
+    "name": "Jus Lucky Green",
+    "price": 730
+   },
+   {
+    "name": "Jus Honky Ponky",
+    "price": 730
+   },
+   {
+    "name": "Jus Miss Sunshine",
+    "price": 730
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Bagel City",
+  "url": "https://www.ubereats.com/store/bagel-city/w6aJu3uiXcOpHNW7tR8pew",
+  "rating": 4.45,
+  "rating_count": 230,
+  "eta_min": 21,
+  "categories": [
+   "Bagels",
+   "Fast food",
+   "Américaine",
+   "Halal"
+  ],
+  "promo": "",
+  "lat": 50.45326,
+  "lng": 3.95166,
+  "address": "Rue de la Chaussée 19, 7000 Mons",
+  "geo_approx": false,
+  "items": [
+   {
+    "name": "Menu Dallas",
+    "price": 1650
+   },
+   {
+    "name": "New-York",
+    "price": 1150
+   },
+   {
+    "name": "Chicken tenders 4p",
+    "price": 990
+   },
+   {
+    "name": "Chicken tenders 2P",
+    "price": 490
+   },
+   {
+    "name": "New-York Veggie",
+    "price": 1250
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Bao Bang (Mons)",
+  "url": "https://www.ubereats.com/store/bao-bang-mons/4lxfoY-XWkGEUrcVK8D3Bg",
+  "rating": 4.35,
+  "rating_count": 23,
+  "eta_min": 11,
+  "categories": [
+   "Burgers",
+   "Américaine",
+   "Sandwichs"
+  ],
+  "promo": "",
+  "lat": 0,
+  "lng": 0,
+  "address": "",
+  "geo_approx": true,
+  "items": [
+   {
+    "name": "Ko chicken",
+    "price": 1499
+   },
+   {
+    "name": "Chicken kick",
+    "price": 699
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Bowl Street (Mons)",
+  "url": "https://www.ubereats.com/store/bowl-street-mons/sjU7DEOaWCCGkWhL6aVMLw",
+  "rating": 4.62,
+  "rating_count": 150,
+  "eta_min": 40,
+  "categories": [
+   "Asiatique",
+   "Coréenne"
+  ],
+  "promo": "Buy 1, get 1",
+  "lat": 50.45424,
+  "lng": 3.95172,
+  "address": "Grand-Place 28, 7000 Mons",
+  "geo_approx": false,
+  "items": [
+   {
+    "name": "Hotwings crispy",
+    "price": 500
+   },
+   {
+    "name": "Œuf Mariné au Soja",
+    "price": 200
+   },
+   {
+    "name": "Teppanyaki Nouilles Scampis",
+    "price": 1600
+   },
+   {
+    "name": "Salade de Choux",
+    "price": 250
+   },
+   {
+    "name": "Spicy Chili Sauce",
+    "price": 100
+   },
+   {
+    "name": "Wakame",
+    "price": 400
+   },
+   {
+    "name": "Ricebowl bœuf Sauce soja",
+    "price": 1500
+   },
+   {
+    "name": "Donburi kara-age",
+    "price": 1300
+   },
+   {
+    "name": "Ramen Scampis",
+    "price": 1600
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Buga Ramen Mons",
+  "url": "https://www.ubereats.com/store/buga-ramen-mons/HCbCJNqXWEaSlbIcgB--Bg",
+  "rating": 4.2,
+  "rating_count": 45,
+  "eta_min": 10,
+  "categories": [
+   "Ramen",
+   "Japonaise",
+   "Curry japonais"
+  ],
+  "promo": "",
+  "lat": 50.45298,
+  "lng": 3.94311,
+  "address": "Place Léopold 15, 7000 Mons",
+  "geo_approx": false,
+  "items": [
+   {
+    "name": "4u Ebi Scampis ( Shoyu)",
+    "price": 2050
+   },
+   {
+    "name": "64u Ebi Kushiyaki",
+    "price": 800
+   },
+   {
+    "name": "36u Combo Yaki Kamo",
+    "price": 2050
+   },
+   {
+    "name": "57u Niku Harumaki Roll",
+    "price": 600
+   },
+   {
+    "name": "56t Tori Nikuman (3 Pièces)",
+    "price": 950
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Burger King - Quaregnon",
+  "url": "https://www.ubereats.com/store/burger-king-quaregnon/irY1l7BLSCuEGG3g5piRqg",
+  "rating": 4.35,
+  "rating_count": 5000,
+  "eta_min": 21,
+  "categories": [
+   "Fast food",
+   "Américaine",
+   "Burgers"
+  ],
+  "promo": "Free item on €25+",
+  "lat": 50.44165,
+  "lng": 3.8532,
+  "address": "Route de Mons 202, 7390 Quaregnon",
+  "geo_approx": false,
+  "items": [],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "CTR Chicken Mons (Independant)",
+  "url": "https://www.ubereats.com/store/ctr-chicken-mons-independant/PJdfrIsgVNiMpJa4W3eIGA",
+  "rating": 4.57,
+  "rating_count": 43,
+  "eta_min": 40,
+  "categories": [
+   "Américaine",
+   "Ailes de poulet",
+   "Poulet",
+   "Burgers"
+  ],
+  "promo": "",
+  "lat": 50.45312,
+  "lng": 3.94347,
+  "address": "Place Léopold 1, 7000 Mons",
+  "geo_approx": false,
+  "items": [
+   {
+    "name": "Chitir box nuggets",
+    "price": 1220
+   },
+   {
+    "name": "Chitir box hot wings",
+    "price": 1220
+   },
+   {
+    "name": "Chitir box bites",
+    "price": 1220
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Chamas Tacos - Mons",
+  "url": "https://www.ubereats.com/store/chamas-tacos-mons/Mxuf02KgUniQYY_ulSr1aw",
+  "rating": 3.34,
+  "rating_count": 500,
+  "eta_min": 11,
+  "categories": [
+   "French tacos",
+   "Halal",
+   "Fast food"
+  ],
+  "promo": "",
+  "lat": 0,
+  "lng": 0,
+  "address": "",
+  "geo_approx": true,
+  "items": [
+   {
+    "name": "Chamas Box double (6 Tenders, 6 Nugg, 6 Onion, 6 Chili Cheese)",
+    "price": 2490
+   },
+   {
+    "name": "Menu Malin Bol",
+    "price": 1490
+   },
+   {
+    "name": "Bol Sur-Mesure",
+    "price": 1100
+   },
+   {
+    "name": "Tacos classique Sur-Mesure",
+    "price": 950
+   },
+   {
+    "name": "Chamas Box simple (3 Tenders, 3 Nugg, 3 Onion, 3 Chili Cheese)",
+    "price": 1350
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Chez Yo",
+  "url": "https://www.ubereats.com/store/chez-yo/yusaZjylUH6gD52Usf-rCQ",
+  "rating": 0.0,
+  "rating_count": 0,
+  "eta_min": 13,
+  "categories": [
+   "Sandwichs",
+   "Cuisine saine",
+   "Snacks"
+  ],
+  "promo": "",
+  "lat": 0,
+  "lng": 0,
+  "address": "",
+  "geo_approx": true,
+  "items": [
+   {
+    "name": "Boulettes maison",
+    "price": 675
+   },
+   {
+    "name": "Poulet KFC deluxe",
+    "price": 830
+   },
+   {
+    "name": "Hamburger",
+    "price": 635
+   },
+   {
+    "name": "Poulet effiloché deluxe",
+    "price": 830
+   },
+   {
+    "name": "Lipton Ice Tea pétillant",
+    "price": 260
+   },
+   {
+    "name": "Sandwich norvégien",
+    "price": 755
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Crousty HD (Dour)",
+  "url": "https://www.ubereats.com/store/crousty-hd-dour/2n_L1mzkXKO0j1X8CrcTRA",
+  "rating": 0.0,
+  "rating_count": 0,
+  "eta_min": 70,
+  "categories": [
+   "Américaine",
+   "Ailes de poulet"
+  ],
+  "promo": "Buy 1, get 1",
+  "lat": 0,
+  "lng": 0,
+  "address": "",
+  "geo_approx": true,
+  "items": [],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Cup Pasta - Mons",
+  "url": "https://www.ubereats.com/store/cup-pasta-mons/_7npPgPHQ-K5rnYWd6FUyA",
+  "rating": 4.43,
+  "rating_count": 160,
+  "eta_min": 11,
+  "categories": [
+   "Méditerranéenne",
+   "Italienne",
+   "Pâtes"
+  ],
+  "promo": "",
+  "lat": 50.45328,
+  "lng": 3.9517,
+  "address": "Rue de la Chaussée 17, 7000 Mons",
+  "geo_approx": false,
+  "items": [
+   {
+    "name": "Spaghetti carbonara",
+    "price": 1600
+   },
+   {
+    "name": "Spaghetti bolognaise",
+    "price": 1500
+   },
+   {
+    "name": "Coca-Cola zéro",
+    "price": 290
+   },
+   {
+    "name": "Penne arabiata",
+    "price": 1500
+   },
+   {
+    "name": "Pizzetta salami piquant",
+    "price": 900
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Domino's Pizza - Mons",
+  "url": "https://www.ubereats.com/store/dominos-pizza-mons/XXk1yIL5U6yU2sfABeFOCw",
+  "rating": 4.02,
+  "rating_count": 600,
+  "eta_min": 30,
+  "categories": [
+   "Pizzas"
+  ],
+  "promo": "€5 off €30+",
+  "lat": 50.45072,
+  "lng": 3.94056,
+  "address": "Boulevard Gendebien 26, 7000 Mons",
+  "geo_approx": false,
+  "items": [
+   {
+    "name": "My Domino's Box 4 Cheese",
+    "price": 1300
+   },
+   {
+    "name": "My Domino’s Box Pepperoni Party",
+    "price": 1300
+   },
+   {
+    "name": "My Domino’s Box BBQ GRILL",
+    "price": 1300
+   },
+   {
+    "name": "Pizza Cannibale",
+    "price": 1500
+   },
+   {
+    "name": "Pizza Spicy Chicken Mix",
+    "price": 1600
+   },
+   {
+    "name": "Pizza Subzz Maple Chicken",
+    "price": 800
+   },
+   {
+    "name": "My Domino’s Box Hawaii",
+    "price": 1300
+   },
+   {
+    "name": "Pizza Tonno",
+    "price": 1450
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Donroll’s (Mons)",
+  "url": "https://www.ubereats.com/store/donrolls-mons/i84xKTVYQ-mWJh9hi5ispQ",
+  "rating": 4.39,
+  "rating_count": 700,
+  "eta_min": 30,
+  "categories": [
+   "Sushis",
+   "Japonaise",
+   "Asiatique",
+   "Poke"
+  ],
+  "promo": "Free item on €30+",
+  "lat": 50.44876,
+  "lng": 3.94921,
+  "address": "Rue de Bertaimont 13, 7000 Mons",
+  "geo_approx": false,
+  "items": [
+   {
+    "name": "Donburi karaage-don",
+    "price": 1699
+   },
+   {
+    "name": "Shio ramen au tempura de scampi",
+    "price": 1799
+   },
+   {
+    "name": "Platter classic box (42 pcs)",
+    "price": 3599
+   },
+   {
+    "name": "Party box (36pc)",
+    "price": 3799
+   },
+   {
+    "name": "Plateau kamasu (16 pcs)",
+    "price": 1399
+   },
+   {
+    "name": "California saumon crispy ball",
+    "price": 799
+   },
+   {
+    "name": "Plateau suca (12 pcs)",
+    "price": 1399
+   },
+   {
+    "name": "California tempura scampi",
+    "price": 799
+   },
+   {
+    "name": "California thon sauce piquante",
+    "price": 799
+   },
+   {
+    "name": "California surimi",
+    "price": 720
+   },
+   {
+    "name": "Plateau saumon rolls (18pc)",
+    "price": 1699
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Dour Crousty",
+  "url": "https://www.ubereats.com/store/dour-crousty/oKyYjKzWXnq8iUDQ4hs1qQ",
+  "rating": 2.91,
+  "rating_count": 76,
+  "eta_min": 45,
+  "categories": [
+   "Barbecue",
+   "Américaine",
+   "Burgers"
+  ],
+  "promo": "",
+  "lat": 0,
+  "lng": 0,
+  "address": "",
+  "geo_approx": true,
+  "items": [
+   {
+    "name": "Brochette de Dinde",
+    "price": 500
+   },
+   {
+    "name": "Poulycroc",
+    "price": 350
+   },
+   {
+    "name": "Eau Chaudfontaine pétillant",
+    "price": 200
+   },
+   {
+    "name": "Boulette",
+    "price": 350
+   },
+   {
+    "name": "Croquette de fromage",
+    "price": 350
+   },
+   {
+    "name": "Brochette de Poisson",
+    "price": 450
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Dour Tacos",
+  "url": "https://www.ubereats.com/store/dour-tacos/VNnNgrpHUdSBSahaA8JVfA",
+  "rating": 3.42,
+  "rating_count": 100,
+  "eta_min": 45,
+  "categories": [
+   "Tacos",
+   "Mexicaine"
+  ],
+  "promo": "",
+  "lat": 0,
+  "lng": 0,
+  "address": "",
+  "geo_approx": true,
+  "items": [
+   {
+    "name": "Croquette fromage",
+    "price": 350
+   },
+   {
+    "name": "Hamburger dinde simple",
+    "price": 500
+   },
+   {
+    "name": "Boulette",
+    "price": 350
+   },
+   {
+    "name": "Hamburger dinde double",
+    "price": 700
+   },
+   {
+    "name": "Chixfingers",
+    "price": 500
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Gare à mon'snack",
+  "url": "https://www.ubereats.com/store/gare-a-monsnack/qoHlMAOaVQuSa82G3hHDGw",
+  "rating": 5.0,
+  "rating_count": 23,
+  "eta_min": 10,
+  "categories": [
+   "Sandwichs",
+   "Cuisine saine",
+   "Salades",
+   "Soupes"
+  ],
+  "promo": "",
+  "lat": 0,
+  "lng": 0,
+  "address": "",
+  "geo_approx": true,
+  "items": [
+   {
+    "name": "Dady",
+    "price": 640
+   },
+   {
+    "name": "Bouddha",
+    "price": 640
+   },
+   {
+    "name": "Cornet de pâtes bolognaise",
+    "price": 715
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Grill Pita",
+  "url": "https://www.ubereats.com/store/grill-pita/qNTERKHGQqysLVWAbg-O-A",
+  "rating": 3.26,
+  "rating_count": 25,
+  "eta_min": 10,
+  "categories": [
+   "Fast food",
+   "Kebab",
+   "Halal"
+  ],
+  "promo": "",
+  "lat": 0,
+  "lng": 0,
+  "address": "",
+  "geo_approx": true,
+  "items": [
+   {
+    "name": "Durum Pita Poulet",
+    "price": 1095
+   },
+   {
+    "name": "Kapsalon",
+    "price": 995
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Hard Ribs",
+  "url": "https://www.ubereats.com/store/hard-ribs/E0LToag1QDKPLSHnsmzQRw",
+  "rating": 0.0,
+  "rating_count": 0,
+  "eta_min": 27,
+  "categories": [
+   "Burgers",
+   "Américaine",
+   "Sandwichs",
+   "Barbecue"
+  ],
+  "promo": "Buy 1, get 1",
+  "lat": 0,
+  "lng": 0,
+  "address": "",
+  "geo_approx": true,
+  "items": [],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Hawaiian Poké Bowl - Mons",
+  "url": "https://www.ubereats.com/store/hawaiian-poke-bowl-mons/NbaVYckIUVCKAvQtw95Jdw",
+  "rating": 4.52,
+  "rating_count": 430,
+  "eta_min": 15,
+  "categories": [
+   "Hawaïenne",
+   "Poke",
+   "Halal",
+   "Végétarienne",
+   "Cuisine saine"
+  ],
+  "promo": "",
+  "lat": 50.45596,
+  "lng": 3.93089,
+  "address": "",
+  "geo_approx": false,
+  "items": [
+   {
+    "name": "Almighty Steak",
+    "price": 1560
+   },
+   {
+    "name": "Spicy Chicken",
+    "price": 1460
+   },
+   {
+    "name": "Super Protein Chicken & Falafel",
+    "price": 1660
+   },
+   {
+    "name": "Sweet Chicken",
+    "price": 1460
+   },
+   {
+    "name": "Full Option Nachos",
+    "price": 1045
+   },
+   {
+    "name": "Classic Tuna",
+    "price": 1595
+   },
+   {
+    "name": "Make Your Own Bowl",
+    "price": 1570
+   },
+   {
+    "name": "Let's Tofu",
+    "price": 1395
+   },
+   {
+    "name": "Salmon Style",
+    "price": 1495
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Kheops & Bryans Burger House (Mons)",
+  "url": "https://www.ubereats.com/store/kheops-&-bryans-burger-house-mons/1XgwiLjxUPq4YWA2XXr0uA",
+  "rating": 3.18,
+  "rating_count": 73,
+  "eta_min": 30,
+  "categories": [
+   "Fast food",
+   "Burgers",
+   "Friterie"
+  ],
+  "promo": "",
+  "lat": 0,
+  "lng": 0,
+  "address": "",
+  "geo_approx": true,
+  "items": [
+   {
+    "name": "Hamburger de Poulet",
+    "price": 500
+   },
+   {
+    "name": "Mitraillette Boulette",
+    "price": 900
+   },
+   {
+    "name": "Mitraillette Poulycroc",
+    "price": 900
+   },
+   {
+    "name": "Mitraillette Chicken Burger",
+    "price": 820
+   },
+   {
+    "name": "Sandwich Hamburger",
+    "price": 640
+   },
+   {
+    "name": "Box Mix",
+    "price": 1200
+   },
+   {
+    "name": "Big Royal Chicken",
+    "price": 750
+   },
+   {
+    "name": "Mix Bucket XXL",
+    "price": 3500
+   },
+   {
+    "name": "Ravier pita king",
+    "price": 995
+   },
+   {
+    "name": "Sandwich Special Chicken Raclette",
+    "price": 850
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "L'atelier Libanais - Mons",
+  "url": "https://www.ubereats.com/store/latelier-libanais-mons/FVhrHMlrUROY6r0tA8q1xw",
+  "rating": 4.61,
+  "rating_count": 25,
+  "eta_min": 30,
+  "categories": [
+   "Libanaise",
+   "Moyen-orientale",
+   "Kebab"
+  ],
+  "promo": "",
+  "lat": 50.45242,
+  "lng": 3.9498,
+  "address": "Rue Samson 1, 7000 Mons",
+  "geo_approx": false,
+  "items": [],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "La Cédraie (Mons)",
+  "url": "https://www.ubereats.com/store/la-cedraie-mons/XX9g-QZWR76SmKZ0KJG18A",
+  "rating": 4.59,
+  "rating_count": 300,
+  "eta_min": 19,
+  "categories": [
+   "Méditerranéenne",
+   "Fast food",
+   "Friterie"
+  ],
+  "promo": "",
+  "lat": 50.45094,
+  "lng": 3.94734,
+  "address": "Rue des Capucins 39, 7000 Mons",
+  "geo_approx": false,
+  "items": [
+   {
+    "name": "Hamburger bicky",
+    "price": 550
+   },
+   {
+    "name": "Viande Hamburger",
+    "price": 300
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Little Italy (Mons)",
+  "url": "https://www.ubereats.com/store/little-italy-mons/P1q5Hv-1UnO7BG3i7GlnVg",
+  "rating": 4.14,
+  "rating_count": 410,
+  "eta_min": 30,
+  "categories": [
+   "Italienne",
+   "Fast food"
+  ],
+  "promo": "",
+  "lat": 50.43041,
+  "lng": 3.99568,
+  "address": "Chaussée de Beaumont 192, 7024 Mons",
+  "geo_approx": false,
+  "items": [
+   {
+    "name": "Pizza Chicken",
+    "price": 1550
+   },
+   {
+    "name": "Pizza Gourmande",
+    "price": 1650
+   },
+   {
+    "name": "Pizza Patate",
+    "price": 1500
+   },
+   {
+    "name": "Pizza Barbecue Chicken",
+    "price": 1550
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Ma Che Pizza (Mons)",
+  "url": "https://www.ubereats.com/store/ma-che-pizza-mons/PQvtQ6LGVP2mp3oyCHc3Jg",
+  "rating": 4.58,
+  "rating_count": 220,
+  "eta_min": 50,
+  "categories": [
+   "Italienne",
+   "Pâtes"
+  ],
+  "promo": "Buy 1, get 1",
+  "lat": 0,
+  "lng": 0,
+  "address": "",
+  "geo_approx": true,
+  "items": [],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "McDonald's - Mons Grand Place",
+  "url": "https://www.ubereats.com/store/mcdonalds-mons-grand-place/Xrk-tSUlSjCMJjCLsLWVbw",
+  "rating": 4.15,
+  "rating_count": 6000,
+  "eta_min": 12,
+  "categories": [
+   "Fast food",
+   "Américaine",
+   "Burgers"
+  ],
+  "promo": "",
+  "lat": 50.45689,
+  "lng": 3.93413,
+  "address": "Avenue Léo Collard, 7000 Mons",
+  "geo_approx": false,
+  "items": [
+   {
+    "name": "Chicken Sharing Box",
+    "price": 1490
+   },
+   {
+    "name": "Chicken & Cheese Sharing Box",
+    "price": 1490
+   },
+   {
+    "name": "Chicken Salad Honey Mustard",
+    "price": 700
+   },
+   {
+    "name": "Fish McWrap",
+    "price": 720
+   },
+   {
+    "name": "Sauce Aigre-Douce",
+    "price": 135
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Miam Miam Sandwicherie Hornutoise",
+  "url": "https://www.ubereats.com/store/miam-miam-sandwicherie-hornutoise/KyuHtBeoUVORqEzQW8vY5w",
+  "rating": 4.69,
+  "rating_count": 30,
+  "eta_min": 40,
+  "categories": [
+   "Salades",
+   "Sandwichs"
+  ],
+  "promo": "",
+  "lat": 0,
+  "lng": 0,
+  "address": "",
+  "geo_approx": true,
+  "items": [
+   {
+    "name": "Jupiler",
+    "price": 280
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "O'Tacos - Mons Les Grands Prés",
+  "url": "https://www.ubereats.com/store/otacos-mons-les-grands-pres/UbQDScRMV9ObvReLTWvBIg",
+  "rating": 3.93,
+  "rating_count": 2000,
+  "eta_min": 14,
+  "categories": [
+   "Fast food",
+   "Halal",
+   "Tacos"
+  ],
+  "promo": "",
+  "lat": 50.45759,
+  "lng": 3.93489,
+  "address": "",
+  "geo_approx": false,
+  "items": [
+   {
+    "name": "Veggie Brunch",
+    "price": 800
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "PREGO! (Mons)",
+  "url": "https://www.ubereats.com/store/prego%21-mons/1C-5nvSrXiavMRlH5vmB8Q",
+  "rating": 0.0,
+  "rating_count": 0,
+  "eta_min": 23,
+  "categories": [
+   "Italienne",
+   "Pâtes"
+  ],
+  "promo": "",
+  "lat": 0,
+  "lng": 0,
+  "address": "",
+  "geo_approx": true,
+  "items": [],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Pitta Shop (Mons)",
+  "url": "https://www.ubereats.com/store/pitta-shop-mons/FQD-xglLXsa2OC4jSK6MOQ",
+  "rating": 3.45,
+  "rating_count": 280,
+  "eta_min": 11,
+  "categories": [
+   "Fast food",
+   "Burgers",
+   "Poulet"
+  ],
+  "promo": "",
+  "lat": 50.45485,
+  "lng": 3.95339,
+  "address": "Rue du Miroir 5, 7000 Mons",
+  "geo_approx": false,
+  "items": [
+   {
+    "name": "Ravier Pitta Mixte",
+    "price": 890
+   },
+   {
+    "name": "Sandwich Hamburger Poulet Pané",
+    "price": 720
+   },
+   {
+    "name": "Ravier Pitta Poulet",
+    "price": 820
+   },
+   {
+    "name": "Hamburger Poulet Pané",
+    "price": 650
+   },
+   {
+    "name": "Hamburger de Dinde",
+    "price": 550
+   },
+   {
+    "name": "Mitraillette Hamburger Poisson",
+    "price": 880
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Pizza Hut - Mons",
+  "url": "https://www.ubereats.com/store/pizza-hut-mons/ISVgv7BjQ8aw2ciWtB5R2g",
+  "rating": 4.47,
+  "rating_count": 1000,
+  "eta_min": 12,
+  "categories": [
+   "Pizzas"
+  ],
+  "promo": "",
+  "lat": 50.45349,
+  "lng": 3.94382,
+  "address": "Place Léopold 7, 7000 Mons",
+  "geo_approx": false,
+  "items": [
+   {
+    "name": "The BOX",
+    "price": 2800
+   },
+   {
+    "name": "Chicken twist",
+    "price": 1940
+   },
+   {
+    "name": "The Loaded Box American Style",
+    "price": 1390
+   },
+   {
+    "name": "Chicken Croq's 12",
+    "price": 680
+   },
+   {
+    "name": "Chicken Multi Mix",
+    "price": 1950
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Quick - Imagix",
+  "url": "https://www.ubereats.com/store/quick-imagix/lkInFVFFTd2Ehpi6m3VmEA",
+  "rating": 4.32,
+  "rating_count": 3000,
+  "eta_min": 15,
+  "categories": [
+   "Fast food",
+   "Américaine",
+   "Burgers"
+  ],
+  "promo": "",
+  "lat": 0,
+  "lng": 0,
+  "address": "",
+  "geo_approx": true,
+  "items": [
+   {
+    "name": "Party Box 20 Fish 'n Dips",
+    "price": 1485
+   },
+   {
+    "name": "Chicken Dips x7",
+    "price": 655
+   },
+   {
+    "name": "Chicken Dips x10",
+    "price": 830
+   },
+   {
+    "name": "Party Box 20 Chicken Dips",
+    "price": 1455
+   },
+   {
+    "name": "Partybox - 10 dips + 5 wings",
+    "price": 1380
+   },
+   {
+    "name": "Petite Salade",
+    "price": 400
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Smash HD (Dour)",
+  "url": "https://www.ubereats.com/store/smash-hd-dour/VoczBIF1RyertZW_5Bqgug",
+  "rating": 0.0,
+  "rating_count": 0,
+  "eta_min": 80,
+  "categories": [
+   "Burgers"
+  ],
+  "promo": "Buy 1, get 1",
+  "lat": 0,
+  "lng": 0,
+  "address": "",
+  "geo_approx": true,
+  "items": [
+   {
+    "name": "Menu spécial Smash burger",
+    "price": 1800
+   },
+   {
+    "name": "Tenders",
+    "price": 700
+   },
+   {
+    "name": "Spécial Smash burger",
+    "price": 1450
+   },
+   {
+    "name": "Smash truffe exquis burger",
+    "price": 1500
+   },
+   {
+    "name": "Fanta lemon",
+    "price": 250
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Snack Pitta Grill Akropolis (Mons)",
+  "url": "https://www.ubereats.com/store/snack-pitta-grill-akropolis-mons/G2vjnzrtXjmy7946foWH1g",
+  "rating": 4.43,
+  "rating_count": 390,
+  "eta_min": 11,
+  "categories": [
+   "Méditerranéenne",
+   "Grecque",
+   "Fast food"
+  ],
+  "promo": "Free item on €15+",
+  "lat": 0,
+  "lng": 0,
+  "address": "",
+  "geo_approx": true,
+  "items": [
+   {
+    "name": "Bicky double hamburger",
+    "price": 700
+   },
+   {
+    "name": "Boulette",
+    "price": 350
+   },
+   {
+    "name": "Bicky double hamburger de dinde",
+    "price": 750
+   },
+   {
+    "name": "Nuggets de poulet - 5pc",
+    "price": 450
+   },
+   {
+    "name": "Nuggets de poulet - 10pc",
+    "price": 760
+   },
+   {
+    "name": "Mix grill brochettes - 2pers",
+    "price": 3200
+   },
+   {
+    "name": "Souvlaki - Brochette de poulet 100gr",
+    "price": 320
+   },
+   {
+    "name": "Plateau mezze Akropolis - 2pers",
+    "price": 4000
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Surfside Poké (Mons)",
+  "url": "https://www.ubereats.com/store/surfside-poke-mons/bh32qDPKRZO3c0IABAzIWQ",
+  "rating": 4.58,
+  "rating_count": 2000,
+  "eta_min": 10,
+  "categories": [
+   "Poke",
+   "Cuisine saine",
+   "Bols",
+   "Asiatique",
+   "Hawaïenne"
+  ],
+  "promo": "Buy 1, get 1",
+  "lat": 50.45232,
+  "lng": 3.9497,
+  "address": "Grand-Rue 4, 7000 Mons",
+  "geo_approx": false,
+  "items": [
+   {
+    "name": "Classy Vegan Chicken",
+    "price": 1450
+   },
+   {
+    "name": "Classy Chicken",
+    "price": 1450
+   },
+   {
+    "name": "Volcano Chicken",
+    "price": 1450
+   },
+   {
+    "name": "Volcano Veggie Chicken",
+    "price": 1450
+   },
+   {
+    "name": "Sunny Salmon",
+    "price": 1650
+   },
+   {
+    "name": "Sunny Flamed Salmon",
+    "price": 1650
+   },
+   {
+    "name": "Spicy Shrimp",
+    "price": 1650
+   },
+   {
+    "name": "Make Your Own Bowl",
+    "price": 1450
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Sushi Lover (Mons)",
+  "url": "https://www.ubereats.com/store/sushi-lover-mons/OkwHhjW3TEW5h5gDvG8JfQ",
+  "rating": 4.39,
+  "rating_count": 1000,
+  "eta_min": 40,
+  "categories": [
+   "Sushis"
+  ],
+  "promo": "Buy 1, get 1",
+  "lat": 50.45373,
+  "lng": 3.95184,
+  "address": "Rue de la Chaussée 4, 7000 Mons",
+  "geo_approx": false,
+  "items": [
+   {
+    "name": "California roll poulet Caesar",
+    "price": 650
+   },
+   {
+    "name": "Nouilles sautées aux scampis",
+    "price": 1500
+   },
+   {
+    "name": "California roll chicken oignons",
+    "price": 650
+   },
+   {
+    "name": "Boulettes de poulet au sésame",
+    "price": 550
+   },
+   {
+    "name": "Rainbow roll chicken mango",
+    "price": 750
+   }
+  ],
+  "checked_at": "2026-10-09"
+ },
+ {
+  "name": "Thai Café - Grands Prés",
+  "url": "https://www.ubereats.com/store/thai-cafe-grands-pres/SnDv7JpISLepqWB8UhgX8A",
+  "rating": 4.6,
+  "rating_count": 700,
+  "eta_min": 13,
+  "categories": [
+   "Asiatique",
+   "Thaïlandaise",
+   "Nouilles"
+  ],
+  "promo": "",
+  "lat": 50.45753,
+  "lng": 3.93519,
+  "address": "Avenue Abel Dubois, 7000 Mons",
+  "geo_approx": false,
+  "items": [
+   {
+    "name": "Kroupouck",
+    "price": 230
+   },
+   {
+    "name": "Kai Satay",
+    "price": 1360
+   },
+   {
+    "name": "Kai Manao",
+    "price": 2280
+   },
+   {
+    "name": "Kanom Jip",
+    "price": 1310
+   },
+   {
+    "name": "Samosas",
+    "price": 1330
+   },
+   {
+    "name": "Salade Yam Woonsen",
+    "price": 1540
+   },
+   {
+    "name": "Nem Veegie",
+    "price": 1360
+   },
+   {
+    "name": "Ha Kao",
+    "price": 1360
+   },
+   {
+    "name": "Nem Kai Crispy",
+    "price": 1400
+   },
+   {
+    "name": "Salade Yam Koong",
+    "price": 2510
+   }
+  ],
+  "checked_at": "2026-10-09"
+ }
+]

@@ -89,6 +89,10 @@ export interface Restaurant extends BaseRecord {
   locked?: boolean
   /** Obsolète : plus proposé par aucune source depuis cette date ("" sinon). */
   stale_since?: ISODate
+  /** Carte partielle : seuls quelques plats sont connus (instantané Uber Eats). */
+  partial_menu?: boolean
+  /** Position approximative (lieu par défaut) : distance non fiable. */
+  geo_approx?: boolean
 }
 
 export type NearbyRestaurant = Restaurant & { distanceKm: number }
@@ -136,7 +140,7 @@ export interface MenuItem extends BaseRecord {
 
 /* -------------------------------------------------------- synchronisation */
 
-export type SyncProvider = 'deliveroo' | 'weloveat' | 'takeaway-site' | 'jsonld'
+export type SyncProvider = 'deliveroo' | 'weloveat' | 'takeaway-site' | 'jsonld' | 'ubereats-snapshot'
 export type SyncRunStatus = 'running' | 'success' | 'partial' | 'failed' | 'blocked'
 export type SyncTrigger = 'cron' | 'manual' | 'startup'
 export type SyncSourceStatus = 'ok' | 'blocked' | 'failed'
@@ -466,6 +470,8 @@ export interface RestaurantImport {
   min_order?: Cents
   providers?: RestaurantProviderLink[]
   active?: boolean
+  partial_menu?: boolean
+  geo_approx?: boolean
   categories: CategoryImport[]
   [key: string]: unknown
 }

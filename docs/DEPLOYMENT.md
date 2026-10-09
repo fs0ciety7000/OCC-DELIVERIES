@@ -128,7 +128,7 @@ journal) et liste des **sources**.
   et ne refait presque aucune requête.
 * **Sources** (*Admin → Synchronisation → Sources*) : activer / désactiver, priorité (la plus
   petite fournit le menu quand un restaurant est sur plusieurs sources : sites Takeaway 10–19,
-  Deliveroo 50, weloveat 60 par défaut), *options* (weloveat : suppléments, 1 requête par plat —
+  Deliveroo 50, weloveat 60, instantané Uber Eats 70 par défaut), *options* (weloveat : suppléments, 1 requête par plat —
   plusieurs heures, désactivé par défaut ; Deliveroo fournit les siennes sans coût).
   **Ajouter une source** : *Site Takeaway* = URL du site satellite d'un restaurant
   (`https://www.tomomons.be/`), *Site (schema.org)* = page carte d'un restaurant publiant un
@@ -153,6 +153,34 @@ journal) et liste des **sources**.
   contourner ; si cela dure, désactiver la source), *Échec*.
 * **Désactiver** : `OCC_SYNC_ENABLED=false` puis redéployer (ou désactiver les sources une à
   une, effet immédiat). Les données déjà synchronisées restent.
+
+### Instantané Uber Eats (restaurants à carte partielle)
+Uber Eats n'est lisible que par le **connecteur Uber Eats d'une session Claude** (très limité :
+nom, lien, note, délai, catégories et au plus 5 plats d'exemple — jamais la carte complète). Le
+serveur ne l'appelle pas : le lead fige le résultat dans
+`backend/migrations/data/mons_ubereats.json` (format : `docs/ARCHITECTURE.md`, *Instantané Uber
+Eats*), lu par la source **« Uber Eats (instantané connecteur) »** (priorité 70, activée, aucune
+requête réseau).
+
+**Rafraîchir l'instantané :**
+1. Dans une session Claude, interroger le connecteur Uber Eats pour l'adresse du bureau et
+   réécrire le fichier (une entrée par restaurant ; prix en centimes ; `url` sans `?…` ;
+   `lat`/`lng` à 0 et `geo_approx: true` si la position est inconnue ; `checked_at` du jour).
+2. `cd backend && go test ./internal/app -run EmbeddedUberEats` (le fichier doit être lisible),
+   puis commit + push sur `main` → redéploiement Coolify.
+3. Appliqué à la **prochaine synchronisation** (nuit), ou tout de suite : *Admin →
+   Synchronisation → **Synchroniser maintenant*** (les flux réseau relisent le cache du jour).
+
+**Ce qui se passe** : un restaurant déjà connu (lien Uber Eats ou nom proche, « (Mons) » /
+« (Independant) » ignorés) reçoit le lien Uber Eats et, s'ils manquent, note / avis / délai — sa
+carte n'est jamais touchée. Un restaurant inconnu est créé **actif** avec le badge **« Aperçu du
+menu »**, une catégorie « Aperçu » (les plats d'exemple) et un bandeau « Carte partielle… » avec un
+bouton vers Uber Eats ; la commande groupée passe alors par l'envoi « Uber Eats ». Dès qu'une autre
+source (site, Deliveroo, weloveat) fournit au moins 5 plats pour ce restaurant, sa carte complète
+remplace l'aperçu (badge retiré). Les restaurants du fichier ne deviennent jamais « obsolètes »
+tant qu'ils y figurent ; retirés du fichier, ils le deviennent. Les fiches **verrouillées** sont
+ignorées. Admin : interrupteurs « Carte partielle » et « Position approximative » dans le
+formulaire du restaurant (ils ne verrouillent pas la fiche à eux seuls).
 
 ## 5. Sauvegardes
 * PocketBase : *Settings → Backups* → sauvegardes automatiques planifiées

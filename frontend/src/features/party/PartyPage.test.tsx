@@ -14,10 +14,12 @@ const resto: Restaurant = {
 const resto2 = { ...resto, id: 'r2', name: 'Sushi Go', emoji: '🍣' }
 
 let status: PartyStatus = 'lobby'
+let partialMenu = false
 const party = (): Party => ({
   id: 'p1', code: 'K7M2QX', title: 'Midi du vendredi', host: 'u1', members: ['u1', 'u2'], status, candidates: ['r1', 'r2'], restaurant: 'r1', provider: '',
   delivery_address: '', notes: '', voting_ends_at: '', ordering_ends_at: '', split_mode: 'equal', delivery_fee: 299, service_fee: 0, tip: 0, payer: 'u1',
-  dispatch: null, closed_at: '', expand: { host: me, members: [me, bob], candidates: [resto, resto2], restaurant: resto },
+  dispatch: null, closed_at: '',
+  expand: { host: me, members: [me, bob], candidates: [{ ...resto, partial_menu: partialMenu }, resto2], restaurant: { ...resto, partial_menu: partialMenu } },
 })
 const summary: Summary = {
   partyId: 'p1', currency: 'EUR', status: 'review', restaurant: { id: 'r1', name: 'Pizza Nonna', minOrder: 1500, deliveryFee: 299 },
@@ -95,5 +97,22 @@ describe('PartyPage — chaque étape se rend', () => {
     const { unmount } = await renderParty()
     expect(await screen.findByText(text, {}, { timeout: 3000 })).toBeInTheDocument()
     unmount()
+  })
+})
+
+describe('PartyPage — restaurant à carte partielle (instantané Uber Eats)', () => {
+  it('montre le badge au vote et le bandeau à la commande', async () => {
+    partialMenu = true
+    status = 'voting'
+    let view = await renderParty()
+    expect(await screen.findByText('Aperçu du menu', {}, { timeout: 3000 })).toBeInTheDocument()
+    view.unmount()
+
+    status = 'ordering'
+    view = await renderParty()
+    expect(await screen.findByText(/seuls quelques plats sont connus ici/, {}, { timeout: 3000 })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /carte complète de Pizza Nonna sur Uber Eats/ })).toHaveAttribute('target', '_blank')
+    view.unmount()
+    partialMenu = false
   })
 })

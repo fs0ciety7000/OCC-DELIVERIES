@@ -11,12 +11,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/catalog"
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/feedsync"
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/menusync"
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/providers"
+	"github.com/fs0ciety7000/occ-deliveries/backend/migrations"
 )
 
 // feedServer serves the menusync fixtures like the real sites would: a
@@ -364,4 +366,138 @@ func TestSyncConfigFromEnv(t *testing.T) {
 	if c := syncConfigFromEnv(); !c.Enabled || c.Cron != DefaultSyncCron {
 		t.Fatalf("defaults %+v", c)
 	}
+}
+
+const appSnapshot = `[
+ {"name":"Tomo (Mons)","url":"https://www.ubereats.com/be/store/tomo/aaa?ps=1","rating":4.9,"rating_count":12,"eta_min":25,
+  "categories":["Japonais"],"promo":"","lat":0,"lng":0,"address":"","geo_approx":true,"items":[{"name":"Gyoza","price":650}],"checked_at":"2026-10-09"},
+ {"name":"Le Nouveau Wok (Independant)","url":"https://www.ubereats.com/be/store/nouveau-wok/bbb","rating":4.2,"rating_count":30,"eta_min":30,
+  "categories":["Chinois"],"promo":"Livraison offerte","lat":0,"lng":0,"address":"","geo_approx":true,
+  "items":[{"name":"Nouilles sautées","price":1150},{"name":"Riz cantonais","price":990}],"checked_at":"2026-10-09"}
+]`
+
+func TestSyncUberEatsSnapshot(t *testing.T) {
+	e := newSyncEnv(t)
+	srv := newFeedServer(t)
+	e.h.sync.cfg.Snapshot = func() ([]byte, error) { return []byte(appSnapshot), nil }
+	e.setSources(
+		map[string]any{"provider": "takeaway-site", "label": "Tomo", "url": srv.URL + "/tomo/", "priority": 10},
+		map[string]any{"provider": "ubereats-snapshot", "label": "Uber Eats (instantané connecteur)", "priority": 70},
+	)
+
+	run := e.runSync(triggerManual)
+	if run.Status != runSuccess || len(run.Sources) != 2 || run.Sources[1].Provider != "ubereats-snapshot" ||
+		run.Sources[1].Status != feedsync.StatusOK || run.Sources[1].Network != 0 || run.Sources[1].Restaurants != 2 {
+		t.Fatalf("run %+v\n%s", run.Sources, run.Log)
+	}
+	if run.Stats.RestaurantsCreated != 2 {
+		t.Fatalf("Tomo (feed) + the wok (snapshot): %+v\n%s", run.Stats, run.Log)
+	}
+
+	// Tomo comes from its site: Uber Eats link added, full menu untouched
+	tomo := e.restaurantsNamed("Tomo")
+	if len(tomo) != 1 || tomo[0].GetBool("partial_menu") || !strings.Contains(tomo[0].GetString("providers"), "ubereats.com/be/store/tomo/aaa") ||
+		strings.Contains(tomo[0].GetString("providers"), "?ps=") {
+		t.Fatalf("tomo %v", tomo)
+	}
+	if n, _ := e.app.CountRecords(colMenuCategories, dbxName(tomo[0].Id, "Aperçu")); n != 0 {
+		t.Fatal("the snapshot must not touch a full menu")
+	}
+
+	// the wok: active, partial menu, approximate position, preview category
+	wok := e.restaurantsNamed("Le Nouveau Wok")
+	if len(wok) != 1 {
+		t.Fatalf("wok %v", wok)
+	}
+	w := wok[0]
+	if !w.GetBool("active") || !w.GetBool("partial_menu") || !w.GetBool("geo_approx") || w.GetFloat("lat") != testConfig.DefaultLat ||
+		w.GetFloat("lng") != testConfig.DefaultLng || w.GetString("emoji") != "🥡" || w.GetInt("eta_max") != 45 || w.GetFloat("rating") != 4.2 ||
+		w.GetString("source_key") != "ubereats-snapshot:ubereats.com/be/store/nouveau-wok/bbb" {
+		t.Fatalf("wok %v", w.FieldsData())
+	}
+	cat, err := e.app.FindFirstRecordByFilter(colMenuCategories, "restaurant = {:r} && name = 'Aperçu'", map[string]any{"r": w.Id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n, _ := e.app.CountRecords(colMenuItems, dbxCat(cat.Id)); n != 2 {
+		t.Fatalf("%d preview items", n)
+	}
+	// public: anyone sees the flags
+	got := e.expect(200, "GET", "/api/collections/restaurants/records/"+w.Id, "", nil).m(t)
+	if got["partial_menu"] != true || got["geo_approx"] != true {
+		t.Fatalf("public record %v", got)
+	}
+	// nearby: approximate positions after the real ones
+	items := e.expect(200, "GET", "/api/occ/restaurants/nearby?radiusKm=50", "", nil).m(t)["items"].([]any)
+	last := items[len(items)-1].(map[string]any)
+	if last["id"] != w.Id {
+		t.Fatalf("approximate position must be listed last: %v", last["name"])
+	}
+	// members can order from the preview
+	alice := e.user("Alice")
+	party := e.expect(200, "POST", "/api/collections/parties/records", alice.token, map[string]any{"title": "Midi"}).m(t)
+	e.expect(200, "POST", "/api/occ/parties/"+party["id"].(string)+"/transition", alice.token, map[string]any{"to": "ordering", "restaurant": w.Id})
+
+	// second run: nothing changes; the wok is never stale (no feed lists it)
+	run = e.runSync(triggerManual)
+	if run.Stats != (feedsync.Stats{}) || len(run.Changes) != 0 {
+		t.Fatalf("second run must be a no-op: %+v %v", run.Stats, run.Changes)
+	}
+	if r, _ := e.app.FindRecordById(colRestaurants, w.Id); r.GetString("stale_since") != "" {
+		t.Fatal("snapshot restaurant marked stale")
+	}
+
+	// admin export / import carry the flags; a full import ends the preview
+	ex, err := catalog.ExportOne(e.app, w.GetString("slug"))
+	if err != nil || ex == nil || !ex.PartialMenu || !ex.GeoApprox {
+		t.Fatalf("export %+v %v", ex, err)
+	}
+	ex.PartialMenu = false
+	ex.Lat, ex.Lng = 0, 0 // coordinates (and their approximation) kept
+	if _, _, err := catalog.Import(e.app, *ex); err != nil {
+		t.Fatal(err)
+	}
+	if r, _ := e.app.FindRecordById(colRestaurants, w.Id); r.GetBool("partial_menu") || !r.GetBool("geo_approx") {
+		t.Fatalf("after import %v", r.FieldsData())
+	}
+
+	// an invalid file: the source fails, the run is partial, nothing is stale
+	e.h.sync.cfg.Snapshot = func() ([]byte, error) { return []byte("{oops"), nil }
+	run = e.runSync(triggerManual)
+	if run.Status != runPartial || run.Sources[1].Status != feedsync.StatusFailed || run.Stats.RestaurantsStale != 0 {
+		t.Fatalf("invalid snapshot: %s %+v %+v", run.Status, run.Sources, run.Stats)
+	}
+}
+
+func TestSyncSnapshotSourceHook(t *testing.T) {
+	e := newSyncEnv(t)
+	admin := e.admin("Root")
+	src := e.expect(200, "POST", "/api/collections/sync_sources/records", admin.token, map[string]any{
+		"provider": "ubereats-snapshot", "url": "https://ignored.example", "priority": 70, "enabled": true,
+	}).m(t)
+	if src["url"] != "" || src["label"] != "ubereats-snapshot" || src["city"] != "mons" {
+		t.Fatalf("source %v", src)
+	}
+	e.expect(400, "POST", "/api/collections/sync_sources/records", admin.token, map[string]any{"provider": "ubereats-api"})
+}
+
+// The committed snapshot file must always be readable by the sync.
+func TestEmbeddedUberEatsSnapshotIsValid(t *testing.T) {
+	data, err := migrations.UberEatsSnapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries, problems, err := feedsync.ParseSnapshot(data, "mons")
+	if err != nil || len(problems) > 0 {
+		t.Fatalf("migrations/data/mons_ubereats.json: %v %v", err, problems)
+	}
+	t.Logf("%d restaurants Uber Eats dans l'instantané", len(entries))
+}
+
+func dbxName(restaurantID, name string) dbx.Expression {
+	return dbx.HashExp{"restaurant": restaurantID, "name": name}
+}
+
+func dbxCat(categoryID string) dbx.Expression {
+	return dbx.HashExp{"category": categoryID}
 }

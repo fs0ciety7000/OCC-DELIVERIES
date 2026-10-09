@@ -28,6 +28,7 @@ export const PROVIDER_LABEL: Record<SyncProvider, string> = {
   weloveat: 'weloveat',
   'takeaway-site': 'Site Takeaway',
   jsonld: 'Site (schema.org)',
+  'ubereats-snapshot': 'Uber Eats (instantané)',
 }
 
 export const PROVIDER_HINT: Record<SyncProvider, string> = {
@@ -35,6 +36,8 @@ export const PROVIDER_HINT: Record<SyncProvider, string> = {
   weloveat: "Racine de l'API weloveat (vide = https://api.weloveat.be/api/).",
   'takeaway-site': 'Site satellite du restaurant construit par Takeaway (ex. https://www.tomomons.be/).',
   jsonld: 'Page carte du restaurant publiant un menu schema.org (JSON-LD ou microdonnées).',
+  'ubereats-snapshot':
+    'Fichier mons_ubereats.json livré avec le serveur (relevé via le connecteur Uber Eats, sans requête). Aucune adresse à saisir. Cartes partielles : quelques plats en aperçu.',
 }
 
 export const SOURCE_STATUS_LABEL: Record<SyncSourceStatus, string> = { ok: 'OK', blocked: 'Bloquée', failed: 'Erreur' }

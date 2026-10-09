@@ -46,7 +46,7 @@ backend/
   internal/app/              hooks PocketBase + routes /api/occ (glue) ; sync.go = planification / exécution de la synchronisation
   internal/catalog/           import / export des menus (JSON, CSV, rapport de validation)
   migrations/                migrations Go (schéma, seed démo, rôles admin, données réelles)
-    data/                    mons_restaurants.json (données réelles embarquées)
+    data/                    mons_restaurants.json (données réelles embarquées), mons_ubereats.json (instantané Uber Eats)
 frontend/
   src/lib/                   pb client, types, api, format, hooks realtime
   src/components/ui/         design system (Button, Card, Sheet, Badge, Avatar…)
@@ -120,6 +120,8 @@ membres de la party concernée. Hook : `wero_id` / `bancontact_phone` normalisé
 | sources | json | synchronisation : `[{ "provider": "deliveroo", "url": "https://…", "checked_at": "2026-10-09" }]` |
 | locked | bool | verrouillé : la synchronisation ne le modifie plus (posé par toute modification admin) |
 | stale_since | date | obsolète : plus proposé par aucune source activée depuis cette date (vide sinon) ; reste actif |
+| partial_menu | bool | **carte partielle** : seuls quelques plats sont connus (catégorie « Aperçu », instantané Uber Eats) ; badge « Aperçu du menu » + bandeau vers Uber Eats — migration `1760000006` |
+| geo_approx | bool | **position approximative** (lieu par défaut `OCC_DEFAULT_LAT/LNG`) : distance masquée dans l'UI, classé après les autres dans `/nearby` |
 
 Rules : list/view `active = true || @request.auth.role = "admin"` ;
 create/update/delete `@request.auth.role = "admin"` (superusers : toujours).
@@ -128,7 +130,8 @@ Hooks (écritures via la collection) : slug/nom normalisés, slug unique (messag
 (`ubereats`, `takeaway`, `deliveroo`, `weloveat`) en `https://` (liens vides retirés), `eta_min ≤ eta_max` ;
 **suppression refusée** si le restaurant apparaît dans une party (le désactiver).
 **Verrouillage automatique** : une modification (update) via l'API pose `locked = true`, sauf
-si la requête envoie elle-même `locked` (interrupteur) ou ne touche que `active` / `locked`.
+si la requête envoie elle-même `locked` (interrupteur) ou ne touche que `active` / `locked` /
+`partial_menu` / `geo_approx`.
 
 ### `menu_categories` (lecture publique)
 `restaurant` R(restaurants, cascade) · `name` · `position` int.
@@ -173,9 +176,9 @@ requête envoie `locked` ou ne touche que `position`.
 ### `sync_sources` — sources de la synchronisation (admin)
 | champ | type | notes |
 |---|---|---|
-| provider | select req | `deliveroo`, `weloveat`, `takeaway-site`, `jsonld` |
+| provider | select req | `deliveroo`, `weloveat`, `takeaway-site`, `jsonld`, `ubereats-snapshot` (migration `1760000006`) |
 | label | text | nom affiché (défaut : le fournisseur) |
-| url | text | page liste Deliveroo de la ville ; racine de l'API weloveat (vide = `https://api.weloveat.be/api/`) ; site du restaurant (`takeaway-site`, `jsonld`) — `https://` requis sauf weloveat |
+| url | text | page liste Deliveroo de la ville ; racine de l'API weloveat (vide = `https://api.weloveat.be/api/`) ; site du restaurant (`takeaway-site`, `jsonld`) — `https://` requis sauf weloveat ; toujours vide pour `ubereats-snapshot` (le hook l'efface) |
 | city | text | ville de recherche (`mons`, seule connue ; défaut) — rayon 8 km |
 | priority | number int | plus petit = lu en premier et menu préféré quand un restaurant est sur plusieurs sources |
 | enabled | bool | |
@@ -185,7 +188,8 @@ requête envoie `locked` ou ne touche que `position`.
 
 Rules : toutes `@request.auth.role = "admin"`. Hook : fournisseur, URL et ville validés,
 `last_*` non modifiables via l'API. Seed (`1760000005`) : un `takeaway-site` par URL de
-`migrations/data/mons_takeaway_sites.txt` (priorités 10…), Deliveroo Mons (50), weloveat Mons (60).
+`migrations/data/mons_takeaway_sites.txt` (priorités 10…), Deliveroo Mons (50), weloveat Mons (60) ;
+seed (`1760000006`) : « Uber Eats (instantané connecteur) » (`ubereats-snapshot`, 70, activée).
 
 ### `sync_runs` — exécutions de la synchronisation
 | champ | type | notes |
@@ -222,6 +226,31 @@ Une exécution `running` trouvée au démarrage passe `failed` (« interrompue �
    * restaurant connu d'une source (`sources` non vide) qu'aucune source ne renvoie →
      `stale_since` (sauf si un de ses fournisseurs a échoué / été bloqué pendant l'exécution) ;
      réapparition → effacé.
+   * **instantané Uber Eats** (source `ubereats-snapshot`, aucune requête réseau : lit le fichier
+     embarqué `migrations/data/mons_ubereats.json`, voir *Instantané Uber Eats* ci-dessous),
+     appliqué **après** les flux (`feedsync.Reconcile`, `Options.Snapshot`) contre l'état
+     planifié (base + restaurants créés par les flux dans la même exécution) :
+     - rapprochement : lien Uber Eats (URL normalisée) ou `source_key` `ubereats-snapshot:<url>`,
+       puis nom normalisé souple (`menusync.NameMatch` : « (Mons) », « - Mons », « (Independant) »,
+       accents / casse / ponctuation ignorés ; même clé, ou une clé contenue dans l'autre (≥ 6 car.),
+       ou similarité « token-set » ≥ 0,8 sur des mots significatifs) ; contrôle de distance
+       (≤ 1,5 km) **seulement** si les deux ont de vraies coordonnées (`geo_approx` = pas de coordonnées) ;
+     - restaurant reconnu : verrouillé → ignoré ; sinon lien Uber Eats ajouté s'il manque, note /
+       nombre d'avis / délai remplis **seulement s'ils valent 0**, **menu jamais touché** ;
+     - restaurant reconnu à carte partielle (créé par l'instantané) : l'aperçu suit le fichier
+       (plats ajoutés / prix / absents → indisponibles), note et délai aussi — sauf si un flux le
+       liste également (le flux l'emporte, l'instantané ne fait que compléter) ;
+     - non reconnu : création **active** avec slug, nom normalisé, cuisines (catégories normalisées),
+       emoji deviné, note, avis, `eta_min` = délai, `eta_max` = délai + 15, lien Uber Eats,
+       adresse / coordonnées du fichier (0 → lieu par défaut et `geo_approx = true`),
+       `partial_menu = true`, catégorie « Aperçu » avec les plats d'exemple (aucune si pas de plat) ;
+     - un flux (Deliveroo, weloveat, site…) reconnu sur un restaurant `partial_menu` (même règles de
+       nom souple) **remplace l'aperçu** dès qu'il apporte ≥ 5 plats (`partial_menu = false`, plats de
+       l'aperçu rapprochés par nom ou rendus indisponibles, vraie position si `geo_approx`) ; avec
+       moins de 5 plats, le menu reste celui de l'aperçu ;
+     - obsolescence : un restaurant présent dans le fichier est « vu » à chaque exécution (jamais
+       marqué obsolète parce que les flux ne le listent pas) ; retiré du fichier → obsolète comme
+       pour toute source ; fichier illisible → source `failed`, rien n'est marqué obsolète.
 3. Écriture **par restaurant dans une transaction** (`RunInTransaction`) ; un enregistrement
    verrouillé entre-temps est laissé tel quel.
 4. Planification : job `app.Cron()` chaque minute qui vérifie `OCC_SYNC_CRON` à l'heure de
@@ -347,7 +376,7 @@ PocketBase `{ "status": 400, "message": "…", "data": {} }`, messages en franç
 |---|---|---|---|
 | `GET /api/occ/health` | — | | `{ "status": "ok", "version": "x.y.z" }` |
 | `GET /api/occ/config` | — | | `{ "currency":"EUR", "defaultLocation":{lat,lng,label}, "providers":[{id,name,color,enabled}] }` |
-| `GET /api/occ/restaurants/nearby` | — | `lat,lng,radiusKm(=5),q,cuisine` | `{ "items": [Restaurant & { "distanceKm": number }] }` triés par distance |
+| `GET /api/occ/restaurants/nearby` | — | `lat,lng,radiusKm(=5),q,cuisine` | `{ "items": [Restaurant & { "distanceKm": number }] }` triés par distance ; les positions approximatives (`geo_approx`) après les autres |
 | `POST /api/occ/parties/join` | ✔ | `{ "code": "K7M2QX" }` | `{ "party": Party }` (idempotent ; statuts lobby/voting/ordering/review) |
 | `POST /api/occ/parties/{id}/leave` | membre (≠ hôte) | | `{ "ok": true }` — seulement en lobby/voting/ordering ; supprime ses votes/items |
 | `POST /api/occ/parties/{id}/transition` | hôte | `{ "to": Status, "restaurant"?: id }` | `{ "party": Party }` |
@@ -440,7 +469,9 @@ copier, QR personnel du payeur s'il l'a téléversé, et un mini-guide
   "categories": [{ "name": "Pizzas", "items": [{ "name": "…", "price": 1250, "tags": [], "popular": false,
                                                  "available": true, "option_groups": [] }] }] }
 ```
-Clés = champs de `restaurants` (sauf `cover`) ; montants en centimes. Les clés
+Clés = champs de `restaurants` (sauf `cover`) ; montants en centimes ; `partial_menu` et
+`geo_approx` facultatifs (`false` par défaut : importer une carte complète met fin à l'aperçu ;
+sans coordonnées, `geo_approx` existant conservé avec la position). Les clés
 inconnues (`source_urls`, `menu_checked_at`…) sont ignorées. L'import **remplace**
 le menu du restaurant (même slug). Si un restaurant existant est réimporté sans
 coordonnées (`lat = lng = 0`) ou sans adresse, celles déjà enregistrées sont
@@ -534,6 +565,25 @@ sont ignorées (journalisées) sans bloquer le démarrage. Sur une installation 
 avec des données réelles, le seed de démo (`1760000001`) ne fait rien.
 Les plateformes de `restaurants.providers` sont celles de `providers.Platforms`.
 
+### Instantané Uber Eats (`backend/migrations/data/mons_ubereats.json`)
+Le connecteur officiel Uber Eats n'est joignable que depuis une session Claude (fortement limité,
+au plus 5 plats d'exemple par restaurant, jamais la carte complète) : le serveur ne peut pas
+l'appeler. Le lead relève les restaurants qui livrent le bureau et les commite dans ce fichier
+(embarqué, `go:embed`, `[]` = vide) ; la source `ubereats-snapshot` le relit à chaque
+synchronisation (aucune requête). Format (commentaires pour la doc, le fichier est du JSON strict) :
+```jsonc
+[{ "name": "CTR Chicken Mons (Independant)",
+   "url": "https://www.ubereats.com/be/store/ctr-chicken-mons/…",  // sans query string (retirée sinon)
+   "rating": 4.6, "rating_count": 320, "eta_min": 25,              // 0 = inconnu
+   "categories": ["Poulet", "Burgers"], "promo": "-20 %",          // promo : ignorée (éphémère)
+   "lat": 50.4551, "lng": 3.9512, "address": "…", "geo_approx": false, // 0 = inconnu → lieu par défaut
+   "items": [{ "name": "Tenders x6", "price": 890 }],              // centimes, 0–5 plats d'exemple
+   "checked_at": "2026-10-09" }]
+```
+Entrées sans nom, sans lien `https://…ubereats.com/…` ou en double (même URL) ignorées (journal) ;
+plats sans nom, à 0 € ou en double retirés ; note bornée à 0–5. Un test vérifie que le fichier commité
+est lisible. Mise à jour : `docs/DEPLOYMENT.md`.
+
 **Flux de menus (`menusync`)** — bibliothèque utilisée par la synchronisation automatique
 du serveur (§3 *Synchronisation automatique*) et par l'outil en ligne de commande : il lit
 les pages publiques (Deliveroo : `__NEXT_DATA__` des pages liste et menu ; weloveat :
@@ -556,7 +606,7 @@ proche à la même adresse. Voir `docs/DEPLOYMENT.md`.
 | `OCC_ADMIN_EMAIL` / `OCC_ADMIN_PASSWORD` | — | crée/met à jour le superuser au démarrage ; le compte **utilisateur** de même e-mail reçoit le rôle `admin` |
 | `OCC_ADMINS` | — | e-mails (séparés par des virgules) promus `admin` au démarrage ou à l'inscription |
 | `OCC_PUBLIC_URL` | `http://localhost:8090` | URL publique (liens d'invitation, `meta.appURL`) |
-| `OCC_DEFAULT_LAT` / `OCC_DEFAULT_LNG` / `OCC_DEFAULT_LABEL` | `50.4542` / `3.9567` / `Mons` | position par défaut |
+| `OCC_DEFAULT_LAT` / `OCC_DEFAULT_LNG` / `OCC_DEFAULT_LABEL` | `50.4542` / `3.9567` / `Mons` | position par défaut (aussi celle des restaurants Uber Eats sans coordonnées, `geo_approx`) |
 | `OCC_SEED_DEMO` | `true` | charge les restaurants de démo au 1er démarrage (ignoré si `migrations/data` contient des restaurants réels) |
 | `OCC_PROVIDERS` | `ubereats,takeaway,deliveroo,weloveat` | plateformes de livraison activées (config + dispatch) |
 | `OCC_PUBLIC_DIR` | `./pb_public` | dossier de la SPA |

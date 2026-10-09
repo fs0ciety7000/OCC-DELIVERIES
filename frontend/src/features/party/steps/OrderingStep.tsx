@@ -8,6 +8,7 @@ import { Avatar, Badge, Button, Card, CardBody, Chip, Countdown, EmptyState, Mon
 import { useMenu } from '@/features/restaurants/hooks'
 import { ItemSheet, type ItemDraft } from '@/features/restaurants/ItemSheet'
 import { MenuSkeleton, MenuView } from '@/features/restaurants/MenuView'
+import { PartialMenuBanner } from '@/features/restaurants/PartialMenu'
 import { RestaurantCover } from '@/features/restaurants/RestaurantCover'
 import { partiesApi } from '@/lib/api'
 import { cn } from '@/lib/cn'
@@ -127,6 +128,7 @@ export function OrderingStep({ ctx }: { ctx: PartyCtx }) {
           </div>
         )}
         <p className="text-xs text-subtle">Prix indicatifs — les totaux sont recalculés par le serveur.</p>
+        {restaurant && <PartialMenuBanner restaurant={restaurant} />}
         {menu.isPending ? (
           <MenuSkeleton />
         ) : menu.isError ? (

@@ -144,16 +144,19 @@ func bindSyncHooks(app core.App) {
 func onSyncSourceUpsert(e *core.RecordRequestEvent) error {
 	r := e.Record
 	provider := r.GetString("provider")
-	if !slices.Contains(feedsync.Providers, provider) {
-		return badRequest("Fournisseur inconnu (deliveroo, weloveat, takeaway-site, jsonld).")
+	if !slices.Contains(feedsync.Providers, provider) && provider != feedsync.ProviderUberEatsSnapshot {
+		return badRequest("Fournisseur inconnu (deliveroo, weloveat, takeaway-site, jsonld, ubereats-snapshot).")
 	}
 	r.Set("label", strings.TrimSpace(r.GetString("label")))
 	if r.GetString("label") == "" {
 		r.Set("label", provider)
 	}
 	u := strings.TrimSpace(r.GetString("url"))
+	if provider == feedsync.ProviderUberEatsSnapshot {
+		u = "" // reads the embedded file, never a URL
+	}
 	r.Set("url", u)
-	if u == "" && provider != menusync.SourceWeloveat {
+	if u == "" && provider != menusync.SourceWeloveat && provider != feedsync.ProviderUberEatsSnapshot {
 		return badRequest("L'adresse (URL) de la source est requise.")
 	}
 	if u != "" {

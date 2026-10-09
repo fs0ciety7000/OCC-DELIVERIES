@@ -43,7 +43,11 @@ type RestaurantImport struct {
 	MinOrder    int              `json:"min_order"`
 	Providers   []providers.Link `json:"providers"`
 	Active      *bool            `json:"active"`
-	Categories  []CategoryImport `json:"categories"`
+	// PartialMenu: only a few sample items are known (Uber Eats snapshot).
+	PartialMenu bool `json:"partial_menu,omitempty"`
+	// GeoApprox: lat / lng are approximate.
+	GeoApprox  bool             `json:"geo_approx,omitempty"`
+	Categories []CategoryImport `json:"categories"`
 }
 
 // CategoryImport is a menu category with its items.
@@ -165,6 +169,7 @@ func Import(app core.App, in RestaurantImport) (string, int, error) {
 		if !rest.IsNew() {
 			if in.Lat == 0 && in.Lng == 0 {
 				in.Lat, in.Lng = rest.GetFloat("lat"), rest.GetFloat("lng")
+				in.GeoApprox = rest.GetBool("geo_approx")
 			}
 			if strings.TrimSpace(in.Address) == "" {
 				in.Address = rest.GetString("address")
@@ -200,6 +205,11 @@ func Import(app core.App, in RestaurantImport) (string, int, error) {
 			"providers":    orEmpty(in.Providers),
 			"active":       active,
 		})
+		// flags of migration 1760000006 (absent when older migrations import)
+		if rest.Collection().Fields.GetByName("partial_menu") != nil {
+			rest.Set("partial_menu", in.PartialMenu)
+			rest.Set("geo_approx", in.GeoApprox)
+		}
 		if err := tx.Save(rest); err != nil {
 			return err
 		}

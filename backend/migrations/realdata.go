@@ -17,8 +17,48 @@ import (
 // such as "source_urls" or "menu_checked_at" are ignored.
 const RealDataFile = "data/mons_restaurants.json"
 
-//go:embed data/mons_restaurants.json
+// UberEatsSnapshotFile is the Uber Eats snapshot read by the sync source
+// "ubereats-snapshot" (docs/ARCHITECTURE.md, feedsync.SnapshotEntry[]). The
+// lead fills it from a Claude session (Uber Eats connector); "[]" = empty.
+const UberEatsSnapshotFile = "data/mons_ubereats.json"
+
+//go:embed data/mons_restaurants.json data/mons_ubereats.json
 var dataFS embed.FS
+
+var (
+	snapshotMu  sync.RWMutex
+	snapshotSet bool
+	snapshot    []byte
+)
+
+// SetUberEatsSnapshotForTesting replaces the embedded Uber Eats snapshot and
+// returns a function restoring the embedded file. Tests only.
+func SetUberEatsSnapshotForTesting(data []byte) (restore func()) {
+	snapshotMu.Lock()
+	prevSet, prev := snapshotSet, snapshot
+	snapshotSet, snapshot = true, data
+	snapshotMu.Unlock()
+	return func() {
+		snapshotMu.Lock()
+		snapshotSet, snapshot = prevSet, prev
+		snapshotMu.Unlock()
+	}
+}
+
+// UberEatsSnapshot returns the embedded Uber Eats snapshot (nil when the
+// file is missing).
+func UberEatsSnapshot() ([]byte, error) {
+	snapshotMu.RLock()
+	defer snapshotMu.RUnlock()
+	if snapshotSet {
+		return snapshot, nil
+	}
+	b, err := fs.ReadFile(dataFS, UberEatsSnapshotFile)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	return b, err
+}
 
 var (
 	overrideMu  sync.RWMutex

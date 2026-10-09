@@ -73,6 +73,13 @@ docker compose up --build         # http://localhost:8090
 Les apprentissages importants (pièges PocketBase, décisions d'UX) sont ajoutés
 ci-dessous, du plus récent au plus ancien.
 
+* 2026-10-09 — **Instantané Uber Eats** (`migrations/data/mons_ubereats.json`, source `ubereats-snapshot`,
+  migration `1760000006`, ADR 0002 mise à jour 3). Le connecteur MCP Uber Eats n'existe que dans les
+  sessions Claude et limite fortement le débit (429 dès le 2e appel rapproché ; une reconnexion du
+  connecteur a levé un 429 permanent) ; il ne donne que 0–5 plats par resto. Restos inconnus créés actifs
+  avec `partial_menu` (catégorie « Aperçu », badge + bandeau vers Uber Eats), `geo_approx` si OpenStreetMap
+  ne les trouve pas ; restos connus : lien + note/délai si 0, menu jamais touché ; un flux ≥ 5 plats
+  remplace l'aperçu. Rafraîchir = régénérer le JSON depuis une session Claude puis déployer.
 * 2026-10-09 — **Synchronisation automatique** des restaurants / menus dans le serveur
   (`internal/feedsync` + `app/sync.go`, page `/admin/synchronisation`, ADR 0002 mise à jour 2).
   - réconciliation pure (`feedsync.Reconcile`) testée sur fixtures ; écriture par restaurant en transaction ;

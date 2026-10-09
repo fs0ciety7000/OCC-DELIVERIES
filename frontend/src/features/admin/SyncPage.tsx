@@ -324,7 +324,19 @@ function SourcesSection() {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="truncate font-semibold">{s.label}</span>
-                    <Badge variant={s.provider === 'deliveroo' ? 'deliveroo' : s.provider === 'weloveat' ? 'weloveat' : s.provider === 'takeaway-site' ? 'takeaway' : 'neutral'}>
+                    <Badge
+                      variant={
+                        s.provider === 'deliveroo'
+                          ? 'deliveroo'
+                          : s.provider === 'weloveat'
+                            ? 'weloveat'
+                            : s.provider === 'takeaway-site'
+                              ? 'takeaway'
+                              : s.provider === 'ubereats-snapshot'
+                                ? 'ubereats'
+                                : 'neutral'
+                      }
+                    >
                       {PROVIDER_LABEL[s.provider]}
                     </Badge>
                     <span className="text-xs text-subtle tabular-nums">priorité {s.priority}</span>
@@ -386,7 +398,10 @@ function SourcesSection() {
   )
 }
 
-const PROVIDERS: SyncProvider[] = ['takeaway-site', 'deliveroo', 'weloveat', 'jsonld']
+const PROVIDERS: SyncProvider[] = ['takeaway-site', 'deliveroo', 'weloveat', 'jsonld', 'ubereats-snapshot']
+
+/** Sources sans adresse : weloveat (racine par défaut), instantané Uber Eats (fichier embarqué). */
+const URL_OPTIONAL: SyncProvider[] = ['weloveat', 'ubereats-snapshot']
 
 function SourceForm({ source, nextPriority, onClose }: { source: SyncSource | null; nextPriority: number; onClose: () => void }) {
   const qc = useQueryClient()
@@ -412,13 +427,13 @@ function SourceForm({ source, nextPriority, onClose }: { source: SyncSource | nu
     e.preventDefault()
     const next: typeof errors = {}
     const u = url.trim()
-    if (u && !/^https?:\/\/[^/\s]+/.test(u)) next.url = 'Adresse en https:// attendue.'
-    if (!u && provider !== 'weloveat') next.url = 'Adresse requise.'
+    if (u && provider !== 'ubereats-snapshot' && !/^https?:\/\/[^/\s]+/.test(u)) next.url = 'Adresse en https:// attendue.'
+    if (!u && !URL_OPTIONAL.includes(provider)) next.url = 'Adresse requise.'
     const p = Number(priority)
     if (!Number.isInteger(p)) next.priority = 'Nombre entier attendu.'
     setErrors(next)
     if (next.url || next.priority) return
-    save.mutate({ provider, label: label.trim(), url: u, priority: p, enabled, options, city: source?.city || 'mons' })
+    save.mutate({ provider, label: label.trim(), url: provider === 'ubereats-snapshot' ? '' : u, priority: p, enabled, options, city: source?.city || 'mons' })
   }
 
   return (
@@ -452,9 +467,11 @@ function SourceForm({ source, nextPriority, onClose }: { source: SyncSource | nu
         <Field label="Nom" optional>
           {(p) => <Input {...p} data-autofocus value={label} onChange={(e) => setLabel(e.target.value)} maxLength={120} placeholder="Site Tomo" />}
         </Field>
-        <Field label="Adresse (URL)" error={errors.url} optional={provider === 'weloveat'}>
-          {(p) => <Input {...p} value={url} onChange={(e) => setUrl(e.target.value)} inputMode="url" placeholder="https://…" />}
-        </Field>
+        {provider !== 'ubereats-snapshot' && (
+          <Field label="Adresse (URL)" error={errors.url} optional={provider === 'weloveat'}>
+            {(p) => <Input {...p} value={url} onChange={(e) => setUrl(e.target.value)} inputMode="url" placeholder="https://…" />}
+          </Field>
+        )}
         <Field label="Priorité" error={errors.priority} hint="Plus petit = préféré pour le menu et lu en premier.">
           {(p) => <Input {...p} value={priority} onChange={(e) => setPriority(e.target.value)} inputMode="numeric" />}
         </Field>

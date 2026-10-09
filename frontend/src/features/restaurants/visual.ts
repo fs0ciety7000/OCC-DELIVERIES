@@ -63,3 +63,8 @@ export const PROVIDER_LABELS: Record<string, string> = {
   weloveat: 'weloveat',
   manual: 'Manuel',
 }
+
+/** Lien Uber Eats du restaurant (vide s'il n'en a pas). */
+export function uberEatsUrl(restaurant: Pick<Restaurant, 'providers'>): string {
+  return restaurant.providers?.find((p) => p.id === 'ubereats' && p.url)?.url ?? ''
+}

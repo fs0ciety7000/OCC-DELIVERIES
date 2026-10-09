@@ -63,6 +63,8 @@ func exportRecord(app core.App, r *core.Record) (RestaurantImport, error) {
 		DeliveryFee: r.GetInt("delivery_fee"),
 		MinOrder:    r.GetInt("min_order"),
 		Active:      &active,
+		PartialMenu: r.GetBool("partial_menu"),
+		GeoApprox:   r.GetBool("geo_approx"),
 		Cuisines:    []string{},
 		Providers:   []providers.Link{},
 		Categories:  []CategoryImport{},

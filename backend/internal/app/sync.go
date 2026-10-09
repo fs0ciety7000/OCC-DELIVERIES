@@ -20,6 +20,7 @@ import (
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/feedsync"
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/menusync"
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/providers"
+	"github.com/fs0ciety7000/occ-deliveries/backend/migrations"
 )
 
 // Collections of the synchronisation.
@@ -61,6 +62,12 @@ type SyncConfig struct {
 	CacheTTL   time.Duration // default 20h
 	// NewFetcher builds the HTTP fetcher of a run (tests replace the pauses).
 	NewFetcher func(cacheDir string) *menusync.Fetcher
+	// Snapshot returns the Uber Eats snapshot read by the "ubereats-snapshot"
+	// sources (default: the embedded migrations/data/mons_ubereats.json).
+	Snapshot func() ([]byte, error)
+	// DefaultLat / DefaultLng place the snapshot restaurants without
+	// coordinates (OCC_DEFAULT_LAT / LNG).
+	DefaultLat, DefaultLng float64
 }
 
 func syncConfigFromEnv() SyncConfig {
@@ -384,10 +391,29 @@ func (s *syncer) execute(ctx context.Context, rec *core.Record) {
 	city = cmpOr(city, "mons")
 	lg.logf("Synchronisation (%s) : %d sources", rec.GetString("trigger"), len(sources))
 
+	netSources, snapSources := feedsync.SplitSources(sources)
 	f := s.newFetcher()
 	f.Logf = lg.logf
-	feed, res := feedsync.FetchAll(ctx, f, sources, feedsync.FetchOptions{RadiusKm: syncRadiusKm, Today: menusync.Today(), Logf: lg.logf})
+	feed, res := feedsync.FetchAll(ctx, f, netSources, feedsync.FetchOptions{RadiusKm: syncRadiusKm, Today: menusync.Today(), Logf: lg.logf})
 	results = res
+	// Uber Eats snapshot: embedded file, no network
+	var snapshot []feedsync.SnapshotEntry
+	if len(snapSources) > 0 {
+		data, err := s.snapshotData()
+		for _, src := range snapSources {
+			var entries []feedsync.SnapshotEntry
+			var r feedsync.SourceResult
+			if err != nil {
+				r = feedsync.SourceResult{ID: src.ID, Label: src.Label, Provider: src.Provider, Status: feedsync.StatusFailed, Message: err.Error()}
+			} else {
+				entries, r = feedsync.ReadSnapshot(src, data, lg.logf)
+			}
+			results = append(results, r)
+			if snapshot == nil {
+				snapshot = entries // several rows read the same file: once is enough
+			}
+		}
+	}
 	s.saveSourceStatus(results)
 	lg.logf("Requêtes réseau : %d, depuis le cache : %d", f.Network, f.Cached)
 	if ctx.Err() != nil {
@@ -395,7 +421,7 @@ func (s *syncer) execute(ctx context.Context, rec *core.Record) {
 		return
 	}
 
-	merged, mstats := menusync.MergeIn(feed, feedsync.Priority(sources), city)
+	merged, mstats := menusync.MergeIn(feed, feedsync.Priority(netSources), city)
 	for _, g := range mstats.Merged {
 		lg.logf("fusionné : %s", strings.Join(g.Sources, " | "))
 	}
@@ -415,12 +441,15 @@ func (s *syncer) execute(ctx context.Context, rec *core.Record) {
 		}
 	}
 
-	snapshot, err := loadSnapshot(app)
+	stored, err := loadSnapshot(app)
 	if err != nil {
 		errMsg = err.Error()
 		return
 	}
-	plan := feedsync.Reconcile(snapshot, merged, feedsync.Options{Now: time.Now(), City: city, Incomplete: incomplete})
+	plan := feedsync.Reconcile(stored, merged, feedsync.Options{
+		Now: time.Now(), City: city, Incomplete: incomplete,
+		Snapshot: snapshot, DefaultLat: s.cfg.DefaultLat, DefaultLng: s.cfg.DefaultLng,
+	})
 	for _, l := range plan.Log {
 		lg.logf("%s", l)
 	}
@@ -437,6 +466,9 @@ func (s *syncer) execute(ctx context.Context, rec *core.Record) {
 		}
 		stats.Add(rp.Stats)
 		changes = append(changes, rp.Changes...)
+	}
+	if len(snapshot) > 0 {
+		lg.logf("Uber Eats (instantané) : %d restaurants, %d reconnus", len(snapshot), plan.SnapshotMatched)
 	}
 	lg.logf("Restaurants : %d reconnus (%d verrouillés), %d créés, %d mis à jour, %d obsolètes ; plats : %d créés, %d mis à jour (%d prix), %d indisponibles",
 		plan.Matched, plan.Locked, stats.RestaurantsCreated, stats.RestaurantsUpdated, stats.RestaurantsStale,
@@ -472,6 +504,14 @@ func truncate(s string, n int) string {
 		return string(r)
 	}
 	return string(r[:n])
+}
+
+// snapshotData returns the Uber Eats snapshot file.
+func (s *syncer) snapshotData() ([]byte, error) {
+	if s.cfg.Snapshot != nil {
+		return s.cfg.Snapshot()
+	}
+	return migrations.UberEatsSnapshot()
 }
 
 func (s *syncer) saveSourceStatus(results []feedsync.SourceResult) {
@@ -515,6 +555,7 @@ func loadSnapshot(app core.App) ([]*feedsync.Restaurant, error) {
 			DeliveryFee: r.GetInt("delivery_fee"), MinOrder: r.GetInt("min_order"),
 			Providers: jsonList[providers.Link](r, "providers"), Sources: jsonList[feedsync.SourceRef](r, "sources"),
 			Locked: r.GetBool("locked"), Active: r.GetBool("active"), StaleSince: r.GetString("stale_since"),
+			PartialMenu: r.GetBool("partial_menu"), GeoApprox: r.GetBool("geo_approx"),
 		}
 		byID[r.Id] = fr
 		out = append(out, fr)
@@ -621,6 +662,8 @@ func applyRestaurantPlan(app core.App, rp *feedsync.RestaurantPlan) error {
 				"source_key":   truncate(r.SourceKey, 300),
 				"sources":      orEmptyList(r.Sources),
 				"stale_since":  stale,
+				"partial_menu": r.PartialMenu,
+				"geo_approx":   r.GeoApprox,
 			})
 			if err := tx.Save(rec); err != nil {
 				return err

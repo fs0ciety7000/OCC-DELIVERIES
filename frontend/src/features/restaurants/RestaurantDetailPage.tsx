@@ -9,6 +9,7 @@ import type { MenuItem } from '@/lib/types'
 import { useMenu, useRestaurant } from './hooks'
 import { ItemSheet } from './ItemSheet'
 import { MenuSkeleton, MenuView } from './MenuView'
+import { PartialMenuBadge, PartialMenuBanner } from './PartialMenu'
 import { ProviderBadges, RestaurantMeta } from './RestaurantCard'
 import { RestaurantCover } from './RestaurantCover'
 import { cuisineLabel } from './visual'
@@ -82,6 +83,7 @@ export function RestaurantDetailPage() {
           </div>
           {r.description && <p className="max-w-[680px] text-muted">{r.description}</p>}
           <RestaurantMeta restaurant={r} />
+          <PartialMenuBadge restaurant={r} />
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted">
             {r.address && (
               <span className="inline-flex items-center gap-1.5">
@@ -111,6 +113,8 @@ export function RestaurantDetailPage() {
       <p className="flex items-center gap-1.5 text-xs text-subtle">
         <Info aria-hidden className="size-3.5" /> Prix indicatifs, susceptibles de varier sur la plateforme de livraison.
       </p>
+
+      {r && <PartialMenuBanner restaurant={r} />}
 
       {menu.isPending ? (
         <MenuSkeleton />

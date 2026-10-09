@@ -67,7 +67,8 @@ func TestSyncMigrationOnProductionHistory(t *testing.T) {
 	}
 
 	// default sources: every Takeaway mini-site, Deliveroo Mons, weloveat Mons
-	seeded, err := app.FindRecordsByFilter("sync_sources", "enabled = true", "priority", 0, 0)
+	// (the Uber Eats snapshot row of 1760000006 is checked in ubereats_snapshot_test.go)
+	seeded, err := app.FindRecordsByFilter("sync_sources", "enabled = true && provider != 'ubereats-snapshot'", "priority", 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -64,3 +64,21 @@ immédiate : `OCC_SYNC_ENABLED=false` (plus aucune requête sortante, déclenche
 sortant est ajouté). Les prix restent « indicatifs » (les plateformes appliquent souvent une
 marge). Les CGU restent applicables : usage interne, volumes modestes, sources désactivables
 une à une ; si une plateforme le demande ou se met à bloquer, on désactive sa source.
+
+## Mise à jour — 2026-10-09 (3) : instantané Uber Eats (cartes partielles)
+**Contexte.** Le connecteur officiel Uber Eats (MCP) répond depuis une session Claude, pas depuis le
+serveur ; il est fortement limité et ne renvoie que 0 à 5 plats d'exemple par restaurant. Les
+utilisateurs veulent pourtant voir tout de suite les restaurants Uber Eats qui livrent le bureau.
+
+**Décision.** Le lead fige les résultats du connecteur dans `migrations/data/mons_ubereats.json`
+(embarqué) ; une source `ubereats-snapshot` le relit à chaque synchronisation, **sans réseau**.
+Les restaurants inconnus sont créés **actifs** avec `partial_menu = true` (catégorie « Aperçu »,
+badge « Aperçu du menu », bandeau renvoyant à Uber Eats) et, sans coordonnées, au lieu par défaut
+(`geo_approx = true`, distance masquée). Un restaurant déjà connu ne reçoit que son lien Uber Eats et
+les note / avis / délai manquants — jamais de changement de menu. Une source à carte complète
+(≥ 5 plats) remplace ensuite l'aperçu. Rapprochement par lien puis nom souple (`menusync.NameMatch`).
+
+**Conséquences.** Pas de scraping d'Uber Eats ni de requête du serveur vers Uber Eats ; la fraîcheur
+dépend des mises à jour du fichier (manuelles, `docs/DEPLOYMENT.md`). La commande sur ces restaurants
+se fait via l'envoi « Uber Eats » (deep link + commande groupée Uber Eats), la carte de l'app n'étant
+qu'un aperçu aux prix indicatifs.

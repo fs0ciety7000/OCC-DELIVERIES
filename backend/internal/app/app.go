@@ -102,6 +102,9 @@ func Register(app core.App, cfg Config) {
 }
 
 func register(app core.App, cfg Config) *handlers {
+	if cfg.Sync.DefaultLat == 0 && cfg.Sync.DefaultLng == 0 {
+		cfg.Sync.DefaultLat, cfg.Sync.DefaultLng = cfg.DefaultLat, cfg.DefaultLng
+	}
 	h := &handlers{cfg: cfg, sync: newSyncer(app, cfg.Sync)}
 	h.sync.bind()
 	bindHooks(app)

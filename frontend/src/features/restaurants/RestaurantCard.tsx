@@ -5,6 +5,7 @@ import { Badge, Card, Money, type BadgeVariant } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { formatDistance, formatEta, formatRating, priceLevel } from '@/lib/format'
 import type { NearbyRestaurant, ProviderId, Restaurant } from '@/lib/types'
+import { PartialMenuBadge } from './PartialMenu'
 import { RestaurantCover } from './RestaurantCover'
 import { cuisineLabel, PROVIDER_LABELS } from './visual'
 
@@ -30,7 +31,8 @@ export function ProviderBadges({ restaurant, className }: { restaurant: Pick<Res
 }
 
 export function RestaurantMeta({ restaurant, className }: { restaurant: Restaurant | NearbyRestaurant; className?: string }) {
-  const distance = 'distanceKm' in restaurant ? restaurant.distanceKm : undefined
+  // position approximative (lieu par défaut) : la distance ne veut rien dire
+  const distance = 'distanceKm' in restaurant && !restaurant.geo_approx ? restaurant.distanceKm : undefined
   return (
     <ul className={cn('relative flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] leading-5 text-muted', className)}>
       {restaurant.rating > 0 && (
@@ -84,6 +86,7 @@ export function RestaurantCard({ restaurant, to, onSelect, selected, action, com
         </div>
         {cuisines && <p className="text-[13px] text-subtle">{cuisines}</p>}
         <RestaurantMeta restaurant={restaurant} />
+        <PartialMenuBadge restaurant={restaurant} className="mt-0.5 self-start" />
         {!compact && <ProviderBadges restaurant={restaurant} className="mt-1" />}
       </div>
     </>

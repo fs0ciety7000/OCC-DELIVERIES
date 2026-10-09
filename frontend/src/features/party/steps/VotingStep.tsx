@@ -5,6 +5,7 @@ import { Suspense, useMemo, useState } from 'react'
 import { VoteBurst } from '@/components/food'
 import { toast } from 'sonner'
 import { AvatarStack, Badge, Button, Card, Countdown, EmptyState, Sheet, Skeleton } from '@/components/ui'
+import { PartialMenuBadge } from '@/features/restaurants/PartialMenu'
 import { RestaurantMeta } from '@/features/restaurants/RestaurantCard'
 import { RestaurantCover } from '@/features/restaurants/RestaurantCover'
 import { partiesApi } from '@/lib/api'
@@ -108,6 +109,7 @@ export function VotingStep({ ctx }: { ctx: PartyCtx }) {
                       <div className="min-w-0">
                         <h3 className="font-display text-lg leading-6 font-semibold">{r.name}</h3>
                         <RestaurantMeta restaurant={r} className="mt-1" />
+                        <PartialMenuBadge restaurant={r} className="mt-2" />
                       </div>
                       <span className="relative shrink-0">
                       <Suspense fallback={null}>

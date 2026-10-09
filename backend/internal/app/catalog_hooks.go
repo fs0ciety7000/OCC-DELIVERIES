@@ -62,7 +62,7 @@ func autoLock(e *core.RecordRequestEvent, neutral ...string) {
 func onRestaurantUpsert(e *core.RecordRequestEvent) error {
 	r := e.Record
 	if !r.IsNew() {
-		autoLock(e, "active", "locked")
+		autoLock(e, "active", "locked", "partial_menu", "geo_approx")
 	}
 	r.Set("slug", strings.ToLower(strings.TrimSpace(r.GetString("slug"))))
 	r.Set("name", strings.TrimSpace(r.GetString("name")))

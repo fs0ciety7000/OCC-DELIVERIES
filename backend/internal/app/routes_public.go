@@ -78,9 +78,10 @@ func (h *handlers) nearby(e *core.RequestEvent) error {
 	}
 
 	type hit struct {
-		data map[string]any
-		dist float64
-		name string
+		data   map[string]any
+		dist   float64
+		name   string
+		approx bool
 	}
 	hits := []hit{}
 	for _, r := range recs {
@@ -110,9 +111,13 @@ func (h *handlers) nearby(e *core.RequestEvent) error {
 		}
 		data := r.PublicExport()
 		data["distanceKm"] = math.Round(d*100) / 100
-		hits = append(hits, hit{data: data, dist: d, name: r.GetString("name")})
+		hits = append(hits, hit{data: data, dist: d, name: r.GetString("name"), approx: r.GetBool("geo_approx")})
 	}
+	// approximate positions (Uber Eats snapshot) come after the real ones
 	sort.SliceStable(hits, func(i, j int) bool {
+		if hits[i].approx != hits[j].approx {
+			return !hits[i].approx
+		}
 		if hits[i].dist != hits[j].dist {
 			return hits[i].dist < hits[j].dist
 		}
