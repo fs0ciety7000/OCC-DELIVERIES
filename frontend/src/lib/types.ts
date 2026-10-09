@@ -404,6 +404,8 @@ export interface AppConfig {
   providers: ProviderConfig[]
   /** Les restaurants ayant moins de plats disponibles sont absents des listes (0 = aucun filtre). */
   minMenuItems: number
+  /** Le serveur peut envoyer des e-mails (vérification, mot de passe oublié…). */
+  mailEnabled: boolean
 }
 
 /** `GET / PATCH /api/occ/admin/settings`. */
@@ -612,6 +614,45 @@ export interface AdminUser {
   verified: boolean
   created: ISODate
   parties: number
+  /** Compte suspendu (connexion refusée, sessions coupées). */
+  banned: boolean
+  bannedReason: string
+  /** `''` si non suspendu. */
+  bannedAt: ISODate | ''
+  /** Compte supprimé (anonymisé : « Compte supprimé », historique conservé). */
+  deleted: boolean
+  deletedAt: ISODate | ''
+  /** `false` pour un compte créé avec Google qui n'a jamais choisi de mot de passe. */
+  passwordSet: boolean
+  /** Fournisseurs OAuth2 liés (`google`). */
+  providers: string[]
+  /** Dernière connexion connue (`''` si aucune). */
+  lastLoginAt: ISODate | ''
+}
+
+/** Filtre d'état de `GET /api/occ/admin/users` (`status`). */
+export type AdminUserStatus = 'banned' | 'unverified' | 'deleted'
+
+/** `GET /api/occ/admin/mail` — aucune donnée secrète. */
+export interface MailStatus {
+  enabled: boolean
+  host: string
+  port: number
+  tls: boolean
+  senderAddress: string
+  senderName: string
+  /** Configuration lue dans OCC_SMTP_* (sinon : admin PocketBase /_/). */
+  fromEnv: boolean
+}
+
+/** `GET /api/occ/me/account` — sécurité du compte connecté. */
+export interface AccountInfo {
+  email: string
+  verified: boolean
+  /** `false` : compte Google sans mot de passe choisi (impossible de dissocier Google). */
+  passwordSet: boolean
+  providers: { id: string; provider: string; created: ISODate }[]
+  mailEnabled: boolean
 }
 
 export interface AdminUserList {

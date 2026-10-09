@@ -88,6 +88,26 @@ ci-dessous, du plus récent au plus ancien.
   Wero/Bancontact ; mobile : liens d'abord + « Afficher le QR pour un collègue ». QR perso Wero/Bancontact gardé
   mais toujours averti « sans montant ». Wero / Bancontact Pay / Lydia / Wisetag : aucun format tiers (ADR 0003 maj 1).
   Piège e2e : un autre agent peut lancer Playwright en parallèle → `--output` dédié, sinon artefacts ENOENT.
+* 2026-10-09 — **Comptes : Google, e-mails, modération** (migration `1760000014`). Google OAuth2 et SMTP
+  configurés au démarrage depuis `OCC_GOOGLE_CLIENT_*` / `OCC_SMTP_*` / `OCC_MAIL_*` (rien n'est touché sans
+  ces variables : la config `/_/` reste) ; modèles d'e-mails français (`app/mailtemplates.go`) vers les routes
+  SPA `/auth/verifier|reinitialiser|changer-email/{TOKEN}`. Pièges PocketBase v0.40 :
+  - champs `Hidden` : jamais renvoyés (même au titulaire), **ignorés en écriture** pour les non-superusers ;
+    lisibles en Go et dans les rules → `banned`, `password_set`… exposés par `/api/occ/me/account` ;
+  - OAuth2 lie par **e-mail** : compte vérifié = simple liaison ; **non vérifié = mot de passe remplacé**
+    (aléatoire) → `password_set = false` ; un compte créé par Google a un mot de passe aléatoire (le `Plain`
+    est vidé avant le `Save` → détecté dans `OnRecordCreate`) ;
+  - `request-password-reset` envoie l'e-mail **en arrière-plan** (tests : attendre le `TestMailer`) ;
+    `request-email-change` est synchrone ;
+  - suspendre = `RefreshTokenKey()` (jetons émis → 401, realtime désauthentifié) + `OnRecordAuthRequest`
+    (403 « Compte suspendu ») + middleware après `pbLoadAuthToken` (priorité `DefaultLoadAuthTokenMiddlewarePriority + 6`) ;
+  - `dbx.And()` vide dans `AndWhere` casse la requête (400 générique) : n'ajouter le `WHERE` que s'il y a des conditions ;
+  - SDK JS : sans `urlCallback`, une pop-up bloquée laisse `authWithOAuth2` **pendant à jamais** → ouvrir la
+    fenêtre nous-mêmes dans le clic (jamais dans un `useMutation`, qui l'ouvre hors geste) ; ne pas se fier à
+    `popup.closed` (avec le COOP `same-origin` de PocketBase il peut passer à `true` dès la navigation vers Google) :
+    bouton « Annuler » côté UI.
+  Suppression de compte = anonymisation (historique et totaux conservés), `users.deleteRule = nil`.
+
 * 2026-10-09 — **Coordonnées des restos** : téléphone E.164 / adresse « Rue X 12, 7000 Mons » normalisés
   partout (`domain/contact.go`, migration `1760000012`) ; enrichissement OpenStreetMap (`internal/enrich`,
   Nominatim : UA identifié, ≥ 1,1 s, cache 30 j y compris les absences, ≤ 60 requêtes/exécution, arrêt sur

@@ -21,6 +21,10 @@ const PartiesAdminPage = lazy(() => import('@/features/admin/PartiesAdminPage').
 const PartyAdminDetailPage = lazy(() => import('@/features/admin/PartiesAdminPage').then((m) => ({ default: m.PartyAdminDetailPage })))
 const SyncPage = lazy(() => import('@/features/admin/SyncPage').then((m) => ({ default: m.SyncPage })))
 const UsersAdminPage = lazy(() => import('@/features/admin/UsersAdminPage').then((m) => ({ default: m.UsersAdminPage })))
+const ForgotPasswordPage = lazy(() => import('@/features/auth/EmailPages').then((m) => ({ default: m.ForgotPasswordPage })))
+const ResetPasswordPage = lazy(() => import('@/features/auth/EmailPages').then((m) => ({ default: m.ResetPasswordPage })))
+const VerifyEmailPage = lazy(() => import('@/features/auth/EmailPages').then((m) => ({ default: m.VerifyEmailPage })))
+const ConfirmEmailChangePage = lazy(() => import('@/features/auth/EmailPages').then((m) => ({ default: m.ConfirmEmailChangePage })))
 const ProfilePage = lazy(() => import('@/features/profile/ProfilePage').then((m) => ({ default: m.ProfilePage })))
 
 export const router = createBrowserRouter([
@@ -31,6 +35,11 @@ export const router = createBrowserRouter([
       { path: '/', element: <HomePage /> },
       { path: '/login', element: <LoginPage /> },
       { path: '/register', element: <RegisterPage /> },
+      // liens des e-mails (modèles serveur : backend/internal/app/mailtemplates.go)
+      { path: '/auth/mot-de-passe-oublie', element: <ForgotPasswordPage /> },
+      { path: '/auth/reinitialiser/:token', element: <ResetPasswordPage /> },
+      { path: '/auth/verifier/:token', element: <VerifyEmailPage /> },
+      { path: '/auth/changer-email/:token', element: <ConfirmEmailChangePage /> },
       { path: '/restaurants', element: <RestaurantsPage /> },
       { path: '/restaurants/:id', element: <RestaurantDetailPage /> },
       {

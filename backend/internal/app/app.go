@@ -44,18 +44,23 @@ type Config struct {
 	AdminEmails []string
 	// Sync drives the automatic menu synchronisation (OCC_SYNC_*).
 	Sync SyncConfig
+	// Mail is the SMTP configuration (OCC_SMTP_*, OCC_MAIL_*).
+	Mail MailConfig
+	// Google is the Google OAuth2 client (OCC_GOOGLE_CLIENT_*).
+	Google GoogleConfig
 }
 
 // ConfigFromEnv reads the OCC_* environment variables.
 func ConfigFromEnv(version string) Config {
 	cfg := Config{
 		Version:      version,
-		PublicURL:    envOr("OCC_PUBLIC_URL", "http://localhost:8090"),
+		PublicURL:    strings.TrimRight(envOr("OCC_PUBLIC_URL", "http://localhost:8090"), "/"),
 		DefaultLat:   envFloat("OCC_DEFAULT_LAT", 50.4542),
 		DefaultLng:   envFloat("OCC_DEFAULT_LNG", 3.9567),
 		DefaultLabel: envOr("OCC_DEFAULT_LABEL", "Mons"),
 	}
 	cfg.Sync = syncConfigFromEnv()
+	authConfigFromEnv(&cfg)
 	cfg.AdminEmails = parseEmails(os.Getenv("OCC_ADMIN_EMAIL") + "," + os.Getenv("OCC_ADMINS"))
 	for _, p := range strings.Split(envOr("OCC_PROVIDERS", "ubereats,takeaway,deliveroo,weloveat"), ",") {
 		p = strings.ToLower(strings.TrimSpace(p))
@@ -115,10 +120,15 @@ func register(app core.App, cfg Config) *handlers {
 	bindCatalogHooks(app)
 	bindSyncHooks(app)
 	bindSettingsHooks(app)
+	bindAccountHooks(app)
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
+		if err := applyAuthSettings(se.App, cfg); err != nil {
+			return err
+		}
 		if err := promoteAdmins(se.App, cfg.AdminEmails); err != nil {
 			return err
 		}
+		se.Router.Bind(bannedGuard())
 		h.routes(se.Router)
 		return se.Next()
 	})
@@ -149,6 +159,9 @@ func (h *handlers) routes(r *router.Router[*core.RequestEvent]) {
 	g.POST("/parties/{id}/reorder", h.reorderApply).Bind(user)
 	g.GET("/me/history", h.meHistory).Bind(user)
 	g.GET("/me/stats", h.meStats).Bind(user)
+	g.GET("/me/account", h.meAccount).Bind(user)
+	g.DELETE("/me/providers/{provider}", h.meUnlinkProvider).Bind(user)
+	g.POST("/me/delete", h.meDelete).Bind(user)
 	g.POST("/payments/{id}/action", h.paymentAction).Bind(user)
 	g.GET("/payments/{id}/qr", h.paymentQR).Bind(user)
 	g.GET("/payments/{id}/wallet-qr/{kind}", h.walletQR).Bind(user)
@@ -161,6 +174,13 @@ func (h *handlers) routes(r *router.Router[*core.RequestEvent]) {
 	admin.GET("/export", h.adminExport)
 	admin.GET("/users", h.adminUsers)
 	admin.PATCH("/users/{id}/role", h.adminSetRole)
+	admin.POST("/users/{id}/ban", h.adminBan)
+	admin.POST("/users/{id}/unban", h.adminUnban)
+	admin.POST("/users/{id}/logout", h.adminLogout)
+	admin.POST("/users/{id}/password-reset", h.adminPasswordReset)
+	admin.DELETE("/users/{id}", h.adminDeleteUser)
+	admin.GET("/mail", h.adminMail)
+	admin.POST("/mail/test", h.adminMailTest)
 	admin.POST("/parties/{id}/cancel", h.adminCancelParty)
 	admin.GET("/sync/status", h.adminSyncStatus)
 	admin.GET("/sync/runs", h.adminSyncRuns)

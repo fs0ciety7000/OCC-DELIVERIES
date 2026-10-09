@@ -6,6 +6,7 @@ import { FoodLoader } from '@/components/food'
 import { Avatar, buttonClass, Logo, ThemeToggle } from '@/components/ui'
 import { ResumeBanner } from '@/features/party/ActiveParties'
 import { useActiveParties } from '@/features/party/resume'
+import { VerifyEmailBanner } from '@/features/profile/VerifyEmailBanner'
 import { CreatePartySheet } from '@/features/party/CreatePartySheet'
 import { useAuth } from '@/lib/auth'
 import { cn } from '@/lib/cn'
@@ -36,7 +37,8 @@ export function AppShell() {
   const inParty = location.pathname.startsWith('/party/')
   // Une seule action principale par écran : le raccourci d'en-tête est secondaire et
   // masqué là où l'écran porte déjà son propre CTA (héros d'accueil, auth, party).
-  const showHeaderCta = !inParty && !['/', '/login', '/register'].includes(location.pathname)
+  const inAuth = ['/login', '/register'].includes(location.pathname) || location.pathname.startsWith('/auth/')
+  const showHeaderCta = !inParty && !inAuth && location.pathname !== '/'
   const launch = () => (user ? setCreateOpen(true) : navigate(`/login?next=${encodeURIComponent(location.pathname)}`))
   const shellStyle = inParty ? ({ '--tabbar-h': '0px' } as CSSProperties) : undefined
 
@@ -60,7 +62,7 @@ export function AppShell() {
     [navigate],
   )
   useMyPartiesRealtime(user?.id, onStatusChange)
-  const hideResume = inParty || location.pathname.startsWith('/j/') || ['/login', '/register'].includes(location.pathname) || (location.pathname === '/' && active.length === 1)
+  const hideResume = inParty || location.pathname.startsWith('/j/') || inAuth || (location.pathname === '/' && active.length === 1)
   const resume = user && !hideResume ? active : []
   const showDock = resume.length > 0
 
@@ -124,6 +126,7 @@ export function AppShell() {
       </header>
 
       <main id="main" className="relative z-10 mx-auto w-full max-w-[1200px] px-4 pt-4 pb-[calc(var(--tabbar-h)+env(safe-area-inset-bottom)+32px)] md:px-8 md:pt-8">
+        {!inParty && !inAuth && location.pathname !== '/profile' && <VerifyEmailBanner user={user} dismissible className="mb-4" />}
         <Suspense fallback={<FoodLoader className="py-24" />}>
           <Outlet />
         </Suspense>

@@ -20,3 +20,10 @@ export function errorMessage(err: unknown, fallback = 'Oups, quelque chose a coi
 export function isNotFound(err: unknown): boolean {
   return err instanceof ClientResponseError && err.status === 404
 }
+
+/** Le serveur a refusé ce champ (erreur de validation PocketBase `data.<field>`). */
+export function hasFieldError(err: unknown, field: string): boolean {
+  if (!(err instanceof ClientResponseError)) return false
+  const data = err.response?.data as Record<string, unknown> | undefined
+  return !!data && field in data
+}

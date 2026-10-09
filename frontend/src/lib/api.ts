@@ -4,6 +4,9 @@ import type {
   AdminStats,
   AdminUserList,
   AdminUser,
+  AdminUserStatus,
+  AccountInfo,
+  MailStatus,
   AppConfig,
   ImportReport,
   PartyStatus,
@@ -186,11 +189,25 @@ export const adminApi = {
 
   downloadExport: () => downloadAuthed('/api/occ/admin/export', 'occ-restaurants.json'),
 
-  users: (q: string, page = 1, role?: UserRole) =>
-    pb.send<AdminUserList>('/api/occ/admin/users', { method: 'GET', query: { q, page, perPage: 50, ...(role ? { role } : {}) } }),
+  users: (q: string, page = 1, filter: { role?: UserRole; status?: AdminUserStatus } = {}) =>
+    pb.send<AdminUserList>('/api/occ/admin/users', {
+      method: 'GET',
+      query: { q, page, perPage: 50, ...(filter.role ? { role: filter.role } : {}), ...(filter.status ? { status: filter.status } : {}) },
+    }),
 
   setRole: (userId: string, role: UserRole) =>
     pb.send<{ user: AdminUser }>(`/api/occ/admin/users/${userId}/role`, { method: 'PATCH', body: JSON.stringify({ role }), headers: { 'Content-Type': 'application/json' } }),
+
+  ban: (userId: string, reason: string) => pb.send<{ user: AdminUser }>(`/api/occ/admin/users/${userId}/ban`, json({ reason })),
+  unban: (userId: string) => pb.send<{ user: AdminUser }>(`/api/occ/admin/users/${userId}/unban`, json({})),
+  forceLogout: (userId: string) => pb.send<{ user: AdminUser }>(`/api/occ/admin/users/${userId}/logout`, json({})),
+  sendPasswordReset: (userId: string) => pb.send<{ sent: boolean; email: string }>(`/api/occ/admin/users/${userId}/password-reset`, json({})),
+  /** « Suppression » = anonymisation (historique conservé). */
+  deleteUser: (userId: string) => pb.send<{ user: AdminUser }>(`/api/occ/admin/users/${userId}`, { method: 'DELETE' }),
+
+  mailStatus: () => pb.send<MailStatus>('/api/occ/admin/mail', { method: 'GET' }),
+  /** Envoie un e-mail de test à l'admin connecté. */
+  mailTest: () => pb.send<{ sent: boolean; to: string }>('/api/occ/admin/mail/test', json({})),
 
   cancelParty: (partyId: string) => pb.send<{ party: Party }>(`/api/occ/admin/parties/${partyId}/cancel`, json({})),
 
@@ -338,8 +355,68 @@ export const usersApi = {
     await pb.collection('users').create<User>({ name, email, password, passwordConfirm: password, emailVisibility: false })
     return pb.collection('users').authWithPassword<User>(email, password)
   },
-  oauth: (provider: string) => pb.collection('users').authWithOAuth2<User>({ provider }),
+  /**
+   * Connexion / inscription OAuth2 (Google) par fenêtre surgissante. La fenêtre est
+   * ouverte **dans le clic** (sinon les bloqueurs la refusent) : `PopupBlockedError` si
+   * le navigateur l'empêche.
+   */
+  oauth: (provider: string) => {
+    const popup = openAuthPopup()
+    if (!popup) return Promise.reject(new PopupBlockedError())
+    return pb
+      .collection('users')
+      .authWithOAuth2<User>({
+        provider,
+        urlCallback: (url) => {
+          popup.location.href = url
+        },
+      })
+      .finally(() => {
+        try {
+          popup.close()
+        } catch {
+          /* fenêtre déjà fermée */
+        }
+      })
+  },
   refresh: () => pb.collection('users').authRefresh<User>(),
+
+  /* --- e-mails : vérification, mot de passe oublié, changement d'adresse --- */
+  requestVerification: (email: string) => pb.collection('users').requestVerification(email),
+  confirmVerification: (token: string) => pb.collection('users').confirmVerification(token),
+  requestPasswordReset: (email: string) => pb.collection('users').requestPasswordReset(email),
+  confirmPasswordReset: (token: string, password: string) => pb.collection('users').confirmPasswordReset(token, password, password),
+  requestEmailChange: (newEmail: string) => pb.collection('users').requestEmailChange(newEmail),
+  /** Demande le mot de passe actuel ; toutes les sessions sont ensuite fermées. */
+  confirmEmailChange: (token: string, password: string) => pb.collection('users').confirmEmailChange(token, password),
+  /** Change le mot de passe puis se reconnecte (le serveur invalide les anciens jetons). */
+  changePassword: async (user: Pick<User, 'id' | 'email'>, oldPassword: string, password: string) => {
+    await pb.collection('users').update<User>(user.id, { oldPassword, password, passwordConfirm: password })
+    if (user.email) await pb.collection('users').authWithPassword<User>(user.email, password)
+  },
+
+  /* --- sécurité du compte (/api/occ/me/*) --- */
+  account: () => pb.send<AccountInfo>('/api/occ/me/account', { method: 'GET' }),
+  unlinkProvider: (provider: string) => pb.send<{ ok: boolean }>(`/api/occ/me/providers/${encodeURIComponent(provider)}`, { method: 'DELETE' }),
+  /** Suppression de son compte (anonymisation) : `confirm` = « SUPPRIMER ». */
+  deleteMe: (confirm: string) => pb.send<void>('/api/occ/me/delete', json({ confirm })),
+}
+
+/** Le navigateur a bloqué la fenêtre de connexion Google. */
+export class PopupBlockedError extends Error {
+  constructor() {
+    super('Ton navigateur a bloqué la fenêtre de connexion. Autorise les fenêtres surgissantes pour ce site, puis réessaie.')
+    this.name = 'PopupBlockedError'
+  }
+}
+
+function openAuthPopup(): Window | null {
+  if (typeof window === 'undefined' || !window.open) return null
+  const w = Math.min(520, window.innerWidth)
+  const h = Math.min(680, window.innerHeight)
+  const left = window.screenX + (window.outerWidth - w) / 2
+  const top = window.screenY + (window.outerHeight - h) / 2
+  return window.open('', 'occ_oauth2', `width=${w},height=${h},left=${left},top=${top},resizable,menubar=no`)
 }
 
 export type PayoutProfileInput = Pick<PayoutProfile, 'holder_name' | 'iban' | 'bic' | 'revolut_tag' | 'paypal_me' | 'payment_link' | 'wero_id' | 'bancontact_phone'>

@@ -18,6 +18,8 @@ import { checkQrFile, isValidMobile, isValidWeroId, normalizeMobile, normalizePa
 import { OrderHistory } from './OrderHistory'
 import { panelId, tabId, type ProfileTab } from './tabs'
 import { ProfileTabs } from './ProfileTabs'
+import { SecurityCard } from './SecurityCard'
+import { VerifyEmailBanner } from './VerifyEmailBanner'
 
 export function ProfilePage() {
   const { user } = useAuth()
@@ -36,6 +38,7 @@ export function ProfilePage() {
           <p className="truncate text-sm text-muted">{user.email}</p>
         </div>
       </header>
+      <VerifyEmailBanner user={user} />
       <ProfileTabs value={tab} onChange={(t) => setParams(t === 'infos' ? { onglet: 'infos' } : {}, { replace: true })} />
       {tab === 'commandes' ? (
         <div role="tabpanel" id={panelId('commandes')} aria-labelledby={tabId('commandes')}>
@@ -45,6 +48,7 @@ export function ProfilePage() {
       <div role="tabpanel" id={panelId('infos')} aria-labelledby={tabId('infos')} className="space-y-6">
       <IdentityCard key={user.id} user={user} />
       <PayoutCard userId={user.id} />
+      <SecurityCard user={user} />
       <Card>
         <CardBody className="space-y-3">
           <h2 className="font-display text-lg font-semibold">Apparence</h2>

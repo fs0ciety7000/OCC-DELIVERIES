@@ -5,15 +5,18 @@ import { Button, Field, Input } from '@/components/ui'
 import { usersApi } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
 import { errorMessage } from '@/lib/errors'
+import { useConfig } from '@/lib/geo-context'
 import { AuthLayout } from './AuthLayout'
 import { safeNext } from './safeNext'
 import { OAuthButtons } from './OAuthButtons'
+import { StrengthMeter } from './PasswordFields'
 
 export function RegisterPage() {
   const [params] = useSearchParams()
   const next = safeNext(params.get('next'))
   const navigate = useNavigate()
   const { isAuthenticated } = useAuth()
+  const config = useConfig()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -23,8 +26,10 @@ export function RegisterPage() {
 
   if (isAuthenticated && !busy) return <Navigate to={next} replace />
 
-  const done = () => {
-    toast.success('Bienvenue à bord ! 🎉')
+  const done = (withPassword: boolean) => {
+    toast.success('Bienvenue à bord ! 🎉', {
+      description: withPassword && config.data?.mailEnabled ? 'Un e-mail de confirmation vient de partir : clique sur le lien quand tu as un moment.' : undefined,
+    })
     navigate(next, { replace: true })
   }
 
@@ -50,7 +55,7 @@ export function RegisterPage() {
           setBusy(true)
           try {
             await usersApi.register(name.trim(), email.trim(), password)
-            done()
+            done(true)
           } catch (err) {
             setError(errorMessage(err, "Impossible de créer le compte. L'e-mail est peut-être déjà utilisé."))
           } finally {
@@ -67,10 +72,11 @@ export function RegisterPage() {
         <Field label="Mot de passe" hint="8 caractères minimum." error={tooShort ? 'Encore un petit effort : 8 caractères minimum.' : error}>
           {(p) => <Input {...p} type="password" autoComplete="new-password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />}
         </Field>
+        <StrengthMeter password={password} />
         <Button type="submit" block size="lg" loading={busy}>
           Créer mon compte
         </Button>
-        <OAuthButtons onSuccess={done} />
+        <OAuthButtons onSuccess={() => done(false)} />
       </form>
     </AuthLayout>
   )

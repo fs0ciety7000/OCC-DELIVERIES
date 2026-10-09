@@ -33,6 +33,9 @@ Enregistrement `A` (ou `CNAME`) `eat.fs0ciety.org` → IP du serveur Coolify.
 | `OCC_DEFAULT_LAT` / `OCC_DEFAULT_LNG` / `OCC_DEFAULT_LABEL` | `50.4542` / `3.9567` / `Mons` |
 | `OCC_SEED_DEMO` | `true` au premier déploiement, puis indifférent |
 | `OCC_PROVIDERS` | `ubereats,takeaway,deliveroo,weloveat` |
+| `OCC_GOOGLE_CLIENT_ID` / `OCC_GOOGLE_CLIENT_SECRET` | *(facultatif, secrets : « Continuer avec Google », voir § 3 bis)* |
+| `OCC_SMTP_HOST` / `OCC_SMTP_PORT` / `OCC_SMTP_USERNAME` / `OCC_SMTP_PASSWORD` | *(facultatif, secrets : e-mails, voir § 3 ter)* |
+| `OCC_MAIL_FROM` / `OCC_MAIL_FROM_NAME` | `noreply@fs0ciety.org` / `OCC Deliveries` |
 
 7. *Deploy*. Activer *Auto deploy* (webhook GitHub) pour déployer à chaque push sur `main`.
 
@@ -46,12 +49,78 @@ Enregistrement `A` (ou `CNAME`) `eat.fs0ciety.org` → IP du serveur Coolify.
 
 ## 3. Après le premier déploiement
 * Admin : `https://eat.fs0ciety.org/_/` (identifiants `OCC_ADMIN_*`).
-* *Settings → Mail settings* : configurer un SMTP (vérification d'e-mail, reset mot de passe).
-* *Collections → users → Options → OAuth2* : activer Google / Microsoft si voulu
-  (les boutons apparaissent automatiquement sur la page de connexion).
+* E-mails et Google : de préférence par variables d'environnement (§ 3 bis / § 3 ter). Sans elles,
+  `/_/` → *Settings → Mail settings* et *Collections → users → Options → OAuth2* restent utilisables
+  (le serveur ne touche à ces réglages que si les variables `OCC_*` correspondantes sont définies) ;
+  les boutons OAuth apparaissent automatiquement sur la connexion / l'inscription.
 * Restaurants : les restaurants réels de `backend/migrations/data/mons_restaurants.json`
   sont importés automatiquement (et remplacent la démo fictive) ; ensuite tout se
   gère depuis `/admin` (voir § 4).
+
+## 3 bis. Connexion avec Google
+Le bouton **« Continuer avec Google »** (connexion **et** inscription) n'apparaît que lorsque le fournisseur
+est actif. On peut réutiliser le projet Google Cloud qui sert déjà à `fs0ciety.org` : il suffit d'y ajouter
+un client (ou l'URI de redirection ci-dessous à un client « Application Web » existant).
+
+1. <https://console.cloud.google.com/> → sélectionner le projet fs0ciety (ou en créer un).
+2. *APIs & Services → OAuth consent screen* (« Écran de consentement » / *Google Auth Platform → Branding*) :
+   type **Externe**, nom « OCC Deliveries », e-mail d'assistance, domaine autorisé **`fs0ciety.org`**
+   (déjà présent si le projet sert au site), logo facultatif ; portées : `openid`, `email`, `profile`
+   (aucune portée sensible → pas de validation Google). Publier l'application (*In production*) ; en mode
+   *Testing*, seuls les comptes listés comme testeurs peuvent se connecter.
+3. *Credentials → Create credentials → OAuth client ID* → type **Web application** (« Application Web »),
+   nom « OCC Deliveries » :
+   * *Authorized JavaScript origins* : **`https://eat.fs0ciety.org`**
+   * *Authorized redirect URIs* : **`https://eat.fs0ciety.org/api/oauth2-redirect`** (exactement ; en local,
+     ajouter `http://localhost:8090/api/oauth2-redirect` et l'origine `http://localhost:8090`)
+4. Copier l'*ID client* et le *code secret* → Coolify → *Environment variables* :
+   `OCC_GOOGLE_CLIENT_ID=…apps.googleusercontent.com`, `OCC_GOOGLE_CLIENT_SECRET=…` (cocher *Is secret*),
+   puis **Redeploy**. Au démarrage le journal affiche « Google OAuth2 enabled from env ».
+5. Vérifier : `https://eat.fs0ciety.org/login` → « Continuer avec Google » (fenêtre surgissante ; si le
+   navigateur la bloque, l'app l'explique : autoriser les pop-ups pour le site).
+
+Comportement : premier passage = compte créé (nom + photo Google, adresse déjà vérifiée, rôle admin si
+l'e-mail est dans `OCC_ADMIN_EMAIL` / `OCC_ADMINS`). Un compte « e-mail + mot de passe » existant avec la
+**même adresse** est **lié** automatiquement : s'il était vérifié, son mot de passe reste valable ; s'il ne
+l'était pas, PocketBase remplace son mot de passe (sécurité) — l'utilisateur en rechoisit un via « Mot de
+passe oublié ». Chacun voit « Google connecté » dans *Profil → Mes infos → Sécurité* et peut le dissocier
+s'il a un mot de passe. Désactiver : retirer les deux variables **et** désactiver Google dans `/_/`
+(*Collections → users → OAuth2*), sinon la configuration enregistrée reste active.
+
+## 3 ter. E-mails (vérification, mot de passe oublié, changement d'adresse)
+Sans SMTP, l'app fonctionne mais sans e-mails : pas de « Mot de passe oublié » (la page l'indique), pas de
+lien de réinitialisation envoyé par un admin, pas de changement d'adresse. Avec SMTP :
+vérification à l'inscription (le compte reste utilisable sans vérification ; un bandeau discret le
+rappelle), « Mot de passe oublié ? » sur la connexion, changement d'adresse et de mot de passe dans le
+profil, lien de réinitialisation envoyé depuis *Admin → Utilisateurs*. Les liens des e-mails pointent vers
+l'app (`/auth/verifier/…`, `/auth/reinitialiser/…`, `/auth/changer-email/…`), d'où l'importance
+d'`OCC_PUBLIC_URL`.
+
+| variable | exemple | notes |
+|---|---|---|
+| `OCC_SMTP_HOST` | `smtp-relay.brevo.com` | défini = SMTP activé au démarrage |
+| `OCC_SMTP_PORT` | `587` | `465` = TLS implicite |
+| `OCC_SMTP_USERNAME` | *(identifiant SMTP)* | |
+| `OCC_SMTP_PASSWORD` | *(clé SMTP — secret)* | jamais journalisé |
+| `OCC_SMTP_TLS` | *(vide)* | `true` force le TLS implicite (défaut : `true` sur 465, STARTTLS sinon) |
+| `OCC_MAIL_FROM` | `noreply@fs0ciety.org` | adresse d'un domaine **authentifié** (SPF/DKIM) chez le fournisseur |
+| `OCC_MAIL_FROM_NAME` | `OCC Deliveries` | |
+
+Fournisseurs conseillés :
+* **Brevo** (ex-Sendinblue, gratuit 300 e-mails/jour) : *SMTP & API* → clé SMTP ; hôte
+  `smtp-relay.brevo.com`, port `587`, identifiant = login SMTP affiché. Authentifier `fs0ciety.org`
+  (enregistrements DKIM / DMARC fournis) pour envoyer en `noreply@fs0ciety.org`.
+* **Resend** (gratuit 3 000 e-mails/mois) : domaine `fs0ciety.org` vérifié ; hôte `smtp.resend.com`,
+  port `465` (TLS) ou `587`, identifiant `resend`, mot de passe = clé API.
+* **Gmail / Google Workspace** (dépannage, ~500 e-mails/jour) : activer la validation en deux étapes, créer
+  un **mot de passe d'application** ; hôte `smtp.gmail.com`, port `587`, identifiant = l'adresse Gmail,
+  `OCC_MAIL_FROM` = cette même adresse (ou un alias vérifié).
+
+**Tester** : redéployer, puis *Admin → Utilisateurs* → carte « E-mails » (badge **Actifs**, expéditeur,
+serveur) → **« Envoyer un e-mail de test »** : il arrive à l'adresse de l'admin connecté. En cas d'erreur
+(identifiants, port, TLS), le message du serveur SMTP s'affiche dans le toast. Ensuite : « Mot de passe
+oublié ? » depuis la page de connexion. Les e-mails partent en `text/html` (modèles français
+`backend/internal/app/mailtemplates.go`) ; vérifier qu'ils n'arrivent pas en indésirables (SPF/DKIM).
 
 ## 4. Gérer les restaurants
 
@@ -59,7 +128,7 @@ Enregistrement `A` (ou `CNAME`) `eat.fs0ciety.org` → IP du serveur Coolify.
 PocketBase `/_/`). Le lien « Admin » apparaît dans la navigation des comptes admin.
 
 ### Devenir admin
-* Crée d'abord un compte normal dans l'app (inscription ou Google/Microsoft).
+* Crée d'abord un compte normal dans l'app (inscription ou Google).
 * Mets son e-mail dans `OCC_ADMIN_EMAIL` (le même e-mail que le superuser) **ou**
   dans `OCC_ADMINS` (plusieurs e-mails séparés par des virgules), puis redéploie :
   au démarrage ces comptes passent `admin`. Un compte créé *après* avec un de ces
@@ -67,6 +136,18 @@ PocketBase `/_/`). Le lien « Admin » apparaît dans la navigation des comptes 
 * Ensuite, un admin peut promouvoir / rétrograder d'autres comptes dans
   *Admin → Utilisateurs* (on ne peut pas se retirer ses propres droits).
 * Un utilisateur ne peut jamais changer son propre rôle (refusé par le serveur).
+
+### Gérer les comptes (*Admin → Utilisateurs*)
+* Filtres **Tous / Admins / Suspendus / Non vérifiés**, recherche nom / e-mail ; badges Admin, Suspendu
+  (avec motif), Non vérifié, Google ; date d'inscription et de dernière connexion.
+* Menu « … » d'un compte : promouvoir / retirer admin, **envoyer un lien de réinitialisation** (e-mail ;
+  personne ne voit jamais de mot de passe ; nécessite SMTP), **forcer la déconnexion** (tous appareils),
+  **suspendre** (motif facultatif ; sessions coupées, connexion refusée « Compte suspendu ») / réactiver,
+  **supprimer le compte** (anonymisation : nom « Compte supprimé », e-mail, photo, coordonnées de
+  remboursement et lien Google effacés ; l'historique des commandes et les montants restent).
+* Garde-fous serveur : pas d'action sur son propre compte, jamais sur le dernier admin actif.
+* Chacun peut aussi supprimer son compte : *Profil → Mes infos → Supprimer mon compte* (taper SUPPRIMER ;
+  refusé tant qu'il héberge une commande en cours ou qu'on lui doit un remboursement).
 
 ### Ce qu'on peut faire
 * **Tableau de bord** : utilisateurs, restaurants, commandes par statut et par jour,

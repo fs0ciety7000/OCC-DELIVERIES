@@ -17,6 +17,7 @@ export const qk = {
   reorder: (partyId: string) => ['party', partyId, 'reorder'] as const,
   payout: (userId: string) => ['payout', userId] as const,
   authMethods: ['authMethods'] as const,
+  account: (userId: string) => ['account', userId] as const,
   admin: {
     all: ['admin'] as const,
     stats: ['admin', 'stats'] as const,
@@ -25,7 +26,8 @@ export const qk = {
     menu: (id: string) => ['admin', 'menu', id] as const,
     parties: (status: string, page: number) => ['admin', 'parties', status, page] as const,
     party: (id: string) => ['admin', 'party', id] as const,
-    users: (q: string, role: string) => ['admin', 'users', q, role] as const,
+    users: (q: string, filter: string) => ['admin', 'users', q, filter] as const,
+    mail: ['admin', 'mail'] as const,
     syncStatus: ['admin', 'sync', 'status'] as const,
     syncRuns: (page: number) => ['admin', 'sync', 'runs', page] as const,
     syncRun: (id: string) => ['admin', 'sync', 'run', id] as const,

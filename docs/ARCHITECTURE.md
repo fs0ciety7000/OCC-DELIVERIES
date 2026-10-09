@@ -73,14 +73,64 @@ Toutes les collections de base ont `created` / `updated` (autodate).
 | avatar | file | optionnel |
 | color | text | couleur d'avatar générée (`#RRGGBB`) si vide |
 | role | select `user` \| `admin` | `user` par défaut (hook) ; `admin` ouvre le panneau `/admin` |
+| banned | bool, **hidden** | compte suspendu (migration `1760000014`) : toute authentification et toute requête refusées (403 « Compte suspendu… ») |
+| banned_reason | text ≤ 300, **hidden** | motif (admins uniquement) |
+| banned_at | date, **hidden** | posé par le serveur à la suspension |
+| deleted_at | date, **hidden** | compte supprimé = **anonymisé** (voir §3 *Comptes*) |
+| password_set | bool, **hidden** | `false` pour un compte créé avec Google (mot de passe aléatoire) tant que son titulaire n'en a pas choisi un (lien « mot de passe oublié », changement depuis le profil) ; sert à interdire de dissocier Google d'un compte qui ne pourrait plus se connecter |
 
-Rules : list/view `@request.auth.id != ""` ; update/delete `id = @request.auth.id`.
+Champs **hidden** : jamais renvoyés par l'API des collections (même au titulaire), ignorés en écriture
+pour tout non-superuser ; lus par les endpoints `/api/occ/me/account` et `/api/occ/admin/users`.
+
+Rules : list/view `@request.auth.id != ""` ; update `id = @request.auth.id` ; **delete `nil`**
+(superuser seulement, migration `1760000014`) : la suppression passe par l'anonymisation
+(`POST /api/occ/me/delete`, `DELETE /api/occ/admin/users/{id}`), une suppression réelle casserait
+l'historique des commandes (hôte, lignes, paiements).
 Rôle : un hook refuse (403) toute création/modification de `role` par la collection
 si le demandeur n'est ni `admin` ni superuser ; les admins changent les rôles via
 `PATCH /api/occ/admin/users/{id}/role` (on ne peut pas retirer ses propres droits).
 Bootstrap : au démarrage, les comptes dont l'e-mail figure dans `OCC_ADMIN_EMAIL`
 ou `OCC_ADMINS` passent `admin` ; un compte créé plus tard avec un de ces e-mails
 (mot de passe, OAuth2, admin `/_/`) naît `admin`.
+
+### Comptes : Google, e-mails, suspension, suppression (`app/accounts.go`, `app/authsettings.go`)
+* **Google (OAuth2 PocketBase)** — au démarrage, si `OCC_GOOGLE_CLIENT_ID` **et** `OCC_GOOGLE_CLIENT_SECRET`
+  sont définis, le fournisseur `google` est activé sur `users` avec ces identifiants et les champs
+  `name` / `avatar` sont mappés (nom et photo Google à l'inscription). Sans ces variables, rien n'est
+  touché (une configuration faite dans `/_/` est conservée ; pour désactiver : `/_/` → *users* → *OAuth2*).
+  Flux « popup » du SDK : redirection vers `{OCC_PUBLIC_URL}/api/oauth2-redirect`.
+  - Premier passage : compte créé (`verified = true`, `password_set = false`, couleur, rôle `admin` si
+    l'e-mail est dans `OCC_ADMIN_EMAIL` / `OCC_ADMINS`) ; sans nom Google, nom déduit de l'e-mail
+    (`alice.dupont@…` → « Alice Dupont »). Pas d'e-mail de vérification.
+  - **Liaison par e-mail** (comportement PocketBase v0.40, `apis/record_auth_with_oauth2.go`, testé) : lien
+    Google déjà connu → ce compte ; sinon, connecté → lien ajouté au compte courant ; sinon compte de **même
+    e-mail** : s'il est **vérifié**, Google y est simplement lié (mot de passe conservé) ; s'il **n'est pas
+    vérifié**, PocketBase le lie mais **remplace son mot de passe par un mot de passe aléatoire** (protection
+    contre la prise de compte) et le marque vérifié → `password_set = false` (l'utilisateur peut en choisir
+    un via « Mot de passe oublié »).
+  - Compte suspendu : refusé avant toute liaison (403).
+  - Dissocier Google (`DELETE /api/occ/me/providers/google`, ou la collection `_externalAuths`) : refusé
+    (400) si c'est le dernier moyen de connexion d'un compte sans mot de passe choisi.
+* **E-mails** — SMTP lu au démarrage depuis `OCC_SMTP_*` / `OCC_MAIL_*` (appliqué seulement si
+  `OCC_SMTP_HOST` est défini ; aucun secret journalisé) ; `meta.appURL = OCC_PUBLIC_URL`. Modèles
+  **français** (`app/mailtemplates.go`, réinstallés à chaque démarrage) dont les liens visent la SPA :
+  vérification `{APP_URL}/auth/verifier/{TOKEN}`, mot de passe `{APP_URL}/auth/reinitialiser/{TOKEN}`,
+  changement d'adresse `{APP_URL}/auth/changer-email/{TOKEN}` ; alerte « nouvelle connexion » et code OTP
+  traduits. Inscription par mot de passe → e-mail de vérification si SMTP actif. **Politique** : un compte
+  non vérifié reste pleinement utilisable (bandeau discret « Confirme ton adresse e-mail » avec « Renvoyer »).
+  `GET /api/occ/config` expose `mailEnabled`.
+* **Suspension** — `banned = true` (endpoint admin, ou `/_/`) : le hook d'update fait tourner `tokenKey`
+  (tous les jetons émis deviennent invalides → 401, et les connexions realtime perdent leur auth) ;
+  `OnRecordAuthRequest` refuse toute authentification (mot de passe, Google, OTP, refresh) avec
+  **403 « Compte suspendu. Contacte un·e administrateur·rice d'OCC Deliveries. »** ; un middleware global
+  (juste après le chargement du jeton) refuse en 403 toute requête portant le jeton d'un compte suspendu
+  (défense en profondeur si `banned` est écrit sans passer par les hooks).
+* **Suppression = anonymisation** (`anonymizeUser`, en transaction) : `name` → « Compte supprimé »,
+  `email` → `deleted-<id>@occ.invalid` (unique, TLD réservé), avatar retiré, rôle `user`, mot de passe
+  aléatoire, `tokenKey` renouvelé, `banned = true`, `deleted_at`, `payout_profiles` supprimé, liens OAuth2,
+  origines de connexion, MFA et OTP supprimés. Parties, lignes de commande, votes et paiements sont
+  **conservés** (montants et totaux inchangés, le nom affiché devient « Compte supprimé »). Irréversible
+  (pas de réactivation). Une nouvelle connexion Google avec l'ancienne adresse crée un compte neuf.
 
 ### `payout_profiles` — coordonnées de remboursement (privées)
 | champ | type | notes |
@@ -440,7 +490,7 @@ PocketBase `{ "status": 400, "message": "…", "data": {} }`, messages en franç
 | méthode & route | auth | corps / query | réponse |
 |---|---|---|---|
 | `GET /api/occ/health` | — | | `{ "status": "ok", "version": "x.y.z" }` |
-| `GET /api/occ/config` | — | | `{ "currency":"EUR", "defaultLocation":{lat,lng,label}, "providers":[{id,name,color,enabled}], "minMenuItems": 10 }` (`minMenuItems` = seuil des cartes incomplètes, 0 = aucun) |
+| `GET /api/occ/config` | — | | `{ "currency":"EUR", "defaultLocation":{lat,lng,label}, "providers":[{id,name,color,enabled}], "minMenuItems": 10, "mailEnabled": true }` (`minMenuItems` = seuil des cartes incomplètes, 0 = aucun ; `mailEnabled` = SMTP configuré : vérification, mot de passe oublié, changement d'adresse disponibles) |
 | `GET /api/occ/restaurants/nearby` | — | `lat,lng,radiusKm(=5),q,cuisine` | `{ "items": [Restaurant & { "distanceKm": number }] }` triés par distance ; les positions approximatives (`geo_approx`) après les autres ; restaurants actifs uniquement, **sans les cartes incomplètes** (`items_count < minMenuItems` quand le seuil > 0) |
 | `POST /api/occ/parties/join` | ✔ | `{ "code": "K7M2QX" }` | `{ "party": Party, "alreadyMember": bool }` — idempotent : un **membre** retrouve sa party quel que soit son statut (`alreadyMember: true`, lien `/j/:code` réouvert) ; un nouveau venu seulement en lobby/voting/ordering/review |
 | `POST /api/occ/parties/{id}/leave` | membre (≠ hôte) | | `{ "ok": true }` — seulement en lobby/voting/ordering ; supprime ses votes/items |
@@ -454,6 +504,9 @@ PocketBase `{ "status": 400, "message": "…", "data": {} }`, messages en franç
 | `POST /api/occ/parties/{id}/reorder` | membre | | `{ "added": [{ name, quantity }], "skipped": [{ name, reason }] }` — status `ordering` (sinon 400) ; ajoute à **mon** panier les lignes encore valides de ma dernière commande ici (prix recalculés serveur, `ready` remis à false) ; **404** sans commande précédente |
 | `GET /api/occ/me/history` | ✔ | `page` (≥ 1), `perPage` (1–50, défaut 10) | `{ page, perPage, totalItems, totalPages, items: HistoryEntry[] }` — mes parties (membre, tous statuts), plus récentes d'abord |
 | `GET /api/occ/me/stats` | ✔ | | `MyStats` (ci-dessous) |
+| `GET /api/occ/me/account` | ✔ | | `{ email, verified, passwordSet, providers: [{ id, provider, created }], mailEnabled }` — sécurité du compte (Profil → Sécurité) |
+| `DELETE /api/occ/me/providers/{provider}` | ✔ | | `{ "ok": true }` — dissocie Google ; **400** si le compte n'a pas de mot de passe choisi et aucun autre lien ; **404** si non lié |
+| `POST /api/occ/me/delete` | ✔ | `{ "confirm": "SUPPRIMER" }` (casse et espaces ignorés) | **204** — anonymise son compte (RGPD, voir §3 *Comptes*) ; **400** sans le mot, si j'héberge une commande ni clôturée ni annulée, si des collègues me doivent encore un remboursement (commande `paying`), ou si je suis le dernier admin actif |
 | `POST /api/occ/payments/{id}/action` | voir | `{ "action": "declare"\|"confirm"\|"reset", "method"?: "qr"\|"revolut"\|"paypal"\|"link"\|"wero"\|"bancontact"\|"cash"\|"later" }` | `{ "payment": Payment }` |
 | `GET /api/occ/payments/{id}/qr` | membre | | `PaymentQR` |
 | `GET /api/occ/payments/{id}/wallet-qr/{kind}` | membre | `kind=wero\|bancontact` | image QR du payeur (stream, `Cache-Control: private`) ou 404 |
@@ -461,8 +514,15 @@ PocketBase `{ "status": 400, "message": "…", "data": {} }`, messages en franç
 | `POST /api/occ/admin/import` | admin | `RestaurantImport` **ou** `RestaurantImport[]` ; `?dryRun=1` | `{ "report": ImportReport, "restaurant": id, "items": n }` — upsert par slug, tout ou rien ; invalide → **400** `{ status, message, data, report }` (rien n'est écrit) ; en dry run → 200 avec `report.valid=false` |
 | `POST /api/occ/admin/import/csv` | admin | multipart `file` (CSV, voir ci-dessous) ; `?dryRun=1` | idem |
 | `GET /api/occ/admin/export` | admin | | `RestaurantImport[]` (tous les restaurants, actifs ou non, menus complets ; `Content-Disposition: attachment`) — réimportable tel quel |
-| `GET /api/occ/admin/users` | admin | `q` (nom/e-mail), `role`, `page`, `perPage` (≤ 200) | `{ page, perPage, totalItems, items: AdminUser[] }` (`AdminUser` = `id,name,email,role,color,avatar,verified,created,parties`) |
-| `PATCH /api/occ/admin/users/{id}/role` | admin | `{ "role": "user"\|"admin" }` | `{ "user": AdminUser }` (400 si on se retire ses propres droits) |
+| `GET /api/occ/admin/users` | admin | `q` (nom/e-mail, `%` `_` littéraux), `role` (`user`\|`admin`), `status` (`banned`\|`unverified`\|`deleted`), `page`, `perPage` (≤ 200) | `{ page, perPage, totalItems, items: AdminUser[] }`, plus récents d'abord (`AdminUser` ci-dessous) |
+| `PATCH /api/occ/admin/users/{id}/role` | admin | `{ "role": "user"\|"admin" }` | `{ "user": AdminUser }` (400 si on se retire ses propres droits, si c'est le dernier admin actif, ou si le compte est supprimé) |
+| `POST /api/occ/admin/users/{id}/ban` | admin | `{ "reason"?: string }` (≤ 300 car.) | `{ "user": AdminUser }` — suspend et déconnecte partout ; **400** soi-même, dernier admin actif, déjà suspendu, compte supprimé, motif trop long |
+| `POST /api/occ/admin/users/{id}/unban` | admin | | `{ "user": AdminUser }` — **400** si non suspendu ou supprimé |
+| `POST /api/occ/admin/users/{id}/logout` | admin | | `{ "user": AdminUser }` — « Forcer la déconnexion » : `tokenKey` renouvelé (tous les appareils) |
+| `POST /api/occ/admin/users/{id}/password-reset` | admin | | `{ "sent": true, "email": "…" }` — e-mail de réinitialisation envoyé à l'utilisateur (aucun mot de passe visible) ; **400** si SMTP non configuré (« L'envoi d'e-mails n'est pas configuré… ») ou envoi en échec |
+| `DELETE /api/occ/admin/users/{id}` | admin | | `{ "user": AdminUser }` — anonymisation (historique conservé) ; **400** soi-même (« depuis ton profil »), dernier admin actif, déjà supprimé |
+| `GET /api/occ/admin/mail` | admin | | `{ enabled, host, port, tls, senderAddress, senderName, fromEnv }` (jamais d'identifiant ni de mot de passe) |
+| `POST /api/occ/admin/mail/test` | admin | | `{ "sent": true, "to": "<e-mail du demandeur>" }` — e-mail de test à l'admin (ou superuser) connecté ; **400** sans SMTP ou en cas d'échec (message de l'erreur SMTP) |
 | `POST /api/occ/admin/parties/{id}/cancel` | admin | | `{ "party": Party }` — annulation forcée (400 si `closed`/`cancelled`) |
 | `GET /api/occ/admin/sync/status` | admin | | `{ enabled, cron, timezone: "Europe/Brussels", running: SyncRun\|null (avec logTail), lastRun: SyncRun\|null, nextRunAt: ISO\|null }` |
 | `GET /api/occ/admin/sync/runs` | admin | `page`, `perPage` (≤ 100, défaut 20) | `{ page, perPage, totalItems, items: SyncRun[] }` (sans `changes` ni `log`, avec `changesCount`), plus récent d'abord |
@@ -474,6 +534,25 @@ PocketBase `{ "status": 400, "message": "…", "data": {} }`, messages en franç
 | `POST /api/occ/admin/sync/sources` | admin | `{ "url": "https://www.site.be/", "label"?: string }` | **201** `{ "source": SyncSource, "created": true }` ; **200** `{ source, created: false }` si une source `takeaway-site` / `jsonld` lit déjà ce site (même hôte sans `www.`, même chemin : idempotent) ; 400 URL invalide ou takeaway.com. Crée `takeaway-site`, activée, ville `mons`, priorité = première libre entre 10 et 39 (39 si tout est pris), libellé = `label` ou l'hôte |
 
 « admin » = utilisateur `role = "admin"` **ou** superuser (401 sans auth, 403 sinon).
+« admin actif » = `role = "admin"`, ni suspendu ni supprimé : on ne peut jamais suspendre, rétrograder ni
+supprimer le **dernier** (même un superuser), ni agir sur son propre compte depuis l'administration
+(`domain.CheckModeration`, pur et testé).
+
+Endpoints PocketBase utilisés tels quels par le front (modèles d'e-mails ci-dessus) :
+`request-verification` / `confirm-verification`, `request-password-reset` / `confirm-password-reset`,
+`request-email-change` / `confirm-email-change` (mot de passe actuel requis ; toutes les sessions sont
+fermées), `auth-with-oauth2`, `auth-methods`, update `users` avec `oldPassword` (changement de mot de passe).
+
+### `AdminUser`
+```json
+{ "id": "…", "name": "Bob", "email": "bob@occ.be", "role": "user", "color": "#…", "avatar": "",
+  "verified": true, "created": "2026-10-01 10:00:00.000Z", "parties": 3,
+  "banned": true, "bannedReason": "spam", "bannedAt": "2026-10-09 08:00:00.000Z",
+  "deleted": false, "deletedAt": "", "passwordSet": true, "providers": ["google"],
+  "lastLoginAt": "2026-10-08 10:00:00.000Z" }
+```
+`lastLoginAt` = dernière origine de connexion connue (`_authOrigins`, mise à jour à chaque connexion par mot
+de passe / Google ; `""` si aucune).
 
 Règles `payments/{id}/action` :
 * `declare` — débiteur seulement. `method=qr|revolut|paypal|link|wero|bancontact|cash` → `status=declared` ; `method=later` → `status=pending`.
@@ -788,3 +867,10 @@ proche à la même adresse. Voir `docs/DEPLOYMENT.md`.
 | `OCC_SYNC_ON_START` | `true` | lance une synchronisation après le démarrage si aucune n'a encore réussi |
 | `OCC_SYNC_START_DELAY` | `60s` | délai de cette première synchronisation (durée Go) |
 | `OCC_ENRICH_ENABLED` | `true` | complète téléphone / adresse / position manquants depuis OpenStreetMap (Nominatim) à la fin de chaque synchronisation ; `false` = aucune requête vers Nominatim (sans effet si `OCC_SYNC_ENABLED=false`) |
+| `OCC_GOOGLE_CLIENT_ID` / `OCC_GOOGLE_CLIENT_SECRET` | — | client OAuth « Application Web » Google : active « Continuer avec Google » (les deux requis ; absents = configuration `/_/` inchangée) |
+| `OCC_SMTP_HOST` | — | serveur SMTP ; défini = e-mails activés (sinon réglages `/_/` inchangés) |
+| `OCC_SMTP_PORT` | `587` | `465` = TLS implicite par défaut |
+| `OCC_SMTP_USERNAME` / `OCC_SMTP_PASSWORD` | — | identifiants SMTP (jamais journalisés ; stockés dans les réglages PocketBase de `pb_data`) |
+| `OCC_SMTP_TLS` | `true` si port 465, sinon `false` | `true` = TLS implicite ; `false` = STARTTLS si le serveur le propose |
+| `OCC_MAIL_FROM` | `OCC_SMTP_USERNAME` s'il contient `@` | expéditeur (ex. `noreply@fs0ciety.org`) |
+| `OCC_MAIL_FROM_NAME` | `OCC Deliveries` | nom d'expéditeur |

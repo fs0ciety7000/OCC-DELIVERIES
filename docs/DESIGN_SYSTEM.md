@@ -172,11 +172,49 @@ un parcours critique, toutes interruptibles.
    * *Paiement* : ma part + QR EPC (montant + communication) / liens Revolut, PayPal
      avec montant / Wero, Bancontact Pay / espèces / plus tard ; vue payeur avec ses
      moyens visibles, la liste des parts (moyen déclaré en badge) et confirmation.
-5. **Profil** — en-tête (avatar, nom, e-mail) puis onglets : *Mes commandes* (4 tuiles
+5. **Authentification** (`features/auth`, mise en page `AuthLayout` : titre display 32 px centré, carte,
+   pied `muted`) — *Connexion* : lien `text-brand` « Mot de passe oublié ? » aligné à droite sous le mot de
+   passe (pré-remplit l'e-mail saisi) ; identifiants refusés → « E-mail ou mot de passe incorrect. », compte
+   suspendu → message serveur « Compte suspendu… ». *Inscription* : jauge de robustesse (`StrengthMeter` :
+   3 segments 6 px `danger` / `warning` / `success`, libellé « Robustesse : Faible / Correct / Solide » + conseil
+   `muted`, `aria-live`), toast de bienvenue avec rappel de l'e-mail de confirmation. **« Continuer avec
+   Google »** : bouton `secondary` pleine largeur sous un séparateur « ou », affiché seulement si le serveur
+   l'annonce ; fenêtre surgissante ouverte dans le clic, pop-up bloquée → toast d'erreur explicite (8 s) ;
+   pendant l'attente « Termine la connexion dans la fenêtre qui s'est ouverte. **Annuler** ».
+   Pages des liens d'e-mail (`/auth/mot-de-passe-oublie`, `/auth/reinitialiser/:token`,
+   `/auth/verifier/:token`, `/auth/changer-email/:token`) : formulaire court (un seul `primary` `lg` pleine
+   largeur) puis **état de résultat** (`Outcome`) — pastille ronde 56 px (`success/12` coche, `danger/12`
+   triangle, `info/12` enveloppe), titre display 20 px, texte `muted`, action suivante (`primary` « Se
+   connecter » / « C'est parti », `secondary` sinon) ; `role="status"` ou `alert`. Nouveau mot de passe :
+   `PasswordFields` (nouveau + confirmation, erreurs seulement après saisie, bouton désactivé tant que
+   invalide). Lien expiré : encadré `danger/10` + lien « Nouveau lien ». Tout l'espace `/auth/*` masque le
+   bandeau « Commande en cours » et le CTA d'en-tête.
+   **Bandeau « Confirme ton adresse e-mail »** (`VerifyEmailBanner`) : `aside` `warning/10` bord
+   `warning/30`, icône `MailWarning`, texte court + adresse en `muted`, bouton `ghost sm` « Renvoyer
+   l'e-mail » (→ « Envoyé »), croix 36 px « Masquer ce rappel » (session) dans le shell ; non masquable dans
+   le profil. Affiché seulement si le compte n'est pas vérifié **et** que le serveur envoie des e-mails :
+   on rappelle, on ne bloque jamais.
+   **E-mails** (`backend/internal/app/mailtemplates.go`) : palette « Ember » claire en styles en ligne (les
+   clients mail ignorent les variables CSS) — fond `#FAF8F4`, carte blanche `radius 20px`, titre 24 px 750,
+   bouton dégradé braise → ambre, texte `#1A0B05` (= `brand-fg`, AA), lien brut de secours en `brand-ink`,
+   pied « Développé par OCC MONS Studios ». Ton tutoyé, durée de validité rappelée, « Ignore cet e-mail »
+   si ce n'est pas toi.
+6. **Profil** — en-tête (avatar, nom, e-mail) puis onglets : *Mes commandes* (4 tuiles
    chiffrées — Commandes, Dépensé, Resto chouchou, Plat préféré —, puis cartes d'historique
    10 par 10 avec « Voir plus de commandes », état vide illustré par l'assiette + « Lancer une
-   commande ») ; *Mes infos* (nom, couleur, coordonnées de remboursement, thème, déconnexion).
-6. **Administration** (`/admin`, rôle `admin`) — mêmes tokens et composants, densité
+   commande ») ; *Mes infos* (nom, couleur, coordonnées de remboursement, **Sécurité**, **Supprimer mon
+   compte**, thème, déconnexion). Carte *Sécurité* en trois sections bordées (titres `h3` avec icône braise
+   16 px) : *Adresse e-mail* (adresse + badge `success` Vérifiée / `warning` Non vérifiée, « Renvoyer
+   l'e-mail de confirmation » en `ghost sm`, champ « Nouvelle adresse » + `secondary` « Changer d'adresse ») ;
+   *Mot de passe* (actuel + `PasswordFields`, `secondary` « Changer le mot de passe » ; compte Google sans mot
+   de passe : texte explicatif + « Recevoir un lien pour choisir un mot de passe ») ; *Comptes connectés*
+   (ligne `elevated/40` par fournisseur : badge `success` « Google connecté » + « depuis … » + `ghost`
+   « Dissocier » — désactivé avec explication sans mot de passe —, ou `secondary` « Associer Google »).
+   Fonctionnalités indisponibles sans SMTP : phrase `subtle` au lieu du formulaire. Carte *Supprimer mon
+   compte* bordée `danger/30` (icône `ShieldAlert`), explication de l'anonymisation, bouton `danger` →
+   `Sheet` « Supprimer ton compte ? » avec champ « Tape SUPPRIMER pour confirmer » (autofocus) ; le bouton
+   `danger` « Supprimer définitivement » reste désactivé tant que le mot n'est pas tapé.
+7. **Administration** (`/admin`, rôle `admin`) — mêmes tokens et composants, densité
    plus « outil » (listes compactes, actions icônes 44 px avec `aria-label`).
    * *Mise en page* : barre latérale 220 px (≥ 768 px, entrées `rounded-md`, icône braise
      sur l'entrée active) ; en mobile, onglets en pills défilants horizontalement sous
@@ -241,8 +279,20 @@ un parcours critique, toutes interruptibles.
      Rien trouvé : encadré « Aucun site Takeaway trouvé. », renvoi vers « Ajouter une source » et
      `details` « N adresses vérifiées » (badges de statut neutres / `warning` / `danger`).
    * *Commandes* : chips de statut, lignes cliquables vers le détail, annulation forcée
-     (icône `Ban`, confirmation). *Utilisateurs* : recherche, filtre de rôle, bouton
-     « Promouvoir / Retirer admin » (désactivé pour soi-même).
+     (icône `Ban`, confirmation).
+   * *Utilisateurs* : carte **E-mails** en tête (pastille `Mail` 40 px `success` / `warning`, badge Actifs /
+     Désactivés, expéditeur et serveur en `subtle` — ou les variables à renseigner —, `secondary sm`
+     « Envoyer un e-mail de test », désactivé sans SMTP, `aria-live`). Recherche + `Segmented` « Tous / Admins /
+     Suspendus / Non vérifiés » (défilant en mobile). Lignes : avatar 40 px, nom, badges `brand` Admin,
+     Toi, `danger` Suspendu (ou neutre Supprimé, ligne à 70 % d'opacité), `warning` Non vérifié, `info`
+     Google ; méta `subtle` (e-mail · commandes · inscrit · connecté il y a …) ; motif de suspension en
+     `danger` 12 px. Une seule action par ligne : bouton icône 44 px `MoreHorizontal` (« Actions pour X »)
+     → `Sheet` titrée du nom, liste d'actions 48 px (icône 20 px + libellé gras + aide `muted`) :
+     Promouvoir / Retirer admin, Envoyer un lien de réinitialisation, Forcer la déconnexion, Réactiver ou
+     **Suspendre** (`danger`), **Supprimer le compte** (`danger`) — actions interdites désactivées avec
+     leur raison (son propre compte, e-mails coupés). Confirmations en `Sheet` (« Suspendre Bob ? » avec
+     `Textarea` « Motif » facultatif ≤ 300 ; « Supprimer le compte de Bob ? » qui rappelle que l'historique
+     reste et que c'est irréversible) : `secondary` Annuler + `danger` / `primary` à droite.
 
 ## 5. Ton éditorial
 

@@ -1,3 +1,4 @@
+import { ClientResponseError } from 'pocketbase'
 import { useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -49,7 +50,8 @@ export function LoginPage() {
             await usersApi.login(email.trim(), password)
             done()
           } catch (err) {
-            setError(errorMessage(err, 'E-mail ou mot de passe incorrect.'))
+            // 400 = identifiants refusés (message PocketBase en anglais) ; 403 = compte suspendu (message serveur)
+            setError(err instanceof ClientResponseError && err.status === 400 ? 'E-mail ou mot de passe incorrect.' : errorMessage(err, 'E-mail ou mot de passe incorrect.'))
           } finally {
             setBusy(false)
           }
@@ -58,9 +60,16 @@ export function LoginPage() {
         <Field label="E-mail">
           {(p) => <Input {...p} type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="prenom@entreprise.be" />}
         </Field>
-        <Field label="Mot de passe" error={error}>
-          {(p) => <Input {...p} type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />}
-        </Field>
+        <div className="space-y-1.5">
+          <Field label="Mot de passe" error={error}>
+            {(p) => <Input {...p} type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />}
+          </Field>
+          <p className="text-right text-sm">
+            <Link to={`/auth/mot-de-passe-oublie${email.trim() ? `?email=${encodeURIComponent(email.trim())}` : ''}`} className="font-semibold text-brand hover:underline">
+              Mot de passe oublié ?
+            </Link>
+          </p>
+        </div>
         <Button type="submit" block size="lg" loading={busy}>
           Se connecter
         </Button>

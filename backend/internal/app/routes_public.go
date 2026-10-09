@@ -43,6 +43,8 @@ func (h *handlers) config(e *core.RequestEvent) error {
 		"providers": list,
 		// restaurants with fewer available items are hidden from /nearby (0 = none)
 		"minMenuItems": minMenuItems(e.App),
+		// e-mails (verification, password reset…) can be sent
+		"mailEnabled": mailEnabled(e.App),
 	})
 }
 
