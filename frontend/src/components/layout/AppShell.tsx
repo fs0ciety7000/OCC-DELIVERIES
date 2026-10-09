@@ -87,17 +87,19 @@ export function AppShell() {
         <Suspense fallback={<FoodLoader className="py-24" />}>
           <Outlet />
         </Suspense>
-        <footer className="mt-16 border-t border-border pt-6 text-center text-xs text-subtle">
-          Développé par{' '}
+        <footer className="mt-16 border-t border-border pt-6 text-xs text-subtle">
           <a
             href="https://studios.fs0ciety.org/"
             target="_blank"
             rel="noopener noreferrer"
-            className="font-semibold text-muted underline-offset-4 hover:text-fg hover:underline focus-visible:text-fg"
+            className="group mx-auto flex w-fit items-center gap-2.5 rounded-md py-1 underline-offset-4 focus-visible:text-fg"
           >
-            OCC MONS Studios
-          </a>{' '}
-          · © {new Date().getFullYear()}
+            <img src="/brand/occ-mons-studios.webp" alt="" width={20} height={33} className="h-10 w-auto transition-transform group-hover:scale-105 motion-reduce:transition-none" />
+            <span>
+              Développé par <span className="font-semibold text-muted group-hover:text-fg group-hover:underline">OCC MONS Studios</span> · ©{' '}
+              {new Date().getFullYear()}
+            </span>
+          </a>
         </footer>
       </main>
 
