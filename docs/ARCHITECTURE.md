@@ -40,9 +40,10 @@ backend/
     epc.go / iban.go         payload QR EPC (SEPA), validation IBAN
     geo.go                   haversine
   internal/providers/        adaptateurs Uber Eats / Takeaway / Deliveroo / weloveat / manuel + tests
-  internal/menusync/         lecture des flux restaurants + menus (Deliveroo, weloveat, sites) + tests
+  internal/menusync/         lecture des flux restaurants + menus (Deliveroo, weloveat, sites), normalisation, fusion + tests
+  internal/feedsync/         synchronisation : lecture des sources + réconciliation pure avec la base + tests
   cmd/menusync/              outil CLI `menusync` (binaire séparé, /pb/menusync dans l'image)
-  internal/app/              hooks PocketBase + routes /api/occ (glue)
+  internal/app/              hooks PocketBase + routes /api/occ (glue) ; sync.go = planification / exécution de la synchronisation
   internal/catalog/           import / export des menus (JSON, CSV, rapport de validation)
   migrations/                migrations Go (schéma, seed démo, rôles admin, données réelles)
     data/                    mons_restaurants.json (données réelles embarquées)
@@ -115,13 +116,19 @@ membres de la party concernée. Hook : `wero_id` / `bancontact_phone` normalisé
 | min_order | number int | cents |
 | providers | json | `[{ "id": "ubereats"|"takeaway"|"deliveroo"|"weloveat", "url": "https://…" }]` |
 | active | bool | |
+| source_key | text (index) | synchronisation : clé stable `<source>:<url normalisée>` (ex. `takeaway-site:tomomons.be`) |
+| sources | json | synchronisation : `[{ "provider": "deliveroo", "url": "https://…", "checked_at": "2026-10-09" }]` |
+| locked | bool | verrouillé : la synchronisation ne le modifie plus (posé par toute modification admin) |
+| stale_since | date | obsolète : plus proposé par aucune source activée depuis cette date (vide sinon) ; reste actif |
 
 Rules : list/view `active = true || @request.auth.role = "admin"` ;
 create/update/delete `@request.auth.role = "admin"` (superusers : toujours).
 Hooks (écritures via la collection) : slug/nom normalisés, slug unique (message clair),
-`cuisines` nettoyées (minuscules, sans doublon), `providers` limités à
-`ubereats`/`takeaway` en `https://` (liens vides retirés), `eta_min ≤ eta_max` ;
+`cuisines` nettoyées (minuscules, sans doublon), `providers` limités aux plateformes
+(`ubereats`, `takeaway`, `deliveroo`, `weloveat`) en `https://` (liens vides retirés), `eta_min ≤ eta_max` ;
 **suppression refusée** si le restaurant apparaît dans une party (le désactiver).
+**Verrouillage automatique** : une modification (update) via l'API pose `locked = true`, sauf
+si la requête envoie elle-même `locked` (interrupteur) ou ne touche que `active` / `locked`.
 
 ### `menu_categories` (lecture publique)
 `restaurant` R(restaurants, cascade) · `name` · `position` int.
@@ -135,7 +142,7 @@ Supprimer une catégorie ne supprime pas ses articles (ils passent « sans caté
 | category | R(menu_categories) | |
 | name | text req | |
 | description | text | |
-| price | number int req | cents (prix de base) |
+| price | number int ≥ 0 | cents (prix de base ; 0 permis quand le prix est dans les options — migration `1760000005`) |
 | emoji | text | |
 | image | file | optionnel |
 | tags | json `string[]` | `veggie`, `vegan`, `spicy`, `gluten_free`, `new`… |
@@ -143,10 +150,15 @@ Supprimer une catégorie ne supprime pas ses articles (ils passent « sans caté
 | popular | bool | |
 | available | bool | |
 | position | number int | |
+| source_key | text | synchronisation : clé du plat dans son restaurant (slug du nom, `--<catégorie>` si le nom se répète) |
+| sources | json | synchronisation : source du menu (`[{ provider, url, checked_at }]`) |
+| locked | bool | verrouillé : jamais modifié par la synchronisation |
 
 Rules : list/view `""` ; create/update/delete `@request.auth.role = "admin"`.
 Hook : `option_groups` validés (`domain.ValidateOptionGroups`), `tags` nettoyés,
 la catégorie doit appartenir au même restaurant, `restaurant` immuable.
+**Verrouillage automatique** : création ou modification via l'API → `locked = true`, sauf si la
+requête envoie `locked` ou ne touche que `position`.
 
 ```json
 "option_groups": [
@@ -157,6 +169,66 @@ la catégorie doit appartenir au même restaurant, `restaurant` immuable.
     "choices": [ { "id": "cheese", "name": "Fromage", "price": 150 } ] }
 ]
 ```
+
+### `sync_sources` — sources de la synchronisation (admin)
+| champ | type | notes |
+|---|---|---|
+| provider | select req | `deliveroo`, `weloveat`, `takeaway-site`, `jsonld` |
+| label | text | nom affiché (défaut : le fournisseur) |
+| url | text | page liste Deliveroo de la ville ; racine de l'API weloveat (vide = `https://api.weloveat.be/api/`) ; site du restaurant (`takeaway-site`, `jsonld`) — `https://` requis sauf weloveat |
+| city | text | ville de recherche (`mons`, seule connue ; défaut) — rayon 8 km |
+| priority | number int | plus petit = lu en premier et menu préféré quand un restaurant est sur plusieurs sources |
+| enabled | bool | |
+| options | bool | requêtes supplémentaires pour les options (suppléments weloveat : 1 requête par plat) ; défaut `false` |
+| last_run_at | date | **serveur** |
+| last_status | text | **serveur** : `ok: 40 restaurants`, `blocked: …`, `failed: …` |
+
+Rules : toutes `@request.auth.role = "admin"`. Hook : fournisseur, URL et ville validés,
+`last_*` non modifiables via l'API. Seed (`1760000005`) : un `takeaway-site` par URL de
+`migrations/data/mons_takeaway_sites.txt` (priorités 10…), Deliveroo Mons (50), weloveat Mons (60).
+
+### `sync_runs` — exécutions de la synchronisation
+| champ | type | notes |
+|---|---|---|
+| started_at, finished_at | date | |
+| status | select | `running`, `success`, `partial`, `failed`, `blocked` |
+| trigger | select | `cron`, `manual`, `startup` |
+| stats | json | `SyncStats` : `{ restaurants_created, restaurants_updated, restaurants_stale, items_created, items_updated, items_price_changed, items_unavailable }` |
+| changes | json | ≤ 500 diffs lisibles (`"Tomo — Miso ramen : 14,50 € → 15,00 €"`, `"X : nouveau restaurant (52 plats)"`, `"… : retiré de la carte (indisponible)"`) |
+| sources | json | `SyncSourceResult[]` : `{ id, label, provider, url, status: "ok"\|"blocked"\|"failed", message, restaurants, network, cached, durationMs }` |
+| log | text | journal (≤ 150 000 car., mis à jour toutes les 5 s pendant l'exécution) |
+| error | text | |
+
+Rules : list/view `@request.auth.role = "admin"` ; écriture **serveur uniquement** (rules `nil`).
+Une exécution `running` trouvée au démarrage passe `failed` (« interrompue »).
+
+### Synchronisation automatique (`internal/feedsync` + `internal/app/sync.go`)
+1. Sources activées triées par priorité, lues **une par une** par un seul `menusync.Fetcher`
+   (politesse §6) ; 403 / page anti-robot → source `blocked`, erreur ou 0 restaurant → `failed`,
+   les suivantes sont lues quand même.
+2. Fusion (`menusync.MergeIn`, priorité des sources) puis **réconciliation pure**
+   (`feedsync.Reconcile`, testée sur fixtures) contre un instantané de la base :
+   * rapprochement : `source_key`, puis lien plateforme / page source identique, puis
+     nom + position (`menusync.SameRestaurant`) — deux passes pour qu'un rapprochement flou ne
+     prenne pas la fiche liée à une autre clé ;
+   * restaurant verrouillé : ignoré (ni modifié, ni marqué obsolète) ;
+   * champs « éditoriaux » (nom, description, emoji, adresse, coordonnées, téléphone, cuisines,
+     image) remplis seulement s'ils sont vides ; note, nombre d'avis, frais, minimum, délai
+     suivent la source quand elle a une valeur ; liens plateformes ajoutés ; jamais de valeur vide ;
+   * plats (non verrouillés) rapprochés par `source_key` puis nom : prix, description, options
+     (si la source en a), disponibilité, populaire, catégorie suivent la source ; nouveaux plats
+     et catégories créés ; plats absents → `available = false` (jamais supprimés) ; menu vide
+     côté source → aucun changement ;
+   * restaurant connu d'une source (`sources` non vide) qu'aucune source ne renvoie →
+     `stale_since` (sauf si un de ses fournisseurs a échoué / été bloqué pendant l'exécution) ;
+     réapparition → effacé.
+3. Écriture **par restaurant dans une transaction** (`RunInTransaction`) ; un enregistrement
+   verrouillé entre-temps est laissé tel quel.
+4. Planification : job `app.Cron()` chaque minute qui vérifie `OCC_SYNC_CRON` à l'heure de
+   **Europe/Brussels** (le cron PocketBase est en UTC ; `time/tzdata` embarqué). Une seule
+   exécution à la fois (verrou en mémoire ; manuel → 409, tick cron ignoré). Exécution en
+   goroutine (jamais dans une requête), annulée proprement à l'arrêt. Cache disque
+   `pb_data/menusync-cache`, TTL 20 h.
 
 ### `parties` — une commande groupée
 | champ | type | notes |
@@ -294,6 +366,10 @@ PocketBase `{ "status": 400, "message": "…", "data": {} }`, messages en franç
 | `GET /api/occ/admin/users` | admin | `q` (nom/e-mail), `role`, `page`, `perPage` (≤ 200) | `{ page, perPage, totalItems, items: AdminUser[] }` (`AdminUser` = `id,name,email,role,color,avatar,verified,created,parties`) |
 | `PATCH /api/occ/admin/users/{id}/role` | admin | `{ "role": "user"\|"admin" }` | `{ "user": AdminUser }` (400 si on se retire ses propres droits) |
 | `POST /api/occ/admin/parties/{id}/cancel` | admin | | `{ "party": Party }` — annulation forcée (400 si `closed`/`cancelled`) |
+| `GET /api/occ/admin/sync/status` | admin | | `{ enabled, cron, timezone: "Europe/Brussels", running: SyncRun\|null (avec logTail), lastRun: SyncRun\|null, nextRunAt: ISO\|null }` |
+| `GET /api/occ/admin/sync/runs` | admin | `page`, `perPage` (≤ 100, défaut 20) | `{ page, perPage, totalItems, items: SyncRun[] }` (sans `changes` ni `log`, avec `changesCount`), plus récent d'abord |
+| `GET /api/occ/admin/sync/runs/{id}` | admin | | `{ "run": SyncRun }` complet (`changes`, `log`) ; 404 sinon |
+| `POST /api/occ/admin/sync/run` | admin | | **202** `{ "run": SyncRun }` (status `running`, exécution en arrière-plan) ; **409** si une exécution tourne ; 400 si `OCC_SYNC_ENABLED=false` |
 
 « admin » = utilisateur `role = "admin"` **ou** superuser (401 sans auth, 403 sinon).
 
@@ -404,6 +480,19 @@ est remplacé par celui du fichier ; un article du même nom garde ses `option_g
 (et son emoji / sa description si la colonne est absente). Les options se gèrent
 dans l'éditeur de menu ou en JSON.
 
+### `SyncRun`
+```json
+{ "id": "…", "started_at": "2026-10-09 01:30:00.000Z", "finished_at": "2026-10-09 01:38:12.000Z",
+  "status": "partial", "trigger": "cron",
+  "stats": { "restaurants_created": 0, "restaurants_updated": 12, "restaurants_stale": 1, "items_created": 4,
+             "items_updated": 31, "items_price_changed": 9, "items_unavailable": 6 },
+  "sources": [{ "id": "…", "label": "Deliveroo — Mons", "provider": "deliveroo", "url": "https://…",
+                "status": "blocked", "message": "accès refusé par … (HTTP 403)", "restaurants": 0,
+                "network": 2, "cached": 0, "durationMs": 3100 }],
+  "changesCount": 50, "changes": ["Tomo — Miso ramen : 14,50 € → 15,00 €"], "log": "…", "error": "" }
+```
+Les sources (`sync_sources`) se gèrent par la collection (rules admin).
+
 ### `AdminStats`
 ```json
 { "users": 42, "admins": 2, "restaurants": { "total": 13, "active": 12 }, "menuItems": 183,
@@ -445,14 +534,20 @@ sont ignorées (journalisées) sans bloquer le démarrage. Sur une installation 
 avec des données réelles, le seed de démo (`1760000001`) ne fait rien.
 Les plateformes de `restaurants.providers` sont celles de `providers.Platforms`.
 
-**Flux de menus (`menusync`)** — outil séparé, jamais appelé par le serveur : il lit
+**Flux de menus (`menusync`)** — bibliothèque utilisée par la synchronisation automatique
+du serveur (§3 *Synchronisation automatique*) et par l'outil en ligne de commande : il lit
 les pages publiques (Deliveroo : `__NEXT_DATA__` des pages liste et menu ; weloveat :
 l'API JSON anonyme qu'appelle la SPA ; sites satellites Takeaway : microdonnées
 schema.org ; sites quelconques : JSON-LD/microdonnées), produit des `RestaurantImport`
 (+ `source`, `source_urls`, `menu_checked_at`, ignorés par l'import), fusionne les
 sources (`menusync merge`) et peut importer via l'endpoint admin. Politesse obligatoire :
 User-Agent identifié, requêtes séquentielles ≥ 2,5 s, robots.txt appliqué, cache disque,
-arrêt net sur 403 / page anti-robot (aucun contournement). Voir `docs/DEPLOYMENT.md`.
+arrêt net sur 403 / page anti-robot (aucun contournement). Normalisation : noms (ALL-CAPS →
+casse française, sigles courts conservés, suffixes de ville / zone retirés), cuisines (minuscules,
+synonymes et pluriels unifiés, tags génériques retirés s'il y en a d'autres, 4 au plus), plats
+(espaces, 0 € sans options retirés, doublons d'une catégorie retirés). Doublons entre sources :
+même lien plateforme ou page source, même nom normalisé ≤ 1,5 km, nom proche ≤ 300 m, ou nom
+proche à la même adresse. Voir `docs/DEPLOYMENT.md`.
 
 ## 7. Configuration (variables d'environnement)
 
@@ -465,3 +560,7 @@ arrêt net sur 403 / page anti-robot (aucun contournement). Voir `docs/DEPLOYMEN
 | `OCC_SEED_DEMO` | `true` | charge les restaurants de démo au 1er démarrage (ignoré si `migrations/data` contient des restaurants réels) |
 | `OCC_PROVIDERS` | `ubereats,takeaway,deliveroo,weloveat` | plateformes de livraison activées (config + dispatch) |
 | `OCC_PUBLIC_DIR` | `./pb_public` | dossier de la SPA |
+| `OCC_SYNC_ENABLED` | `true` | synchronisation automatique des restaurants / menus ; `false` = aucune requête sortante, déclenchement manuel refusé |
+| `OCC_SYNC_CRON` | `30 3 * * *` | planification (cron 5 champs) lue à l'heure de **Europe/Brussels** |
+| `OCC_SYNC_ON_START` | `true` | lance une synchronisation après le démarrage si aucune n'a encore réussi |
+| `OCC_SYNC_START_DELAY` | `60s` | délai de cette première synchronisation (durée Go) |

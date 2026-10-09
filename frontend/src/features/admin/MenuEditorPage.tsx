@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, ArrowLeft, ArrowUp, Check, ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowUp, Check, ExternalLink, Lock, LockOpen, Pencil, Plus, Trash2, TriangleAlert } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router'
 import { toast } from 'sonner'
@@ -84,7 +84,9 @@ export function MenuEditorPage() {
   const moveCategory = (index: number, delta: number) => run.mutate(() => persistOrder(move(cats, index, delta), (cid, position) => adminApi.saveCategory(cid, { position })))
   const moveItem = (list: MenuItem[], index: number, delta: number) => run.mutate(() => persistOrder(move(list, index, delta), (iid, position) => adminApi.saveItem(iid, { position })))
   const patchItem = (item: MenuItem, data: Partial<MenuItem>) => {
-    qc.setQueryData<Menu>(qk.admin.menu(id), (old) => old && { ...old, items: old.items.map((x) => (x.id === item.id ? { ...x, ...data } : x)) })
+    // toute modification d'un article le verrouille côté serveur (sauf l'interrupteur lui-même)
+    const next = 'locked' in data ? data : { ...data, locked: true }
+    qc.setQueryData<Menu>(qk.admin.menu(id), (old) => old && { ...old, items: old.items.map((x) => (x.id === item.id ? { ...x, ...next } : x)) })
     run.mutate(() => adminApi.saveItem(item.id, data))
   }
 
@@ -99,6 +101,16 @@ export function MenuEditorPage() {
           description={
             <span className="flex flex-wrap items-center gap-2">
               {!r.active && <Badge>Masqué</Badge>}
+              {r.locked && (
+                <Badge variant="info">
+                  <Lock className="size-3" aria-hidden /> Verrouillé
+                </Badge>
+              )}
+              {r.stale_since && (
+                <Badge variant="warning">
+                  <TriangleAlert className="size-3" aria-hidden /> Obsolète
+                </Badge>
+              )}
               <span>{plural(items.length, 'article')} · {plural(cats.length, 'catégorie')}</span>
             </span>
           }
@@ -184,6 +196,17 @@ export function MenuEditorPage() {
                     <Money cents={it.price} className="font-semibold" />
                     <div className="flex items-center gap-1">
                       <Toggle checked={it.available} onChange={(v) => patchItem(it, { available: v })} label={`Disponible : ${it.name}`} />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-pressed={!!it.locked}
+                        aria-label={`Verrouillé (hors synchronisation) : ${it.name}`}
+                        title={it.locked ? 'Verrouillé : la synchronisation ne le modifie pas' : 'Suit la synchronisation'}
+                        onClick={() => patchItem(it, { locked: !it.locked })}
+                        className={it.locked ? 'text-info' : 'text-subtle'}
+                      >
+                        {it.locked ? <Lock className="size-4" /> : <LockOpen className="size-4" />}
+                      </Button>
                       <Button variant="ghost" size="icon" aria-pressed={it.popular} aria-label={`Populaire : ${it.name}`} onClick={() => patchItem(it, { popular: !it.popular })} className={it.popular ? 'text-brand' : 'text-subtle'}>
                         <span aria-hidden>{it.popular ? '★' : '☆'}</span>
                       </Button>

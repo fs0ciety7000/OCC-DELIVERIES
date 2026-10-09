@@ -33,8 +33,15 @@ var WeloveatCities = map[string]WeloveatCity{
 	"mons": {Address: "Grand-Place, 7000 Mons, Belgique", PostalCode: "7000", Locality: "Mons", Lat: 50.4542, Lng: 3.9567},
 }
 
+// API paths, relative to WeloveatAPI.
+const (
+	weloveatSearchPath    = "test/searchEstablishments?page=1"
+	weloveatCataloguePath = "products/getFoundEstablishmentProducts"
+	weloveatProductPath   = "products/"
+)
+
 // WeloveatSearchURL lists establishments (POST, page 1, server returns all).
-func WeloveatSearchURL() string { return WeloveatAPI + "test/searchEstablishments?page=1" }
+func WeloveatSearchURL() string { return WeloveatAPI + weloveatSearchPath }
 
 // WeloveatSearchBody is the body the SPA posts to search establishments.
 func WeloveatSearchBody(c WeloveatCity) []byte {
@@ -47,7 +54,7 @@ func WeloveatSearchBody(c WeloveatCity) []byte {
 }
 
 // WeloveatCatalogueURL returns a shop's categories and products (POST).
-func WeloveatCatalogueURL() string { return WeloveatAPI + "products/getFoundEstablishmentProducts" }
+func WeloveatCatalogueURL() string { return WeloveatAPI + weloveatCataloguePath }
 
 // WeloveatCatalogueBody is the body the SPA posts for a shop catalogue.
 func WeloveatCatalogueBody(slug string, c WeloveatCity) []byte {
@@ -59,7 +66,9 @@ func WeloveatCatalogueBody(slug string, c WeloveatCity) []byte {
 }
 
 // WeloveatProductURL returns a product with its supplements (GET).
-func WeloveatProductURL(productSlug string) string { return WeloveatAPI + "products/" + productSlug }
+func WeloveatProductURL(productSlug string) string {
+	return WeloveatAPI + weloveatProductPath + productSlug
+}
 
 // WeloveatPageURL is the public restaurant page of the SPA.
 func WeloveatPageURL(slug string) string { return WeloveatSite + "/" + slug }

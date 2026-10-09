@@ -73,6 +73,17 @@ docker compose up --build         # http://localhost:8090
 Les apprentissages importants (pièges PocketBase, décisions d'UX) sont ajoutés
 ci-dessous, du plus récent au plus ancien.
 
+* 2026-10-09 — **Synchronisation automatique** des restaurants / menus dans le serveur
+  (`internal/feedsync` + `app/sync.go`, page `/admin/synchronisation`, ADR 0002 mise à jour 2).
+  - réconciliation pure (`feedsync.Reconcile`) testée sur fixtures ; écriture par restaurant en transaction ;
+  - `locked` posé par les hooks catalogue sur toute modification admin (sauf `active` / `position` / `locked` seuls) ;
+  - cron PocketBase en **UTC** : job chaque minute + `cron.NewSchedule(...).IsDue` à l'heure de Bruxelles
+    (`time/tzdata` importé pour l'image alpine) ;
+  - `NumberField{Required:true}` refusant 0, `menu_items.price` devient optionnel (min 0) ;
+  - le hook restaurants refusait les liens Deliveroo / weloveat (corrigé : `providers.IsPlatform`) ;
+  - tests : sources pointées sur un `httptest.Server` servant les fixtures `menusync/testdata`,
+    `Fetcher.Sleep` remplacé (aucune vraie pause, aucun réseau).
+
 * 2026-10-09 — **Panneau `/admin`** + rôle `users.role` (`user`/`admin`). Bootstrap par
   `OCC_ADMIN_EMAIL` / `OCC_ADMINS` (au démarrage et à l'inscription). Rules catalogue
   `@request.auth.role = "admin"` ; lecture des parties ouverte aux admins (`… || @request.auth.role = "admin"`).

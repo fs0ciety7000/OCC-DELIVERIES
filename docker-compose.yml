@@ -17,6 +17,9 @@ services:
       OCC_DEFAULT_LABEL: ${OCC_DEFAULT_LABEL:-Mons}
       OCC_SEED_DEMO: ${OCC_SEED_DEMO:-true}
       OCC_PROVIDERS: ${OCC_PROVIDERS:-ubereats,takeaway,deliveroo,weloveat}
+      OCC_SYNC_ENABLED: ${OCC_SYNC_ENABLED:-true}
+      OCC_SYNC_CRON: ${OCC_SYNC_CRON:-30 3 * * *}
+      OCC_SYNC_ON_START: ${OCC_SYNC_ON_START:-true}
     ports:
       - "8090:8090"
     volumes:

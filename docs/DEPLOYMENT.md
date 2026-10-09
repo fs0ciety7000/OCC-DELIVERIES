@@ -73,12 +73,14 @@ PocketBase `/_/`). Le lien « Admin » apparaît dans la navigation des comptes 
   montant commandé, restaurants les plus commandés.
 * **Restaurants** : rechercher, masquer / réafficher (un resto masqué disparaît de
   l'app mais reste dans l'historique), créer / modifier (adresse + bouton
-  **Géocoder** via OpenStreetMap, liens Uber Eats / Takeaway, frais en euros).
+  **Géocoder** via OpenStreetMap, liens Uber Eats / Takeaway / Deliveroo / weloveat,
+  frais en euros). Badges **Verrouillé** et **Obsolète** : voir *Synchronisation*.
 * **Menu** (clic sur un resto) : catégories (ajout, renommage, ordre ↑↓, suppression),
   articles (prix en euros `12,50`, étiquettes, disponible / populaire, options :
   groupes min/max et choix avec supplément).
 * **Commandes** : liste filtrable par statut, détail (membres, articles, paiements),
   **annulation forcée**.
+* **Synchronisation** : restaurants et menus relus automatiquement, voir ci-dessous.
 * **Import** : voir ci-dessous.
 
 ### Importer des menus (JSON ou CSV)
@@ -107,6 +109,51 @@ PocketBase `/_/`). Le lien « Admin » apparaît dans la navigation des comptes 
 * API équivalente (jeton d'un admin) : `GET /api/occ/admin/export`,
   `POST /api/occ/admin/import[?dryRun=1]`, `POST /api/occ/admin/import/csv[?dryRun=1]`.
 
+### Synchronisation automatique (restaurants et menus)
+Le serveur relit chaque nuit les sources publiques et met le catalogue à jour tout seul
+(ADR 0002, mise à jour 2). Page **Admin → Synchronisation** : état (en cours / dernier
+résultat / prochaine exécution), bouton **Synchroniser maintenant**, historique des
+exécutions (compteurs, liste des changements « Tomo — Miso ramen : 14,50 € → 15,00 € »,
+journal) et liste des **sources**.
+
+| variable | défaut | rôle |
+|---|---|---|
+| `OCC_SYNC_ENABLED` | `true` | `false` coupe tout : aucune requête sortante, bouton manuel refusé |
+| `OCC_SYNC_CRON` | `30 3 * * *` | planification (cron 5 champs) lue à l'**heure de Bruxelles** (le cron interne de PocketBase est en UTC : le serveur convertit) |
+| `OCC_SYNC_ON_START` | `true` | ~60 s après le démarrage, lance une synchronisation si aucune n'a encore réussi (premier déploiement) |
+| `OCC_SYNC_START_DELAY` | `60s` | délai de ce premier lancement (durée Go : `30s`, `5m`) |
+
+* **Durée** : quelques minutes (≈ 150 requêtes espacées d'au moins 2,5 s). Une seule
+  exécution à la fois ; une relance le même jour lit le cache (`pb_data/menusync-cache`, 20 h)
+  et ne refait presque aucune requête.
+* **Sources** (*Admin → Synchronisation → Sources*) : activer / désactiver, priorité (la plus
+  petite fournit le menu quand un restaurant est sur plusieurs sources : sites Takeaway 10–19,
+  Deliveroo 50, weloveat 60 par défaut), *options* (weloveat : suppléments, 1 requête par plat —
+  plusieurs heures, désactivé par défaut ; Deliveroo fournit les siennes sans coût).
+  **Ajouter une source** : *Site Takeaway* = URL du site satellite d'un restaurant
+  (`https://www.tomomons.be/`), *Site (schema.org)* = page carte d'un restaurant publiant un
+  menu JSON-LD, *Deliveroo* = URL d'une page liste de ville (avec `?geohash=`), *weloveat* =
+  racine de l'API (vide = défaut). Villes gérées : `mons` (rayon 8 km).
+* **Ce que fait une exécution** : les restaurants sont reconnus (même source, même lien
+  plateforme, ou même nom au même endroit) — les fiches existantes ne sont jamais dupliquées ;
+  prix, descriptions, options et disponibilité des plats suivent la source ; nouveaux plats et
+  catégories ajoutés ; un plat qui disparaît passe **indisponible** (il revient tout seul s'il
+  réapparaît) ; les champs déjà remplis (adresse, coordonnées, téléphone, nom, emoji…) ne sont
+  jamais écrasés, et jamais par une valeur vide. Rien n'est supprimé.
+* **« Verrouillé »** : toute modification d'un restaurant ou d'un article par un admin (panneau,
+  API, `/_/`) le verrouille — la synchronisation ne le touchera plus. Masquer / réafficher un
+  restaurant ou réordonner des articles ne verrouille pas. Pour le rendre à la
+  synchronisation : interrupteur « Verrouillé » du formulaire (ou cadenas dans l'éditeur de menu).
+* **« Obsolète »** : plus aucune source activée ne propose ce restaurant (fermé, retiré d'une
+  plateforme, source supprimée). Il reste **visible** ; le badge disparaît s'il revient. À toi
+  de le masquer s'il a vraiment fermé. Une source en échec ou bloquée ce jour-là ne rend rien
+  obsolète.
+* **Statuts** : *Réussie*, *Partielle* (une source en échec / bloquée, les autres appliquées),
+  *Bloquée* (toutes les sources ont refusé : 403 ou page anti-robot — rien n'est tenté pour
+  contourner ; si cela dure, désactiver la source), *Échec*.
+* **Désactiver** : `OCC_SYNC_ENABLED=false` puis redéployer (ou désactiver les sources une à
+  une, effet immédiat). Les données déjà synchronisées restent.
+
 ## 5. Sauvegardes
 * PocketBase : *Settings → Backups* → sauvegardes automatiques planifiées
   (option S3 compatible). Recommandé : quotidien, rétention 14.
@@ -126,12 +173,13 @@ docker compose up --build
 open http://localhost:8090
 ```
 
-## 7. Gérer les restaurants
+## 8. Outil `menusync` (ligne de commande)
 
 Les restaurants se gèrent dans l'admin (`/_/`) ou par import JSON
 (`POST /api/occ/admin/import`, un `RestaurantImport` par appel, jeton superuser).
-Pour **récupérer les cartes réelles** des plateformes, l'image contient l'outil
-`menusync` (`/pb/menusync`, binaire séparé : le serveur ne l'appelle jamais).
+Le serveur **synchronise lui-même** les cartes chaque nuit (voir §4 *Synchronisation
+automatique*). L'outil en ligne de commande `menusync` (`/pb/menusync`) reste disponible
+pour des essais ponctuels ou produire des fichiers JSON.
 
 | source (`-provider`) | ce qui est lu | options (suppléments) |
 |---|---|---|
@@ -149,7 +197,8 @@ docker exec -it <conteneur> /pb/menusync -provider weloveat -city mons \
 docker exec -it <conteneur> /pb/menusync -provider takeaway-site -urls /pb/pb_data/sites.txt \
   -cache /pb/pb_data/menusync-cache -out /pb/pb_data/mons-sites.json
 
-# fusionner (doublons : même lien plateforme, ou nom proche + < 150 m / même rue et numéro)
+# fusionner (doublons : même lien plateforme / page source, même nom ≤ 1,5 km,
+# nom proche ≤ 300 m, ou nom proche + même rue et numéro)
 docker exec -it <conteneur> /pb/menusync merge \
   -in /pb/pb_data/mons-sites.json,/pb/pb_data/mons-deliveroo.json,/pb/pb_data/mons-weloveat.json \
   -out /pb/pb_data/mons-merged.json   # -priority takeaway-site,deliveroo,weloveat,jsonld,existing
@@ -164,6 +213,9 @@ docker exec -it -e OCC_IMPORT_TOKEN=<jeton> <conteneur> /pb/menusync \
 * Sortie : tableau JSON au format `RestaurantImport` (prix en **centimes**, slug = nom
   « slugifié »), plus `source`, `source_urls`, `menu_checked_at` (ignorés à l'import).
   Un restaurant par ligne (`-pretty` pour du JSON indenté).
+* Données nettoyées : noms (« BAGEL CITY » → « Bagel City », suffixes « - Mons - Mons Center »,
+  « (MON) » retirés), cuisines unifiées (pluriels, synonymes, « boissons » / « desserts » retirés
+  s'il y a mieux, 4 au plus), plats à 0 € sans options et doublons retirés.
 * `merge` garde les liens de toutes les plateformes, prend le menu de la source préférée
   (`-priority`), les champs « éditoriaux » (slug, nom, emoji, gamme de prix, adresse) de
   la fiche `existing` (préfixe `existing=fichier.json`) et n'invente aucun champ absent.

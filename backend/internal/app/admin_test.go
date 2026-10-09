@@ -156,7 +156,9 @@ func TestAdminRules(t *testing.T) {
 		t.Fatalf("restaurant normalized: %v", nr)
 	}
 	e.expect(400, "POST", "/api/collections/restaurants/records", boss.token, map[string]any{"name": "Doublon", "slug": "nouveau-resto"})
-	e.expect(400, "POST", "/api/collections/restaurants/records", boss.token, map[string]any{"name": "X", "slug": "x-x", "providers": []map[string]any{{"id": "deliveroo", "url": "https://d"}}})
+	e.expect(400, "POST", "/api/collections/restaurants/records", boss.token, map[string]any{"name": "X", "slug": "x-x", "providers": []map[string]any{{"id": "glovo", "url": "https://g"}}})
+	// every delivery platform of providers.Platforms is accepted (Deliveroo, weloveat…)
+	e.expect(200, "POST", "/api/collections/restaurants/records", boss.token, map[string]any{"name": "Y", "slug": "y-y", "providers": []map[string]any{{"id": "deliveroo", "url": "https://deliveroo.be/fr/menu/x"}}})
 
 	cat := e.expect(200, "POST", "/api/collections/menu_categories/records", boss.token, map[string]any{"restaurant": nr["id"], "name": "Plats", "position": 0}).m(t)
 	e.expect(200, "POST", "/api/collections/menu_items/records", boss.token, map[string]any{

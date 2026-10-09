@@ -480,7 +480,7 @@ func testFetcher(t *testing.T) (*Fetcher, *[]time.Duration) {
 	f := NewFetcher(t.TempDir())
 	f.Jitter = 0
 	var waits []time.Duration
-	f.sleep = func(_ context.Context, d time.Duration) error { waits = append(waits, d); return nil }
+	f.Sleep = func(_ context.Context, d time.Duration) error { waits = append(waits, d); return nil }
 	return f, &waits
 }
 

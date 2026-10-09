@@ -42,6 +42,15 @@ type ListingEntry struct {
 	Name       string
 	Href       string  // "/menu/Brussels/mons-center/baalbeck?geohash=…"
 	DistanceKm float64 // -1 when unknown
+	// Base is the site root of the listing ("" = DeliverooBase).
+	Base string
+}
+
+func (e ListingEntry) base() string {
+	if e.Base != "" {
+		return e.Base
+	}
+	return DeliverooBase
 }
 
 // Path returns the href without its query string.
@@ -53,7 +62,7 @@ func (e ListingEntry) Path() string {
 // MenuURL is the page to fetch. Only the delivery geohash is kept from the
 // card link (fees depend on it); scheduling params (day, time…) are dropped.
 func (e ListingEntry) MenuURL() string {
-	u := DeliverooBase + "/fr" + e.Path()
+	u := e.base() + "/fr" + e.Path()
 	if _, q, ok := strings.Cut(e.Href, "?"); ok {
 		if v, err := url.ParseQuery(q); err == nil && v.Get("geohash") != "" {
 			u += "?geohash=" + url.QueryEscape(v.Get("geohash"))
@@ -63,7 +72,7 @@ func (e ListingEntry) MenuURL() string {
 }
 
 // PageURL is the canonical public restaurant page (provider link).
-func (e ListingEntry) PageURL() string { return DeliverooBase + "/fr" + e.Path() }
+func (e ListingEntry) PageURL() string { return e.base() + "/fr" + e.Path() }
 
 var kmRe = regexp.MustCompile(`([\d.,]+)\s*km`)
 

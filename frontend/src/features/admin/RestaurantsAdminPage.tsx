@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { MapPinOff, Pencil, Plus, Search, UtensilsCrossed } from 'lucide-react'
+import { Lock, MapPinOff, Pencil, Plus, Search, TriangleAlert, UtensilsCrossed } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
@@ -13,7 +13,14 @@ import { fold } from './text'
 import { RestaurantForm } from './RestaurantForm'
 import { Toggle } from './Toggle'
 
-type Filter = 'all' | 'active' | 'inactive'
+const dayFmt = new Intl.DateTimeFormat('fr-BE', { day: 'numeric', month: 'long' })
+
+function formatDay(value: string): string {
+  const d = new Date(value.replace(' ', 'T'))
+  return Number.isNaN(d.getTime()) ? value : dayFmt.format(d)
+}
+
+type Filter = 'all' | 'active' | 'inactive' | 'stale'
 
 export function RestaurantsAdminPage() {
   const [q, setQ] = useState('')
@@ -38,6 +45,7 @@ export function RestaurantsAdminPage() {
     return (list.data ?? []).filter((r) => {
       if (filter === 'active' && !r.active) return false
       if (filter === 'inactive' && r.active) return false
+      if (filter === 'stale' && !r.stale_since) return false
       if (!needle) return true
       return fold(`${r.name} ${r.slug} ${r.address} ${(r.cuisines ?? []).join(' ')}`).includes(needle)
     })
@@ -68,6 +76,7 @@ export function RestaurantsAdminPage() {
             { value: 'all', label: 'Tous' },
             { value: 'active', label: 'Visibles' },
             { value: 'inactive', label: 'Masqués' },
+            { value: 'stale', label: 'Obsolètes' },
           ]}
         />
       </div>
@@ -107,6 +116,16 @@ export function RestaurantsAdminPage() {
                     {r.name}
                   </Link>
                   {!r.active && <Badge>Masqué</Badge>}
+                  {r.locked && (
+                    <Badge variant="info" title="Modifié à la main : la synchronisation ne touche plus ce restaurant.">
+                      <Lock className="size-3" aria-hidden /> Verrouillé
+                    </Badge>
+                  )}
+                  {r.stale_since && (
+                    <Badge variant="warning" title={`Plus proposé par aucune source depuis le ${formatDay(r.stale_since)} (toujours visible).`}>
+                      <TriangleAlert className="size-3" aria-hidden /> Obsolète
+                    </Badge>
+                  )}
                   {!r.lat && !r.lng && (
                     <Badge variant="warning">
                       <MapPinOff className="size-3" aria-hidden /> Sans coordonnées

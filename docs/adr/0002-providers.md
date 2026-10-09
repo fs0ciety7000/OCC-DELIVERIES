@@ -29,3 +29,38 @@ aux restaurants/partenaires, sous contrat. Le scraping viole leurs CGU.
   la SPA weloveat, sites satellites Takeaway) : usage ponctuel par un admin, robots.txt appliqué,
   requêtes espacées, arrêt sur 403/anti-robot, aucun contournement. Le serveur ne fait jamais
   ces requêtes ; les données passent par l'import admin après relecture.
+
+## Mise à jour — 2026-10-09 (2) : synchronisation automatique dans le serveur
+Ceci **remplace** la phrase « Le serveur ne fait jamais ces requêtes » de la mise à jour précédente.
+
+**Contexte.** Les restaurants et leurs cartes doivent être fidèles et à jour sans travail
+manuel : relancer `menusync` à la main puis importer n'était pas tenu dans la durée, et
+l'import remplace tout le menu (il écrase les retouches admin et recrée les articles).
+
+**Décision.** Le serveur relit lui-même les sources publiques (`internal/feedsync`, au-dessus
+de `menusync`) et **réconcilie** au lieu d'importer :
+* sources configurées en base (`sync_sources`, admin) — par défaut : les 10 sites satellites
+  Takeaway de Mons, la page liste Deliveroo Mons, l'API anonyme de weloveat (Mons) ;
+* exécution **planifiée** (`OCC_SYNC_CRON`, défaut 03:30 heure de Bruxelles, heure creuse),
+  **au démarrage** si aucune n'a encore réussi, ou **manuelle** depuis `/admin/synchronisation` ;
+* rapprochement par clé de source, lien plateforme, puis nom + position (les fiches curées
+  sont reconnues, jamais dupliquées) ; mise à jour en place, transaction par restaurant ;
+* aucune suppression : un plat absent devient indisponible, un restaurant que plus aucune
+  source ne propose est marqué **obsolète** (badge admin), toujours visible ;
+* les fiches **verrouillées** (toute modification admin les verrouille) ne sont jamais touchées.
+
+**Garde-fous** (identiques à l'outil, non désactivables) : User-Agent identifié
+`OCC-Deliveries-menusync/1.0 (+https://eat.fs0ciety.org)` ; **une requête à la fois** (une
+seule exécution possible, verrou en mémoire + 409), ≥ 2,5 s (+ aléa) entre deux requêtes,
+robots.txt appliqué (jamais d'appel aux `/api/` ni `graphql` de Deliveroo), 1 seul nouvel essai
+sur 429/5xx avec `Retry-After`, **arrêt net** d'une source sur 403 ou page anti-robot
+(statut « bloquée », les autres sources continuent, aucun contournement), cache disque
+`pb_data/menusync-cache` de 20 h (une relance le même jour ne refait pas les requêtes),
+données personnelles retirées des réponses weloveat avant le cache. Volume : ~150 requêtes par
+nuit pour Mons (suppléments weloveat désactivés par défaut : 1 requête par plat). Coupure
+immédiate : `OCC_SYNC_ENABLED=false` (plus aucune requête sortante, déclenchement manuel refusé).
+
+**Conséquences.** Le serveur a désormais des requêtes sortantes (à autoriser si un pare-feu
+sortant est ajouté). Les prix restent « indicatifs » (les plateformes appliquent souvent une
+marge). Les CGU restent applicables : usage interne, volumes modestes, sources désactivables
+une à une ; si une plateforme le demande ou se met à bloquer, on désactive sa source.

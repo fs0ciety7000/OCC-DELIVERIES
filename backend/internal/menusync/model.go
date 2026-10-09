@@ -40,6 +40,35 @@ type Restaurant struct {
 	Source        string   `json:"source,omitempty"`
 	SourceURLs    []string `json:"source_urls"`
 	MenuCheckedAt string   `json:"menu_checked_at,omitempty"`
+	// Origins lists every source record merged into this one.
+	Origins []Origin `json:"origins,omitempty"`
+}
+
+// Origin is one source record of a (merged) restaurant.
+type Origin struct {
+	Source    string `json:"source"`
+	URL       string `json:"url"`
+	CheckedAt string `json:"checked_at,omitempty"`
+}
+
+// SourceKey is the stable id of the record: "<source>:<normalized url>" of
+// the source its menu comes from ("" when unknown).
+func (r Restaurant) SourceKey() string {
+	pick := func(o Origin) string { return o.Source + ":" + NormURL(o.URL) }
+	for _, o := range r.Origins {
+		if o.Source == r.Source && o.URL != "" {
+			return pick(o)
+		}
+	}
+	for _, o := range r.Origins {
+		if o.URL != "" && o.Source != SourceExisting {
+			return pick(o)
+		}
+	}
+	if r.Source != "" && r.Source != SourceExisting && len(r.SourceURLs) > 0 {
+		return r.Source + ":" + NormURL(r.SourceURLs[0])
+	}
+	return ""
 }
 
 // ItemCount returns the number of menu items.

@@ -1,4 +1,4 @@
-import { BarChart3, FileUp, Store, ShoppingBag, Users } from 'lucide-react'
+import { BarChart3, FileUp, RefreshCw, Store, ShoppingBag, Users } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link, Navigate, NavLink, Outlet, useLocation } from 'react-router'
 import { buttonClass, EmptyState } from '@/components/ui'
@@ -8,6 +8,7 @@ import { cn } from '@/lib/cn'
 const ADMIN_NAV = [
   { to: '/admin', label: 'Tableau de bord', icon: BarChart3, end: true },
   { to: '/admin/restaurants', label: 'Restaurants', icon: Store, end: false },
+  { to: '/admin/synchronisation', label: 'Synchronisation', icon: RefreshCw, end: false },
   { to: '/admin/import', label: 'Import', icon: FileUp, end: false },
   { to: '/admin/commandes', label: 'Commandes', icon: ShoppingBag, end: false },
   { to: '/admin/utilisateurs', label: 'Utilisateurs', icon: Users, end: false },

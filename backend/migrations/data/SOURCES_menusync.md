@@ -2,8 +2,8 @@
 
 Fichiers produits par `backend/cmd/menusync` le **2026-10-09** (`menu_checked_at`), au
 format `RestaurantImport` (+ `source`, `source_urls`, `menu_checked_at`, ignorés à l'import).
-Ils **ne sont pas branchés aux migrations** : la fusion avec `mons_restaurants.json` et le
-choix de ce qui est importé restent à décider. Aucun prix n'est estimé, aucun champ inventé :
+Ils **ne sont pas branchés aux migrations** : en production, la synchronisation automatique du
+serveur relit les mêmes sources (table `sync_sources`) et met la base à jour elle-même. Aucun prix n'est estimé, aucun champ inventé :
 un champ absent de la source reste vide (`0`, `""`, `[]`).
 
 | fichier | source | restaurants | plats | plats avec options |
@@ -11,9 +11,11 @@ un champ absent de la source reste vide (`0`, `""`, `[]`).
 | `mons_deliveroo.json` | Deliveroo, liste « Mons Center » + pages menu, rayon 8 km | 40 | 2 996 | 1 274 (33 restaurants) |
 | `mons_weloveat.json` | weloveat.be, API publique de la SPA, rayon 8 km | 70 | 4 806 | 0 (suppléments non lus, voir plus bas) |
 | `mons_takeaway_sites.json` | 10 sites satellites Takeaway (`mons_takeaway_sites.txt`) | 10 | 1 204 | 0 |
-| `mons_merged.json` | fusion des trois + `mons_restaurants.json` (`existing`) | 104 | 7 613 | 1 263 (31 restaurants) |
+| `mons_merged.json` | fusion des trois + `mons_restaurants.json` (`existing`) | 102 | 7 533 | 1 263 (31 restaurants) |
 
-Commande de fusion (133 fiches → 104 restaurants, 29 doublons fusionnés, 19 groupes) :
+Commande de fusion (133 fiches → 102 restaurants, 31 doublons fusionnés, 21 groupes ; régénéré le
+2026-10-09 avec la normalisation : noms, cuisines, plats à 0 € sans options et doublons retirés,
+« Bagel City » / « BAGEL CITY » et « Pili Pili Mons » / « PILI PILI MONS » fusionnés) :
 
 ```bash
 menusync merge -in mons_takeaway_sites.json,mons_deliveroo.json,mons_weloveat.json,existing=mons_restaurants.json \

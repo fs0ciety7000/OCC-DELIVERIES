@@ -81,6 +81,14 @@ export interface Restaurant extends BaseRecord {
   min_order: Cents
   providers: RestaurantProviderLink[] | null
   active: boolean
+  /** Synchronisation : identifiant stable de la source (`fournisseur:url`). */
+  source_key?: string
+  /** Synchronisation : sources qui proposent ce restaurant. */
+  sources?: SyncSourceRef[] | null
+  /** Verrouillé : la synchronisation ne le modifie plus (posé à toute modification admin). */
+  locked?: boolean
+  /** Obsolète : plus proposé par aucune source depuis cette date ("" sinon). */
+  stale_since?: ISODate
 }
 
 export type NearbyRestaurant = Restaurant & { distanceKm: number }
@@ -120,6 +128,96 @@ export interface MenuItem extends BaseRecord {
   popular: boolean
   available: boolean
   position: number
+  source_key?: string
+  sources?: SyncSourceRef[] | null
+  /** Verrouillé : la synchronisation ne le modifie plus. */
+  locked?: boolean
+}
+
+/* -------------------------------------------------------- synchronisation */
+
+export type SyncProvider = 'deliveroo' | 'weloveat' | 'takeaway-site' | 'jsonld'
+export type SyncRunStatus = 'running' | 'success' | 'partial' | 'failed' | 'blocked'
+export type SyncTrigger = 'cron' | 'manual' | 'startup'
+export type SyncSourceStatus = 'ok' | 'blocked' | 'failed'
+
+export interface SyncSourceRef {
+  provider: SyncProvider
+  url: string
+  checked_at: string
+}
+
+/** Collection `sync_sources` (admin). */
+export interface SyncSource extends BaseRecord {
+  provider: SyncProvider
+  label: string
+  /** Page liste (Deliveroo), racine de l'API (weloveat) ou site (takeaway-site / jsonld). */
+  url: string
+  city: string
+  /** Plus petit = préféré pour le menu, lu en premier. */
+  priority: number
+  enabled: boolean
+  /** Requêtes supplémentaires pour les options (suppléments weloveat). */
+  options: boolean
+  last_run_at: ISODate
+  /** « ok: 40 restaurants », « blocked: … », « failed: … » (serveur). */
+  last_status: string
+}
+
+export interface SyncStats {
+  restaurants_created: number
+  restaurants_updated: number
+  restaurants_stale: number
+  items_created: number
+  items_updated: number
+  items_price_changed: number
+  items_unavailable: number
+}
+
+export interface SyncSourceResult {
+  id: string
+  label: string
+  provider: SyncProvider
+  url: string
+  status: SyncSourceStatus
+  message: string
+  restaurants: number
+  network: number
+  cached: number
+  durationMs: number
+}
+
+export interface SyncRun {
+  id: string
+  started_at: ISODate
+  finished_at: ISODate
+  status: SyncRunStatus
+  trigger: SyncTrigger
+  stats: SyncStats
+  sources: SyncSourceResult[]
+  changesCount: number
+  /** Détail uniquement (`GET /sync/runs/{id}`). */
+  changes?: string[]
+  log?: string
+  /** Dernières lignes du journal (exécution en cours, `GET /sync/status`). */
+  logTail?: string
+  error: string
+}
+
+export interface SyncStatus {
+  enabled: boolean
+  cron: string
+  timezone: string
+  running: SyncRun | null
+  lastRun: SyncRun | null
+  nextRunAt: ISODate | null
+}
+
+export interface SyncRunList {
+  page: number
+  perPage: number
+  totalItems: number
+  items: SyncRun[]
 }
 
 /* ---------------------------------------------------------------- parties */

@@ -42,6 +42,9 @@ export function ItemForm({
   const [tagInput, setTagInput] = useState('')
   const [available, setAvailable] = useState(item?.available ?? true)
   const [popular, setPopular] = useState(item?.popular ?? false)
+  // enregistrer une modification protège l'article de la synchronisation
+  // (comportement du serveur) : l'interrupteur montre ce qui sera enregistré
+  const [locked, setLocked] = useState(true)
   const [groups, setGroups] = useState<GroupDraft[]>(() => toDrafts(item?.option_groups))
   const [errors, setErrors] = useState<{ name?: string; price?: string; options?: string[] }>({})
   const qc = useQueryClient()
@@ -92,6 +95,7 @@ export function ItemForm({
       available,
       popular,
       option_groups: opts.groups,
+      locked,
       ...(item ? {} : { position: nextPosition }),
     })
   }
@@ -165,7 +169,12 @@ export function ItemForm({
         <div className="flex flex-wrap gap-x-6">
           <Toggle checked={available} onChange={setAvailable} label="Disponible" showLabel />
           <Toggle checked={popular} onChange={setPopular} label="Populaire" showLabel />
+          <Toggle checked={locked} onChange={setLocked} label="Verrouillé (hors synchronisation)" showLabel />
         </div>
+        <p className="-mt-3 text-xs text-subtle">
+          Un article verrouillé n'est jamais modifié par la synchronisation automatique.
+          {item && !item.locked ? ' Il ne l’est pas encore : désactive l’interrupteur pour qu’il continue de suivre les sources.' : ''}
+        </p>
 
         <section className="space-y-3" aria-labelledby="options-title">
           <div className="flex items-center justify-between">

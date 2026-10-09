@@ -28,6 +28,10 @@ import type {
   RestaurantImport,
   SelectedOption,
   SplitMode,
+  SyncRun,
+  SyncRunList,
+  SyncSource,
+  SyncStatus,
   Summary,
   TransitionBody,
   User,
@@ -171,6 +175,17 @@ export const adminApi = {
     pb.send<{ user: AdminUser }>(`/api/occ/admin/users/${userId}/role`, { method: 'PATCH', body: JSON.stringify({ role }), headers: { 'Content-Type': 'application/json' } }),
 
   cancelParty: (partyId: string) => pb.send<{ party: Party }>(`/api/occ/admin/parties/${partyId}/cancel`, json({})),
+
+  /* --- synchronisation automatique des menus --- */
+
+  syncStatus: () => pb.send<SyncStatus>('/api/occ/admin/sync/status', { method: 'GET' }),
+  syncRuns: (page = 1) => pb.send<SyncRunList>('/api/occ/admin/sync/runs', { method: 'GET', query: { page, perPage: 20 } }),
+  syncRun: (id: string) => pb.send<{ run: SyncRun }>(`/api/occ/admin/sync/runs/${id}`, { method: 'GET' }),
+  startSync: () => pb.send<{ run: SyncRun }>('/api/occ/admin/sync/run', json({})),
+  syncSources: () => pb.collection('sync_sources').getFullList<SyncSource>({ sort: 'priority,label' }),
+  saveSyncSource: (id: string | null, data: Partial<SyncSource>) =>
+    id ? pb.collection('sync_sources').update<SyncSource>(id, data) : pb.collection('sync_sources').create<SyncSource>(data),
+  deleteSyncSource: (id: string) => pb.collection('sync_sources').delete(id),
 
   /* --- catalogue (collections, rules « role = admin ») --- */
 

@@ -172,20 +172,39 @@ un parcours critique, toutes interruptibles.
      à bouts arrondis 4 px posées sur la ligne de base, écart 2 px, grille discrète, infobulle
      au survol/focus, tableau `sr-only` en alternative — pas de librairie de graphiques),
      répartition par statut en badges, top restaurants.
-   * *Restaurants* : recherche + `Segmented` (Tous / Visibles / Masqués), lignes avec emoji,
-     badges « Masqué » / « Sans coordonnées » (warning), interrupteur de visibilité
+   * *Restaurants* : recherche + `Segmented` (Tous / Visibles / Masqués / Obsolètes), lignes avec emoji,
+     badges « Masqué » / « Sans coordonnées » (warning) / « Verrouillé » (`info`, icône `Lock`) /
+     « Obsolète » (`warning`, icône `TriangleAlert`, date en infobulle), interrupteur de visibilité
      (`Toggle`, `role="switch"`), actions Menu / Modifier. Formulaire en `Sheet lg` par
-     sections (Identité, Adresse + bouton *Géocoder*, Livraison, Plateformes), montants
-     saisis en euros (`12,50`) et convertis en centimes.
+     sections (Identité, Adresse + bouton *Géocoder*, Livraison, Plateformes — Uber Eats,
+     Takeaway, Deliveroo, weloveat —, Synchronisation), montants saisis en euros (`12,50`) et
+     convertis en centimes. L'interrupteur « Verrouillé » est **activé par défaut** à
+     l'enregistrement : il montre ce que fera le serveur (toute modification verrouille).
    * *Éditeur de menu* : une carte par catégorie (↑ ↓, renommer, supprimer), lignes
      d'articles (prix à droite, étiquettes en badges, interrupteur « disponible », étoile
-     « populaire », ↑ ↓, modifier, supprimer) ; article barré si indisponible. Sheet article :
+     « populaire », cadenas `Lock` / `LockOpen` (`aria-pressed`, couleur `info` si verrouillé),
+     ↑ ↓, modifier, supprimer) ; article barré si indisponible ; badges Verrouillé / Obsolète
+     dans l'en-tête. Sheet article :
      étiquettes en `Chip` (presets + libres), options en groupes encadrés (min / max, choix
      + supplément en euros). Confirmations destructives en `Sheet` avec bouton `danger`.
    * *Import* : zone de dépôt pointillée (bordure braise au survol), aperçu par restaurant
      (badge Nouveau / Mise à jour, erreurs `danger`, avertissements `warning`, menu dans un
      `details`), barre d'action collante avec l'unique `primary` « Importer » (désactivé tant
      qu'il reste des erreurs) ; cartes latérales Modèles et « Depuis Uber Eats / Takeaway ».
+   * *Synchronisation* (`/admin/synchronisation`, icône `RefreshCw`) : unique `primary`
+     « Synchroniser maintenant » dans l'en-tête (icône qui tourne pendant l'exécution, désactivé
+     si une exécution tourne ou si `OCC_SYNC_ENABLED=false`). **Carte d'état** (`aria-live`) :
+     en cours → `Spinner` + durée + journal en direct (`pre` 12 dernières lignes, sondage 3 s) ;
+     sinon badge de statut (`success` Réussie, `warning` Partielle, `danger` Échec / Bloquée)
+     + résumé des compteurs sans les zéros + prochaine exécution (heure de Bruxelles).
+     **Historique** : une carte repliable par exécution (bouton plein largeur `aria-expanded`,
+     chevron qui pivote, `motion-reduce` respecté) → sources (badge OK / Bloquée / Erreur,
+     requêtes, cache, durée), liste des changements (« Tomo — Miso ramen : 14,50 € → 15,00 € »,
+     zone défilante bordée) et journal technique dans un `details`. **Sources** : lignes avec
+     interrupteur d'activation, nom, badge plateforme (couleurs Deliveroo / weloveat / Takeaway),
+     priorité en `tabular-nums`, URL tronquée, dernier statut ; ajout / modification en `Sheet`
+     (type, nom, URL avec aide propre au type, priorité, activée, options) ; suppression
+     confirmée en `Sheet` avec bouton `danger`.
    * *Commandes* : chips de statut, lignes cliquables vers le détail, annulation forcée
      (icône `Ban`, confirmation). *Utilisateurs* : recherche, filtre de rôle, bouton
      « Promouvoir / Retirer admin » (désactivé pour soi-même).

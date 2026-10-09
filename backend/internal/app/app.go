@@ -42,6 +42,8 @@ type Config struct {
 	Providers []string
 	// AdminEmails get the "admin" role (OCC_ADMIN_EMAIL + OCC_ADMINS), lower-cased.
 	AdminEmails []string
+	// Sync drives the automatic menu synchronisation (OCC_SYNC_*).
+	Sync SyncConfig
 }
 
 // ConfigFromEnv reads the OCC_* environment variables.
@@ -53,6 +55,7 @@ func ConfigFromEnv(version string) Config {
 		DefaultLng:   envFloat("OCC_DEFAULT_LNG", 3.9567),
 		DefaultLabel: envOr("OCC_DEFAULT_LABEL", "Mons"),
 	}
+	cfg.Sync = syncConfigFromEnv()
 	cfg.AdminEmails = parseEmails(os.Getenv("OCC_ADMIN_EMAIL") + "," + os.Getenv("OCC_ADMINS"))
 	for _, p := range strings.Split(envOr("OCC_PROVIDERS", "ubereats,takeaway,deliveroo,weloveat"), ",") {
 		p = strings.ToLower(strings.TrimSpace(p))
@@ -95,10 +98,16 @@ func (c Config) providerEnabled(id string) bool {
 
 // Register binds every hook and the /api/occ routes on the app.
 func Register(app core.App, cfg Config) {
-	h := &handlers{cfg: cfg}
+	register(app, cfg)
+}
+
+func register(app core.App, cfg Config) *handlers {
+	h := &handlers{cfg: cfg, sync: newSyncer(app, cfg.Sync)}
+	h.sync.bind()
 	bindHooks(app)
 	bindRoleHooks(app, cfg)
 	bindCatalogHooks(app)
+	bindSyncHooks(app)
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
 		if err := promoteAdmins(se.App, cfg.AdminEmails); err != nil {
 			return err
@@ -106,10 +115,12 @@ func Register(app core.App, cfg Config) {
 		h.routes(se.Router)
 		return se.Next()
 	})
+	return h
 }
 
 type handlers struct {
-	cfg Config
+	cfg  Config
+	sync *syncer
 }
 
 func (h *handlers) routes(r *router.Router[*core.RequestEvent]) {
@@ -140,6 +151,10 @@ func (h *handlers) routes(r *router.Router[*core.RequestEvent]) {
 	admin.GET("/users", h.adminUsers)
 	admin.PATCH("/users/{id}/role", h.adminSetRole)
 	admin.POST("/parties/{id}/cancel", h.adminCancelParty)
+	admin.GET("/sync/status", h.adminSyncStatus)
+	admin.GET("/sync/runs", h.adminSyncRuns)
+	admin.GET("/sync/runs/{id}", h.adminSyncRun)
+	admin.POST("/sync/run", h.adminSyncStart)
 }
 
 // ---------------------------------------------------------------- helpers

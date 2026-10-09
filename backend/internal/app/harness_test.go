@@ -80,6 +80,16 @@ func newTestApp(t testing.TB) *tests.TestApp {
 	return ta
 }
 
+// newTestAppNoRegister clones the template without binding the app hooks.
+func newTestAppNoRegister(t testing.TB) *tests.TestApp {
+	t.Helper()
+	ta, err := tests.NewTestApp(templateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ta
+}
+
 // newEnvWith builds an env with a custom config; before runs before the
 // OnServe hooks (e.g. to create records that the bootstrap must see).
 func newEnvWith(t *testing.T, cfg Config, before func(app *tests.TestApp)) *env {

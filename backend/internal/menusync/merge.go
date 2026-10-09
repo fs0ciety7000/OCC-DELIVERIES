@@ -15,8 +15,16 @@ import (
 var DefaultPriority = []string{SourceTakeawaySite, SourceDeliveroo, SourceWeloveat, SourceJSONLD, SourceExisting}
 
 // SameRestaurantMaxKm is the max distance between two records of the same
-// restaurant (150 m).
-const SameRestaurantMaxKm = 0.150
+// restaurant when their names are similar (300 m).
+const SameRestaurantMaxKm = 0.300
+
+// SameNameMaxKm is the max distance between two records carrying the very
+// same name (case, accents, punctuation and city suffix ignored): platforms
+// often publish slightly different addresses for one restaurant (1.5 km).
+const SameNameMaxKm = 1.5
+
+// DefaultCity is the city whose name is stripped from restaurant names by Merge.
+var DefaultCity = "mons"
 
 // MergeGroup describes one output restaurant built from several records.
 type MergeGroup struct {
@@ -41,6 +49,11 @@ func (s MergeStats) Duplicates() int { return s.In - s.Out }
 // other field from the first source in priority that has it. Nothing is
 // invented: a field missing everywhere stays empty.
 func Merge(in []Restaurant, priority []string) ([]Restaurant, MergeStats) {
+	return MergeIn(in, priority, DefaultCity)
+}
+
+// MergeIn is Merge for another city (used to normalize names).
+func MergeIn(in []Restaurant, priority []string, city string) ([]Restaurant, MergeStats) {
 	if len(priority) == 0 {
 		priority = DefaultPriority
 	}
@@ -71,7 +84,7 @@ func Merge(in []Restaurant, priority []string) ([]Restaurant, MergeStats) {
 	stats := MergeStats{In: len(in)}
 	out := make([]Restaurant, 0, len(clusters))
 	for _, c := range clusters {
-		m := mergeCluster(c)
+		m := mergeCluster(c, city)
 		out = append(out, m)
 		if len(c) > 1 {
 			g := MergeGroup{Slug: m.Slug}
@@ -103,7 +116,7 @@ func sourceOr(s string) string {
 }
 
 // mergeCluster merges records already sorted by source priority.
-func mergeCluster(c []Restaurant) Restaurant {
+func mergeCluster(c []Restaurant, city string) Restaurant {
 	curated := slices.Clone(c)
 	sort.SliceStable(curated, func(i, j int) bool {
 		return (sourceOr(curated[i].Source) == SourceExisting) && (sourceOr(curated[j].Source) != SourceExisting)
@@ -161,11 +174,23 @@ func mergeCluster(c []Restaurant) Restaurant {
 			}
 		}
 		m.SourceURLs = appendUnique(m.SourceURLs, r.SourceURLs...)
+		origins := r.Origins
+		if len(origins) == 0 && len(r.SourceURLs) > 0 {
+			origins = []Origin{{Source: sourceOr(r.Source), URL: r.SourceURLs[0], CheckedAt: r.MenuCheckedAt}}
+		}
+		for _, o := range origins {
+			if o.URL != "" && !slices.ContainsFunc(m.Origins, func(x Origin) bool { return x.Source == o.Source && NormURL(x.URL) == NormURL(o.URL) }) {
+				m.Origins = append(m.Origins, o)
+			}
+		}
 	}
 	for _, r := range curated {
-		for _, cu := range r.Cuisines {
-			m.Cuisines = appendUnique(m.Cuisines, strings.ToLower(cu))
-		}
+		m.Cuisines = append(m.Cuisines, r.Cuisines...)
+	}
+	hasCurated := sourceOr(curated[0].Source) == SourceExisting && curated[0].Slug != ""
+	m.Clean(city)
+	if !hasCurated {
+		m.Slug = Slugify(m.Name)
 	}
 	return m
 }
@@ -176,21 +201,37 @@ func setStr(dst *string, v string) {
 	}
 }
 
-// SameRestaurant reports whether two records describe the same place.
+// SameRestaurant reports whether two records describe the same place: same
+// platform link or source page, the very same name (case, accents,
+// punctuation, city suffix ignored) within SameNameMaxKm, a similar name
+// within SameRestaurantMaxKm, or a similar name at the same street address.
 func SameRestaurant(a, b Restaurant) bool {
 	for _, pa := range a.Providers {
 		for _, pb := range b.Providers {
-			if pa.ID == pb.ID && pa.URL != "" && normURL(pa.URL) == normURL(pb.URL) {
+			if pa.ID == pb.ID && pa.URL != "" && NormURL(pa.URL) == NormURL(pb.URL) {
 				return true
 			}
 		}
 	}
-	if !SimilarNames(a.Name, b.Name) {
+	for _, ua := range a.SourceURLs {
+		for _, ub := range b.SourceURLs {
+			if ua != "" && NormURL(ua) == NormURL(ub) {
+				return true
+			}
+		}
+	}
+	ka, kb := NameKey(a.Name, DefaultCity), NameKey(b.Name, DefaultCity)
+	if ka == "" || kb == "" {
+		return false
+	}
+	same := ka == kb
+	if !same && !SimilarNames(a.Name, b.Name) {
 		return false
 	}
 	aGeo, bGeo := a.Lat != 0 || a.Lng != 0, b.Lat != 0 || b.Lng != 0
 	if aGeo && bGeo {
-		if domain.HaversineKm(a.Lat, a.Lng, b.Lat, b.Lng) <= SameRestaurantMaxKm {
+		d := domain.HaversineKm(a.Lat, a.Lng, b.Lat, b.Lng)
+		if d <= SameRestaurantMaxKm || (same && d <= SameNameMaxKm) {
 			return true
 		}
 	}
@@ -199,7 +240,9 @@ func SameRestaurant(a, b Restaurant) bool {
 
 var takeawayPathRe = regexp.MustCompile(`/menu/([a-z0-9-]+)`)
 
-func normURL(u string) string {
+// NormURL normalizes a URL for comparisons (scheme, www, query string and
+// trailing slash ignored; Takeaway locale paths unified).
+func NormURL(u string) string {
 	u = strings.ToLower(strings.TrimSpace(u))
 	u, _, _ = strings.Cut(u, "?")
 	u = strings.TrimSuffix(u, "/")
@@ -231,6 +274,16 @@ func nameTokens(s string) []string {
 	return out
 }
 
+// genericNameWords alone never make two names similar ("La Pizza" is not
+// "Pizza Milano").
+var genericNameWords = map[string]bool{
+	"pizza": true, "pizzas": true, "pizzeria": true, "sushi": true, "burger": true, "burgers": true,
+	"snack": true, "friterie": true, "kebab": true, "pitta": true, "pita": true, "tacos": true, "poke": true,
+	"wok": true, "grill": true, "pasta": true, "house": true, "bar": true, "cafe": true, "food": true,
+	"express": true, "city": true, "chicken": true, "asia": true, "china": true, "street": true,
+	"kitchen": true, "home": true, "bowl": true, "a": true, "au": true, "chez": true, "de": true, "du": true,
+}
+
 // SimilarNames compares names loosely: same significant words, one name's
 // words included in the other's ("Tomo" ~ "TOMO RAMEN"), or same letters
 // once spaces are removed ("Donrolls" ~ "DON ROLL'S").
@@ -243,6 +296,9 @@ func SimilarNames(a, b string) bool {
 		return true
 	}
 	subset := func(x, y []string) bool {
+		if !slices.ContainsFunc(x, func(t string) bool { return !genericNameWords[t] }) {
+			return false
+		}
 		for _, t := range x {
 			if !slices.Contains(y, t) {
 				return false

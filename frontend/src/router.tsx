@@ -19,6 +19,7 @@ const MenuEditorPage = lazy(() => import('@/features/admin/MenuEditorPage').then
 const ImportPage = lazy(() => import('@/features/admin/ImportPage').then((m) => ({ default: m.ImportPage })))
 const PartiesAdminPage = lazy(() => import('@/features/admin/PartiesAdminPage').then((m) => ({ default: m.PartiesAdminPage })))
 const PartyAdminDetailPage = lazy(() => import('@/features/admin/PartiesAdminPage').then((m) => ({ default: m.PartyAdminDetailPage })))
+const SyncPage = lazy(() => import('@/features/admin/SyncPage').then((m) => ({ default: m.SyncPage })))
 const UsersAdminPage = lazy(() => import('@/features/admin/UsersAdminPage').then((m) => ({ default: m.UsersAdminPage })))
 const ProfilePage = lazy(() => import('@/features/profile/ProfilePage').then((m) => ({ default: m.ProfilePage })))
 
@@ -64,6 +65,7 @@ export const router = createBrowserRouter([
           { path: 'restaurants', element: <RestaurantsAdminPage /> },
           { path: 'restaurants/:id', element: <MenuEditorPage /> },
           { path: 'import', element: <ImportPage /> },
+          { path: 'synchronisation', element: <SyncPage /> },
           { path: 'commandes', element: <PartiesAdminPage /> },
           { path: 'commandes/:id', element: <PartyAdminDetailPage /> },
           { path: 'utilisateurs', element: <UsersAdminPage /> },

@@ -24,6 +24,9 @@
 
 ## v0.3 — Données restaurants
 - [x] Import de menus CSV / JSON avec aperçu (panneau `/admin`)
+- [x] Flux `menusync` (Deliveroo, weloveat, sites Takeaway, schema.org) : normalisation des noms / cuisines / plats, dédoublonnage
+- [x] **Synchronisation automatique** dans le serveur (cron nocturne, au démarrage, manuelle) : rapprochement avec les fiches existantes, verrouillage des modifications admin, plats retirés → indisponibles, restaurants obsolètes signalés, historique des exécutions — page `/admin/synchronisation`
+- [ ] Synchronisation : suppléments weloveat par lots (étalés sur plusieurs nuits), alertes (e-mail) sur échec / blocage
 - [ ] Import assisté : coller un lien Uber Eats / Takeaway → formulaire pré-rempli (côté serveur)
 - [ ] Journal d'audit des actions admin ; upload d'images (cover / plats) depuis `/admin`
 - [ ] Carte (MapLibre) des restaurants autour du bureau

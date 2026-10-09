@@ -1,6 +1,7 @@
 package app
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/pocketbase/dbx"
@@ -38,8 +39,31 @@ func cleanStrings(r *core.Record, field string) error {
 	return nil
 }
 
+// autoLock sets "locked" when an admin edits a record through the API, so
+// that the automatic synchronisation never overwrites the edit. A request
+// that sets "locked" itself (the lock toggle) wins; a request touching only
+// the neutral fields (visibility, order…) does not lock.
+func autoLock(e *core.RecordRequestEvent, neutral ...string) {
+	info, err := e.RequestInfo()
+	if err != nil {
+		return
+	}
+	if _, explicit := info.Body["locked"]; explicit {
+		return
+	}
+	for k := range info.Body {
+		if !slices.Contains(neutral, k) {
+			e.Record.Set("locked", true)
+			return
+		}
+	}
+}
+
 func onRestaurantUpsert(e *core.RecordRequestEvent) error {
 	r := e.Record
+	if !r.IsNew() {
+		autoLock(e, "active", "locked")
+	}
 	r.Set("slug", strings.ToLower(strings.TrimSpace(r.GetString("slug"))))
 	r.Set("name", strings.TrimSpace(r.GetString("name")))
 	if err := cleanStrings(r, "cuisines"); err != nil {
@@ -57,7 +81,7 @@ func onRestaurantUpsert(e *core.RecordRequestEvent) error {
 		if l.URL == "" {
 			continue
 		}
-		if l.ID != providers.UberEats && l.ID != providers.Takeaway {
+		if !providers.IsPlatform(l.ID) {
 			return badRequest("Fournisseur inconnu : « " + l.ID + " ».")
 		}
 		if !strings.HasPrefix(l.URL, "https://") && !strings.HasPrefix(l.URL, "http://") {
@@ -100,6 +124,8 @@ func onCategoryUpsert(e *core.RecordRequestEvent) error {
 
 func onMenuItemUpsert(e *core.RecordRequestEvent) error {
 	r := e.Record
+	// an item added or edited by hand is never touched by the synchronisation
+	autoLock(e, "locked", "position")
 	r.Set("name", strings.TrimSpace(r.GetString("name")))
 	if !r.IsNew() && r.GetString("restaurant") != r.Original().GetString("restaurant") {
 		return badRequest("Un article ne peut pas changer de restaurant.")

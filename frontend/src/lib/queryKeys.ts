@@ -23,5 +23,9 @@ export const qk = {
     parties: (status: string, page: number) => ['admin', 'parties', status, page] as const,
     party: (id: string) => ['admin', 'party', id] as const,
     users: (q: string, role: string) => ['admin', 'users', q, role] as const,
+    syncStatus: ['admin', 'sync', 'status'] as const,
+    syncRuns: (page: number) => ['admin', 'sync', 'runs', page] as const,
+    syncRun: (id: string) => ['admin', 'sync', 'run', id] as const,
+    syncSources: ['admin', 'sync', 'sources'] as const,
   },
 }

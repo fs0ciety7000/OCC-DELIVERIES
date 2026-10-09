@@ -40,8 +40,14 @@ interface Actor {
   allow: RegExp[]
 }
 
-/** Bruit réseau légitime : flux SSE coupé à la navigation / fermeture, requêtes annulées par TanStack. */
-const GLOBAL_ALLOW: RegExp[] = [/^\[requestfailed\] GET \S+\/api\/realtime net::ERR_ABORTED$/]
+/**
+ * Bruit réseau légitime : flux SSE coupé à la navigation / fermeture, requêtes annulées par TanStack,
+ * images de couverture distantes (CDN des plateformes, données synchronisées) annulées par une navigation.
+ */
+const GLOBAL_ALLOW: RegExp[] = [
+  /^\[requestfailed\] GET \S+\/api\/realtime net::ERR_ABORTED$/,
+  /^\[requestfailed\] GET https:\/\/(?!127\.0\.0\.1|localhost)[^/\s]+\/\S*\.(?:jpe?g|png|webp|gif)(?:\?\S*)? net::ERR_ABORTED$/,
+]
 
 async function newActor(browser: Browser, name: string, opts: BrowserContextOptions, baseURL: string): Promise<Actor> {
   const ctx = await browser.newContext({ ...opts, baseURL, locale: 'fr-BE', timezoneId: 'Europe/Brussels', acceptDownloads: true })

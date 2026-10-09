@@ -31,7 +31,10 @@ interface FormState {
   min_order: string
   ubereats: string
   takeaway: string
+  deliveroo: string
+  weloveat: string
   active: boolean
+  locked: boolean
 }
 
 function providerUrl(r: Restaurant | null, id: RestaurantProviderLink['id']): string {
@@ -60,7 +63,12 @@ function initial(r: Restaurant | null): FormState {
     min_order: r ? centsToEuros(r.min_order) : '',
     ubereats: providerUrl(r, 'ubereats'),
     takeaway: providerUrl(r, 'takeaway'),
+    deliveroo: providerUrl(r, 'deliveroo'),
+    weloveat: providerUrl(r, 'weloveat'),
     active: r?.active ?? true,
+    // enregistrer une modification verrouille la fiche (comme le serveur le
+    // ferait) : l'interrupteur montre ce qui sera enregistré
+    locked: true,
   }
 }
 
@@ -95,10 +103,10 @@ function toRestaurantData(f: FormState): { data?: Partial<Restaurant>; errors: E
   const slug = f.slug.trim() || slugify(f.name)
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) errors.slug = 'Minuscules, chiffres et tirets.'
   const providers: RestaurantProviderLink[] = []
-  const ue = url('ubereats', f.ubereats)
-  const ta = url('takeaway', f.takeaway)
-  if (ue) providers.push({ id: 'ubereats', url: ue })
-  if (ta) providers.push({ id: 'takeaway', url: ta })
+  for (const id of ['ubereats', 'takeaway', 'deliveroo', 'weloveat'] as const) {
+    const u = url(id, f[id])
+    if (u) providers.push({ id, url: u })
+  }
   const data: Partial<Restaurant> = {
     name: f.name.trim(),
     slug,
@@ -147,7 +155,7 @@ export function RestaurantForm({ restaurant, open, onClose, onSaved }: { restaur
     e.preventDefault()
     const { data, errors } = toRestaurantData(form)
     setErrors(errors)
-    if (data) save.mutate(data)
+    if (data) save.mutate(restaurant ? { ...data, locked: form.locked } : data)
   }
 
   const runGeocode = async () => {
@@ -257,7 +265,26 @@ export function RestaurantForm({ restaurant, open, onClose, onSaved }: { restaur
           <legend className="mb-2 font-display text-base font-semibold">Plateformes</legend>
           {text('ubereats', 'Lien Uber Eats', { inputMode: 'url', optional: true, placeholder: 'https://www.ubereats.com/be/store/…' })}
           {text('takeaway', 'Lien Takeaway', { inputMode: 'url', optional: true, placeholder: 'https://www.takeaway.com/be-fr/…' })}
+          {text('deliveroo', 'Lien Deliveroo', { inputMode: 'url', optional: true, placeholder: 'https://deliveroo.be/fr/menu/…' })}
+          {text('weloveat', 'Lien weloveat', { inputMode: 'url', optional: true, placeholder: 'https://weloveat.be/…' })}
         </fieldset>
+
+        {restaurant && (
+          <fieldset className="space-y-1">
+            <legend className="mb-2 font-display text-base font-semibold">Synchronisation</legend>
+            <Toggle
+              checked={form.locked}
+              onChange={(v) => set('locked', v)}
+              label="Verrouillé : la synchronisation ne modifie plus ce restaurant"
+              showLabel
+            />
+            <p className="text-xs text-subtle">
+              Enregistrer ici verrouille la fiche, pour que la synchronisation automatique ne l'écrase pas.
+              {restaurant.locked ? '' : ' Elle ne l’est pas encore : désactive l’interrupteur pour qu’elle continue de suivre les sources.'}
+              {restaurant.stale_since ? ' Ce restaurant n’est plus proposé par aucune source (obsolète).' : ''}
+            </p>
+          </fieldset>
+        )}
       </form>
     </Sheet>
   )

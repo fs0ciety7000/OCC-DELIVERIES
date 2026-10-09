@@ -78,6 +78,9 @@ type Fetcher struct {
 	Delay    time.Duration // clamped to MinDelay
 	Jitter   time.Duration
 	CacheDir string // "" disables the cache
+	// CacheTTL makes cached answers older than this be fetched again
+	// (0 = cached answers never expire).
+	CacheTTL time.Duration
 	// MaxRetryWait caps Retry-After / backoff waits.
 	MaxRetryWait time.Duration
 	Logf         func(format string, args ...any)
@@ -85,7 +88,10 @@ type Fetcher struct {
 	// Network counts the requests actually sent; Cached the cache hits.
 	Network, Cached int
 
-	sleep  func(context.Context, time.Duration) error
+	// Sleep replaces the real pauses (tests only: the delays are still
+	// computed, never skipped in production).
+	Sleep func(context.Context, time.Duration) error
+
 	last   time.Time
 	robots map[string]*Robots
 }
@@ -168,9 +174,11 @@ func (f *Fetcher) cachePath(req Request, pu *url.URL) string {
 func (f *Fetcher) cachedDo(ctx context.Context, req Request, pu *url.URL) ([]byte, error) {
 	cp := f.cachePath(req, pu)
 	if cp != "" {
-		if b, err := os.ReadFile(cp); err == nil {
-			f.Cached++
-			return b, nil
+		if st, err := os.Stat(cp); err == nil && (f.CacheTTL <= 0 || time.Since(st.ModTime()) < f.CacheTTL) {
+			if b, err := os.ReadFile(cp); err == nil {
+				f.Cached++
+				return b, nil
+			}
 		}
 	}
 	b, err := f.network(ctx, req)
@@ -191,8 +199,8 @@ func (f *Fetcher) cachedDo(ctx context.Context, req Request, pu *url.URL) ([]byt
 }
 
 func (f *Fetcher) wait(ctx context.Context, d time.Duration) error {
-	if f.sleep != nil {
-		return f.sleep(ctx, d)
+	if f.Sleep != nil {
+		return f.Sleep(ctx, d)
 	}
 	if d <= 0 {
 		return nil

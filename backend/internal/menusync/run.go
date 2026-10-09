@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -30,8 +31,13 @@ type Options struct {
 	Limit    int  // 0 = no limit
 	Details  bool // fetch per-product details (weloveat supplements)
 	URLs     []string
-	Today    string // menu_checked_at (YYYY-MM-DD)
-	Logf     func(format string, args ...any)
+	// ListingURL replaces the Deliveroo city listing page (its host is then
+	// used for the menu pages too).
+	ListingURL string
+	// APIBase replaces the weloveat API root (https://api.weloveat.be/api/).
+	APIBase string
+	Today   string // menu_checked_at (YYYY-MM-DD)
+	Logf    func(format string, args ...any)
 }
 
 func (o Options) logf(format string, args ...any) {
@@ -70,17 +76,26 @@ func Run(ctx context.Context, f *Fetcher, source string, o Options) ([]Restauran
 		for i := range out {
 			out[i].Source = source
 		}
-		out, st = Merge(out, nil)
+		out, st = MergeIn(out, nil, o.City)
 		for _, g := range st.Merged {
 			o.logf("doublon fusionné : %s", strings.Join(g.Sources, " | "))
 		}
 	}
 	for i := range out {
-		out[i].Source = source
-		if out[i].MenuCheckedAt == "" {
-			out[i].MenuCheckedAt = o.Today
+		r := &out[i]
+		r.Source = source
+		if r.MenuCheckedAt == "" {
+			r.MenuCheckedAt = o.Today
 		}
-		out[i].Normalize()
+		if len(r.Origins) == 0 && len(r.SourceURLs) > 0 {
+			r.Origins = []Origin{{Source: source, URL: r.SourceURLs[0], CheckedAt: r.MenuCheckedAt}}
+		}
+		for j := range r.Origins {
+			r.Origins[j].Source, r.Origins[j].CheckedAt = source, r.MenuCheckedAt
+		}
+		r.Clean(o.City)
+		r.Slug = Slugify(r.Name)
+		r.Normalize()
 	}
 	return out, err
 }
@@ -126,9 +141,16 @@ func keep(o Options, r Restaurant) error {
 }
 
 func runDeliveroo(ctx context.Context, f *Fetcher, o Options) ([]Restaurant, error) {
-	listing, ok := DeliverooCityListing[o.City]
-	if !ok {
-		return nil, fmt.Errorf("ville %q inconnue pour Deliveroo", o.City)
+	listing := o.ListingURL
+	if listing == "" {
+		var ok bool
+		if listing, ok = DeliverooCityListing[o.City]; !ok {
+			return nil, fmt.Errorf("ville %q inconnue pour Deliveroo", o.City)
+		}
+	}
+	base, err := siteRoot(listing)
+	if err != nil {
+		return nil, err
 	}
 	page, err := f.Get(ctx, listing)
 	if err != nil {
@@ -137,6 +159,9 @@ func runDeliveroo(ctx context.Context, f *Fetcher, o Options) ([]Restaurant, err
 	entries, err := ParseDeliverooListing(page)
 	if err != nil {
 		return nil, err
+	}
+	for i := range entries {
+		entries[i].Base = base
 	}
 	SortEntriesByDistance(entries)
 	o.logf("Deliveroo : %d restaurants dans la liste", len(entries))
@@ -176,7 +201,11 @@ func runWeloveat(ctx context.Context, f *Fetcher, o Options) ([]Restaurant, erro
 	if !ok {
 		return nil, fmt.Errorf("ville %q inconnue pour weloveat", o.City)
 	}
-	b, err := f.Do(ctx, Request{Method: "POST", URL: WeloveatSearchURL(), Body: WeloveatSearchBody(city), Accept: "application/json", Sanitize: SanitizeWeloveat})
+	api := WeloveatAPI
+	if o.APIBase != "" {
+		api = strings.TrimSuffix(o.APIBase, "/") + "/"
+	}
+	b, err := f.Do(ctx, Request{Method: "POST", URL: api + weloveatSearchPath, Body: WeloveatSearchBody(city), Accept: "application/json", Sanitize: SanitizeWeloveat})
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +223,7 @@ func runWeloveat(ctx context.Context, f *Fetcher, o Options) ([]Restaurant, erro
 			o.logf("- %s : ignoré (hors rayon)", s.Name)
 			continue
 		}
-		b, err := f.Do(ctx, Request{Method: "POST", URL: WeloveatCatalogueURL(), Body: WeloveatCatalogueBody(s.Slug, city), Accept: "application/json", Sanitize: SanitizeWeloveat})
+		b, err := f.Do(ctx, Request{Method: "POST", URL: api + weloveatCataloguePath, Body: WeloveatCatalogueBody(s.Slug, city), Accept: "application/json", Sanitize: SanitizeWeloveat})
 		if err != nil {
 			if IsBlocked(err) || errors.Is(err, context.Canceled) {
 				return out, err
@@ -216,7 +245,7 @@ func runWeloveat(ctx context.Context, f *Fetcher, o Options) ([]Restaurant, erro
 		}
 		if o.Details {
 			for _, ref := range refs {
-				pb, err := f.Do(ctx, Request{URL: WeloveatProductURL(ref.Slug), Accept: "application/json", Sanitize: SanitizeWeloveat})
+				pb, err := f.Do(ctx, Request{URL: api + weloveatProductPath + ref.Slug, Accept: "application/json", Sanitize: SanitizeWeloveat})
 				if err != nil {
 					if IsBlocked(err) || errors.Is(err, context.Canceled) {
 						return out, err
@@ -271,6 +300,14 @@ func runPages(ctx context.Context, f *Fetcher, o Options, parse func([]byte, str
 		out = append(out, r)
 	}
 	return out, nil
+}
+
+func siteRoot(u string) (string, error) {
+	pu, err := url.Parse(u)
+	if err != nil || pu.Host == "" || (pu.Scheme != "https" && pu.Scheme != "http") {
+		return "", fmt.Errorf("URL invalide : %q", u)
+	}
+	return pu.Scheme + "://" + pu.Host, nil
 }
 
 // Today returns the current date in Brussels as YYYY-MM-DD.
