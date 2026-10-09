@@ -31,6 +31,9 @@ export function ClosedStep({ ctx }: { ctx: PartyCtx }) {
   const celebrate = useOnce(`occ-rain-${party.id}`)
   const [raining, setRaining] = useState(celebrate)
   const mine = summary.data?.participants.find((p) => p.user.id === me.id)
+  // Clôture manuelle possible avec des parts non confirmées : ne pas annoncer « tout est réglé ».
+  const pendingCount = (payments.data ?? []).filter((p) => p.debtor !== p.creditor && p.method !== 'self' && p.status !== 'confirmed').length
+  const settled = payments.isSuccess && pendingCount === 0
 
   return (
     <div className="mx-auto max-w-[680px] space-y-5">
@@ -45,9 +48,10 @@ export function ClosedStep({ ctx }: { ctx: PartyCtx }) {
             <Suspense fallback={<div className="h-22" />}>
               <PaymentCoin size={88} />
             </Suspense>
-            <h2 className="font-display text-[32px] leading-9 font-bold">Tout est réglé !</h2>
+            <h2 className="font-display text-[32px] leading-9 font-bold">{settled ? 'Tout est réglé !' : 'Commande clôturée'}</h2>
             <p className="text-muted">
-              Bon appétit 🍽️ {party.closed_at && <span className="text-subtle">· clôturée {formatRelativeTime(party.closed_at)}</span>}
+              {settled || !payments.isSuccess ? 'Bon appétit 🍽️' : `Bon appétit ! ${pendingCount > 1 ? `${pendingCount} remboursements restent` : 'Un remboursement reste'} à régler entre vous.`}{' '}
+              {party.closed_at && <span className="text-subtle">· clôturée {formatRelativeTime(party.closed_at)}</span>}
             </p>
           </div>
           {summary.data && (
@@ -58,7 +62,7 @@ export function ClosedStep({ ctx }: { ctx: PartyCtx }) {
               </div>
               <div>
                 <p className="text-xs text-muted">Ta part</p>
-                <Money cents={mine?.total ?? 0} className="font-display text-2xl font-bold text-ember" />
+                <Money cents={mine?.total ?? 0} className="font-display text-2xl font-bold text-brand" />
               </div>
             </CardBody>
           )}

@@ -10,8 +10,8 @@ const variants: Record<BadgeVariant, string> = {
   warning: 'bg-warning/12 text-warning border-warning/25',
   danger: 'bg-danger/12 text-danger border-danger/25',
   info: 'bg-info/12 text-info border-info/25',
-  ubereats: 'bg-ubereats/14 text-ubereats border-ubereats/30',
-  takeaway: 'bg-takeaway/14 text-takeaway border-takeaway/30',
+  ubereats: 'bg-ubereats/14 text-ubereats-ink border-ubereats/30',
+  takeaway: 'bg-takeaway/14 text-takeaway-ink border-takeaway/30',
   wero: 'bg-wero text-wero-fg border-transparent',
   bancontact: 'bg-bancontact text-bancontact-fg border-transparent',
 }

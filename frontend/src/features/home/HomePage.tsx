@@ -112,7 +112,7 @@ export function HomePage() {
             Tous les restos <ArrowRight className="size-4" />
           </Link>
         </div>
-        <div className="scrollbar-none -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 sm:-mx-8 sm:px-8" role="list" aria-label="Restaurants à proximité">
+        <div className="scrollbar-none relative -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 sm:-mx-8 sm:px-8" role="list" aria-label="Restaurants à proximité">
           {nearby.isPending
             ? Array.from({ length: 4 }, (_, i) => (
                 <div key={i} className="w-[260px] shrink-0 snap-start" role="listitem">

@@ -120,7 +120,7 @@ export function OrderingStep({ ctx }: { ctx: PartyCtx }) {
           <div className="flex items-center gap-3">
             <RestaurantCover restaurant={restaurant} thumb="120x120" className="size-14 shrink-0 rounded-md" emojiClassName="text-2xl" />
             <div className="min-w-0 flex-1">
-              <h2 className="truncate font-display text-xl font-semibold">On commande chez {restaurant.name}</h2>
+              <h2 className="line-clamp-2 font-display text-xl leading-7 font-semibold">On commande chez {restaurant.name}</h2>
               <p className="text-sm text-muted">Compose ton panier puis dis-nous quand t'es prêt·e.</p>
             </div>
             <Countdown to={party.ordering_ends_at} label="Fin de la commande" />

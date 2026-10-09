@@ -342,7 +342,7 @@ test('commande groupée complète : vote → paniers → récap → dispatch →
       await shot(members, '4b-paying')
       // Bob voit les déclarations en direct puis confirme.
       const parts = bp.locator('li').filter({ has: bp.getByRole('button', { name: 'Confirmer' }) })
-      await expect(bp.getByText("C'est toi qui as avancé l'argent")).toBeVisible()
+      await expect(bp.getByText(/avancé l.argent/)).toBeVisible()
       await expect(parts.filter({ hasText: 'Alice' })).toContainText('Wero')
       await expect(parts.filter({ hasText: 'Alice' })).toContainText('Déclaré')
       await expect(parts.filter({ hasText: 'Chloé' })).toContainText('Espèces')

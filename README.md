@@ -31,3 +31,7 @@ TanStack Query · Docker · Coolify.
 * [Design system « Ember »](docs/DESIGN_SYSTEM.md)
 * [Workflow](docs/WORKFLOW.md) · [Déploiement Coolify](docs/DEPLOYMENT.md) · [Roadmap](docs/ROADMAP.md)
 * [Décisions (ADR)](docs/adr/)
+
+### Captures d'écran (revue design)
+`cd e2e && node scripts/capture.mjs http://localhost:8090 ../docs/screenshots` — régénère les
+captures mobile/desktop, thèmes sombre/clair, de chaque écran (voir `docs/screenshots/`).

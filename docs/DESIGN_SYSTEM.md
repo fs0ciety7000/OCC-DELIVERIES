@@ -32,16 +32,18 @@ les tokens (jamais de hex en dur).
 | `--color-border-strong` | `rgb(255 255 255 / 0.16)` | inputs focus/hover |
 | `--color-fg` | `#F6F4EF` | texte principal |
 | `--color-muted` | `#A3A1AB` | texte secondaire |
-| `--color-subtle` | `#6E6C77` | placeholders, méta |
+| `--color-subtle` | `#86838F` | placeholders, méta (≥ 4,5:1 sur surface) |
 | `--color-brand` | `#FF6A3D` | braise — accent unique |
 | `--color-brand-2` | `#FFB547` | ambre — fin du dégradé |
 | `--color-brand-fg` | `#1A0B05` | texte sur braise |
+| `--color-brand-ink` / `--color-brand-ink-2` | = brand / brand-2 | braise posée **en texte** (`.text-brand`, `.text-ember`) ; assombrie en clair pour l'AA |
 | `--color-success` | `#3DD68C` | prêt, payé |
 | `--color-warning` | `#F5B83D` | en attente |
 | `--color-danger` | `#F26D6D` | erreurs, annulation |
 | `--color-info` | `#6AA8FF` | infos |
 | `--color-ubereats` | `#06C167` | marque fournisseur |
 | `--color-takeaway` | `#FF8000` | marque fournisseur |
+| `--color-ubereats-ink` / `--color-takeaway-ink` | = marque | texte des badges fournisseurs (AA sur leur teinte à 14 %) |
 | `--color-wero` / `--color-wero-fg` | `#FFE500` / `#1A1A1A` | wallet Wero — aplat + texte (contraste ≈ 15:1) |
 | `--color-bancontact` / `--color-bancontact-fg` | `#005498` / `#FFFFFF` | Bancontact Pay — aplat + texte (contraste ≈ 7,6:1) |
 | `--color-qr-bg` / `--color-qr-fg` | `#FFFFFF` / `#000000` | QR codes, identiques dans les deux thèmes |
@@ -50,7 +52,11 @@ les tokens (jamais de hex en dur).
 
 ### Thème clair (`[data-theme="light"]`)
 `bg #FAF8F4`, `surface #FFFFFF`, `elevated #F3F0EA`, `border rgb(20 16 12 / 0.08)`,
-`fg #17151A`, `muted #5F5B66`, `subtle #8E8A95`, `brand #F2542D`, `brand-2 #F59E0B`.
+`fg #17151A`, `muted #5F5B66`, `subtle #6F6B77`, `brand #F2542D`, `brand-2 #F59E0B`,
+`brand-ink #B93A17`, `brand-ink-2 #9A5B00`, `success #0B7A4B`, `warning #94600F`,
+`danger #C03030`, `info #2560C0`, `ubereats-ink #036B4D`, `takeaway-ink #A84A00`.
+En clair, `.text-brand` est redirigé vers `--color-brand-ink` (`styles/index.css`) :
+la braise vive (3,4:1 sur blanc) reste réservée aux aplats, dégradés et icônes.
 
 ### Dégradés & effets
 * `--gradient-ember: linear-gradient(135deg, var(--color-brand), var(--color-brand-2))`
@@ -156,3 +162,55 @@ un parcours critique, toutes interruptibles.
 
 Français, tutoiement léger et chaleureux (« On commande où ? », « T'es prêt·e ? »),
 phrases courtes, pas de jargon technique. Inclusif (point médian avec parcimonie).
+
+## 6. Revue design — 2026-10-09
+
+Revue sur captures Playwright (390×844 et 1280×800, sombre + clair) d'un parcours
+complet à deux (salon → vote → commande → récap → paiement Wero → clôture).
+Captures de référence : `docs/screenshots/<écran>-<mobile|desktop>-<dark|light>.png`.
+
+### Corrigé pendant la revue
+* **P0** — Défilement horizontal de l'accueil (+1 800 px en mobile) : les `sr-only`
+  des cartes du carrousel « À deux pas » s'échappaient vers `<main>`. Le carrousel
+  et `RestaurantMeta` sont `relative`. → *Règle : tout conteneur `overflow-x-auto`
+  contenant des `sr-only` est `relative`.*
+* **P0** — QR d'invitation qui débordait de sa carte dans la colonne de 360 px du salon
+  (desktop) : `InviteCard` passe en *container query* (`@container` + `@md:`).
+* **P1** — Deux `primary` visibles (CTA d'en-tête + CTA de l'écran) : le raccourci
+  d'en-tête est `secondary` et masqué sur l'accueil, l'auth et la party.
+* **P1** — Ingrédients du héros posés sur les lettres du titre : placement en trois
+  paliers (creux des lignes en mobile, au-dessus en tablette, moitié droite vide en desktop).
+* **P1** — Contraste AA en clair : badges d'état, braise en texte, badges Uber Eats /
+  Takeaway, `subtle` (sombre et clair), montant « Ta part » en dégradé ambre.
+* **P1** — « € » orphelin sur sa propre ligne dans les cartes resto : la gamme de prix
+  suit la note.
+* **P1** — Écran clôturé qui annonçait « Tout est réglé ! » alors que des parts
+  restaient en attente (clôture manuelle) → « Commande clôturée » + nombre restant.
+* **P1** — Vue payeur : « Merci pour l'ava… » tronqué en 390 px → le titre passe à la ligne.
+* **P2** — Stepper mobile : coche masquée < `sm` (fini les « Comma… ») ; titre
+  « On commande chez … » sur deux lignes max au lieu d'être tronqué.
+
+### Patterns validés
+* Barre d'action collante en bas (panier + « Je suis prêt·e », « Rouvrir » + « Qui a payé ? ») :
+  un `primary` large, un `secondary` à gauche, au-dessus de la tab bar.
+* En-tête de party : titre + badge d'état + avatars (anneau vert = prêt) + « n membres · n prêts »
+  + code copiable, puis stepper — l'état du groupe reste visible à chaque étape.
+* Montant héros « Ma part » (display 40 px, `tabular-nums`) + communication en clair,
+  tuiles de paiement 2 colonnes, détails copiables et guide en 3 étapes numérotées.
+* Sheet d'options : groupes avec badge « Obligatoire » / « Jusqu'à n », lignes de 48 px,
+  prix de supplément alignés à droite, CTA collant en pied.
+* États vides illustrés (assiette + couverts) avec une action secondaire.
+
+### Idées P2 restantes
+* Accueil desktop : le carrousel « À deux pas » est coupé net à 1 240 px — ajouter un
+  masque en fondu sur les bords ; harmoniser « Créer un salon » / « Lancer une commande ».
+* Récap mobile : « Passer la commande » (envoi fournisseur) arrive après le CTA « Qui a payé ? » ;
+  remonter le bloc d'envoi avant le choix du payeur pour suivre l'ordre réel.
+* Salon desktop : la liste « Dans le salon » passe sous la ligne de flottaison depuis que
+  le QR est empilé — envisager un QR plus petit (120 px) ou un onglet Lien / QR.
+* Couleurs d'avatar générées parfois trop proches (deux oranges côte à côte) : imposer un
+  écart de teinte minimal dans une même party.
+* Thème clair : le cœur de vote et les icônes `text-brand` passent en braise foncée ;
+  envisager une classe `icon-brand` qui garde la braise vive (3:1 suffit pour une icône).
+* Mobile : le bouton « + » de la tab bar double le CTA du héros sur l'accueil.
+* Code de party affiché deux fois dans le salon (pastille d'en-tête + carte d'invitation).

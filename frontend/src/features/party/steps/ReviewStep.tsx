@@ -143,8 +143,8 @@ function FeesEditor({ ctx, summary }: { ctx: PartyCtx; summary: Summary }) {
 }
 
 const DISPATCH_TILES: { method: DispatchMethod; title: string; hint: string; className: string; icon?: React.ReactNode }[] = [
-  { method: 'ubereats', title: 'Uber Eats', hint: 'Lien du resto + récap à saisir', className: 'border-ubereats/30 hover:border-ubereats/60 [&_[data-mark]]:bg-ubereats/15 [&_[data-mark]]:text-ubereats' },
-  { method: 'takeaway', title: 'Takeaway', hint: 'Lien Takeaway.com + récap', className: 'border-takeaway/30 hover:border-takeaway/60 [&_[data-mark]]:bg-takeaway/15 [&_[data-mark]]:text-takeaway' },
+  { method: 'ubereats', title: 'Uber Eats', hint: 'Lien du resto + récap à saisir', className: 'border-ubereats/30 hover:border-ubereats/60 [&_[data-mark]]:bg-ubereats/15 [&_[data-mark]]:text-ubereats-ink' },
+  { method: 'takeaway', title: 'Takeaway', hint: 'Lien Takeaway.com + récap', className: 'border-takeaway/30 hover:border-takeaway/60 [&_[data-mark]]:bg-takeaway/15 [&_[data-mark]]:text-takeaway-ink' },
   { method: 'export', title: 'Exporter', hint: 'CSV, TXT ou JSON', className: 'hover:border-border-strong', icon: <FileDown className="size-4" /> },
   { method: 'phone', title: 'Téléphone', hint: 'Script à dicter au resto', className: 'hover:border-border-strong', icon: <Phone className="size-4" /> },
 ]

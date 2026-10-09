@@ -13,16 +13,22 @@
   --color-border-strong: rgb(255 255 255 / 0.16);
   --color-fg: #f6f4ef;
   --color-muted: #a3a1ab;
-  --color-subtle: #6e6c77;
+  --color-subtle: #86838f; /* ≥ 4.5:1 sur surface / elevated (méta lisible) */
   --color-brand: #ff6a3d;
   --color-brand-2: #ffb547;
   --color-brand-fg: #1a0b05;
+  /* Braise « texte » : accent posé en petit texte (liens, badges). = brand en sombre, assombri en clair (AA). */
+  --color-brand-ink: #ff6a3d;
+  --color-brand-ink-2: #ffb547;
   --color-success: #3dd68c;
   --color-warning: #f5b83d;
   --color-danger: #f26d6d;
   --color-info: #6aa8ff;
   --color-ubereats: #06c167;
   --color-takeaway: #ff8000;
+  /* Texte des badges fournisseurs (AA sur leur teinte à 14 %). */
+  --color-ubereats-ink: #06c167;
+  --color-takeaway-ink: #ff8000;
   /* Wallets belges : aplats de marque + texte dédié (contraste AA vérifié). */
   --color-wero: #ffe500;
   --color-wero-fg: #1a1a1a;
@@ -94,6 +100,8 @@
 
 :root {
   --gradient-ember: linear-gradient(135deg, var(--color-brand), var(--color-brand-2));
+  /* Dégradé appliqué au texte (.text-ember) : version assombrie en clair pour rester AA. */
+  --gradient-ember-text: linear-gradient(135deg, var(--color-brand-ink), var(--color-brand-ink-2));
   --header-h: calc(56px + env(safe-area-inset-top));
   --tabbar-h: 64px;
   --content-max: 1200px;
@@ -128,14 +136,19 @@
   --color-border-strong: rgb(20 16 12 / 0.16);
   --color-fg: #17151a;
   --color-muted: #5f5b66;
-  --color-subtle: #8e8a95;
+  --color-subtle: #6f6b77;
   --color-brand: #f2542d;
   --color-brand-2: #f59e0b;
   --color-brand-fg: #1a0b05;
-  --color-success: #12a564;
-  --color-warning: #b7791f;
-  --color-danger: #d64545;
-  --color-info: #2f6fd6;
+  --color-brand-ink: #b93a17;
+  --color-brand-ink-2: #9a5b00;
+  --color-ubereats-ink: #036b4d;
+  --color-takeaway-ink: #a84a00;
+  /* États assombris : texte de badge AA (≥ 4.5:1) sur leur teinte à 12 %. */
+  --color-success: #0b7a4b;
+  --color-warning: #94600f;
+  --color-danger: #c03030;
+  --color-info: #2560c0;
   --color-scrim: rgb(23 21 26 / 0.4);
 
   --shadow-card: 0 1px 0 rgb(255 255 255 / 0.6) inset, 0 8px 24px -14px rgb(40 24 12 / 0.22);

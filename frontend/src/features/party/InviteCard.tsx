@@ -8,9 +8,9 @@ export function InviteCard({ party }: { party: Party }) {
   const url = inviteUrl(party.code)
   const canShare = typeof navigator !== 'undefined' && 'share' in navigator
   return (
-    <Card className="overflow-hidden">
-      <div className="grid gap-5 p-4 sm:grid-cols-[1fr_auto] sm:p-5">
-        <div className="space-y-3">
+    <Card className="@container overflow-hidden">
+      <div className="grid gap-5 p-4 @md:grid-cols-[minmax(0,1fr)_auto] sm:p-5">
+        <div className="min-w-0 space-y-3">
           <h2 className="font-display text-lg font-semibold">Invite ton équipe</h2>
           <p className="text-sm text-muted">Partage le lien, fais scanner le QR ou donne le code.</p>
           <div className="flex items-center gap-3">

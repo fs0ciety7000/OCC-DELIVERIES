@@ -88,7 +88,7 @@ describe('PartyPage — chaque étape se rend', () => {
     ['ordering', /On commande chez Pizza Nonna/],
     ['review', /Qui a pris quoi/],
     ['paying', /Les parts/],
-    ['closed', /Tout est réglé/],
+    ['closed', /Tout est réglé|Commande clôturée/],
     ['cancelled', /Commande annulée/],
   ])('%s', async (s, text) => {
     status = s

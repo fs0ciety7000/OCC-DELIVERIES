@@ -7,7 +7,7 @@
   background-image: var(--gradient-ember);
 }
 @utility text-ember {
-  background-image: var(--gradient-ember);
+  background-image: var(--gradient-ember-text);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -90,6 +90,12 @@
   [role="button"]:not(:disabled) {
     cursor: pointer;
   }
+}
+
+/* Thème clair : la braise (#F2542D, 3,4:1) reste pour les aplats/boutons, mais
+   l'accent posé en texte passe sur --color-brand-ink (AA ≥ 4.5:1). */
+[data-theme="light"] .text-brand {
+  color: var(--color-brand-ink);
 }
 
 /* Halo braise en haut de page + grain SVG très léger. */

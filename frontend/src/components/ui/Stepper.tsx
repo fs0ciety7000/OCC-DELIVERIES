@@ -36,7 +36,7 @@ export function Stepper({ status, className }: StepperProps) {
                 active ? 'text-fg' : done ? 'text-muted' : 'text-subtle',
               )}
             >
-              {done && <Check aria-hidden className="size-3 shrink-0 text-brand" />}
+              {done && <Check aria-hidden className="hidden size-3 shrink-0 text-brand sm:block" />}
               <span className="truncate">{step.label}</span>
               <span className="sr-only">{done ? ' (terminé)' : active ? ' (en cours)' : ' (à venir)'}</span>
             </span>

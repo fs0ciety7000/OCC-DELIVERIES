@@ -25,7 +25,7 @@ export function ProviderBadges({ restaurant, className }: { restaurant: Pick<Res
 export function RestaurantMeta({ restaurant, className }: { restaurant: Restaurant | NearbyRestaurant; className?: string }) {
   const distance = 'distanceKm' in restaurant ? restaurant.distanceKm : undefined
   return (
-    <ul className={cn('flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] leading-5 text-muted', className)}>
+    <ul className={cn('relative flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] leading-5 text-muted', className)}>
       {restaurant.rating > 0 && (
         <li className="inline-flex items-center gap-1 font-semibold text-fg">
           <Star aria-hidden className="size-3.5 fill-brand-2 text-brand-2" />
@@ -34,6 +34,7 @@ export function RestaurantMeta({ restaurant, className }: { restaurant: Restaura
           <span className="sr-only">sur 5</span>
         </li>
       )}
+      {restaurant.price_level > 0 && <li className="font-medium tracking-wide" aria-label={`Gamme de prix ${restaurant.price_level} sur 4`}>{priceLevel(restaurant.price_level)}</li>}
       {(restaurant.eta_min > 0 || restaurant.eta_max > 0) && (
         <li className="inline-flex items-center gap-1">
           <Clock aria-hidden className="size-3.5" />
@@ -50,7 +51,6 @@ export function RestaurantMeta({ restaurant, className }: { restaurant: Restaura
           <span className="tabular">{formatDistance(distance)}</span>
         </li>
       )}
-      {restaurant.price_level > 0 && <li aria-label={`Gamme de prix ${restaurant.price_level} sur 4`}>{priceLevel(restaurant.price_level)}</li>}
     </ul>
   )
 }

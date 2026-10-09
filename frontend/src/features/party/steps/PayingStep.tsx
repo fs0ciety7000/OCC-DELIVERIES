@@ -53,10 +53,10 @@ export function PayingStep({ ctx }: { ctx: PartyCtx }) {
             <div className="flex items-center gap-3">
               {payer && <Avatar user={payer} size={40} />}
               <div className="min-w-0 flex-1">
-                <p className="text-sm text-muted">{iAmPayer ? "C'est toi qui as avancé l'argent" : 'À rembourser à'}</p>
-                <p className="truncate font-display text-lg font-semibold">{iAmPayer ? 'Merci pour l’avance 🙌' : (payer?.name ?? 'Le payeur')}</p>
+                <p className="text-sm text-muted">{iAmPayer ? 'Tu as avancé l’argent' : 'À rembourser à'}</p>
+                <p className={cn('font-display text-lg leading-6 font-semibold', iAmPayer ? 'text-pretty' : 'truncate')}>{iAmPayer ? 'Merci pour l’avance 🙌' : (payer?.name ?? 'Le payeur')}</p>
               </div>
-              <div className="text-right">
+              <div className="shrink-0 text-right">
                 <p className="text-xs text-muted">Remboursé</p>
                 <p className="text-sm font-semibold tabular">
                   <Money cents={confirmed} /> / <Money cents={total} />

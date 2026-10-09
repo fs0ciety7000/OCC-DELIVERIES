@@ -18,6 +18,9 @@ export function AppShell() {
   const navigate = useNavigate()
   const [createOpen, setCreateOpen] = useState(false)
   const inParty = location.pathname.startsWith('/party/')
+  // Une seule action principale par écran : le raccourci d'en-tête est secondaire et
+  // masqué là où l'écran porte déjà son propre CTA (héros d'accueil, auth, party).
+  const showHeaderCta = !inParty && !['/', '/login', '/register'].includes(location.pathname)
   const launch = () => (user ? setCreateOpen(true) : navigate(`/login?next=${encodeURIComponent(location.pathname)}`))
   const shellStyle = inParty ? ({ '--tabbar-h': '0px' } as CSSProperties) : undefined
 
@@ -48,9 +51,11 @@ export function AppShell() {
           </nav>
           <div className="ml-auto flex items-center gap-1">
             <ThemeToggle />
-            <button type="button" onClick={launch} className={cn(buttonClass('primary', 'sm'), 'hidden md:inline-flex')}>
-              <Plus className="size-4" /> Lancer une commande
-            </button>
+            {showHeaderCta && (
+              <button type="button" onClick={launch} className={cn(buttonClass('secondary', 'sm'), 'hidden md:inline-flex')}>
+                <Plus className="size-4" /> Lancer une commande
+              </button>
+            )}
             {user ? (
               <Link to="/profile" className="hidden rounded-full p-1.5 md:block" aria-label="Mon profil">
                 <Avatar user={user} size={32} decorative />
