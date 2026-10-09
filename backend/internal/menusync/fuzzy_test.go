@@ -8,6 +8,8 @@ import (
 func TestCleanStoreName(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{"CTR Chicken Mons (Independant)", "CTR Chicken"},
+		{"Altaj (Quaregnon)", "Altaj"},
+		{"Burger King - Quaregnon", "Burger King"},
 		{"Snack Pitta Grill Akropolis (Mons)", "Snack Pitta Grill Akropolis"},
 		{"Donroll’s (Mons)", "Donroll’s"},
 		{"Tomo - Mons", "Tomo"},

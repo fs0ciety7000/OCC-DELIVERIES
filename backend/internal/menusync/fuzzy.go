@@ -13,7 +13,11 @@ import (
 
 // storeLabelRe matches a trailing platform label: « (Independant) »,
 // « (Indépendant) », « [Independent] ».
-var storeLabelRe = regexp.MustCompile(`(?i)\s*[(\[]\s*(ind[eé]pendante?|independent|franchise)\s*[)\]]\s*$`)
+var storeLabelRe = regexp.MustCompile(`(?i)\s*[(\[]\s*(ind[eé]pendante?|independent|franchise|` + nearbyTowns + `)\s*[)\]]\s*$|\s+-\s+(` + nearbyTowns + `)\s*$`)
+
+// nearbyTowns are the localities around Mons that the platforms append to
+// store names (« Altaj (Quaregnon) », « Burger King - Quaregnon »).
+const nearbyTowns = `quaregnon|dour|jemappes|cuesmes|nimy|ghlin|hyon|havr[eé]|obourg|frameries|boussu|saint-ghislain|jurbise|maisi[eè]res|spiennes|mesvin|ciply|hornu`
 
 // MinContainedKey is the minimal length of a name key contained in another
 // one for the two names to match (« donrolls » in « donrollssushi »).
