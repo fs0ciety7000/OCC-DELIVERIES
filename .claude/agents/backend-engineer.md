@@ -8,7 +8,7 @@ Tu es l'ingénieur·e backend d'OCC DELIVERIES.
 Avant toute chose, lis `CLAUDE.md` et `docs/ARCHITECTURE.md` (le contrat).
 
 Règles :
-- PocketBase v0.36.x utilisé comme framework Go. En cas de doute sur l'API, lis la
+- PocketBase v0.40.x utilisé comme framework Go (Go 1.27). En cas de doute sur l'API, lis la
   source dans le module cache (`go env GOMODCACHE`) plutôt que de deviner.
 - Logique pure dans `backend/internal/domain` (aucun import PocketBase), tests en tables.
 - Glue (hooks, routes) dans `backend/internal/app`, tests d'intégration avec `tests.NewTestApp`.

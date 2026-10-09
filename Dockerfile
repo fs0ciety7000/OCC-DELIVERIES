@@ -1,7 +1,7 @@
 # OCC DELIVERIES — image unique : binaire PocketBase/Go + SPA React.
 
 # ---------- 1. Frontend ----------
-FROM node:22-alpine AS web
+FROM node:24-alpine AS web
 WORKDIR /web
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
@@ -9,7 +9,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # ---------- 2. Backend ----------
-FROM golang:1.24-alpine AS api
+FROM golang:1.27-alpine AS api
 WORKDIR /src
 COPY backend/go.mod backend/go.sum ./
 RUN go mod download
@@ -18,7 +18,7 @@ ARG VERSION=dev
 RUN CGO_ENABLED=0 go build -trimpath -tags timetzdata -ldflags "-s -w -X main.version=${VERSION}" -o /out/occ .
 
 # ---------- 3. Runtime ----------
-FROM alpine:3.22
+FROM alpine:3.24
 # ca-certificates et wget (busybox) sont déjà dans alpine ; tzdata est embarqué
 # dans le binaire (-tags timetzdata) → aucun accès réseau requis à cette étape.
 RUN adduser -D -H -u 10001 occ \

@@ -9,7 +9,7 @@ chacun rembourse le payeur en scannant un QR code.
 
 ## Démarrer
 ```bash
-# Prérequis : Go 1.24+, Node 22+
+# Prérequis : Go 1.27.2+ (auto via GOTOOLCHAIN), Node 24 LTS (`.nvmrc`)
 cd frontend && npm ci && cd ..
 make dev            # API http://127.0.0.1:8090  ·  front http://localhost:5173
 ```
@@ -18,7 +18,7 @@ ou en conteneur : `cp .env.example .env && docker compose up --build` → http:/
 Admin PocketBase : `/_/` (identifiants `OCC_ADMIN_EMAIL` / `OCC_ADMIN_PASSWORD`).
 
 ## Stack
-PocketBase v0.36 (Go, SQLite, realtime) · React 19 · Vite · Tailwind v4 ·
+PocketBase v0.40 (Go 1.27, SQLite, realtime) · React 19 · Vite · Tailwind v4 ·
 TanStack Query · Docker · Coolify.
 
 ## Documentation
