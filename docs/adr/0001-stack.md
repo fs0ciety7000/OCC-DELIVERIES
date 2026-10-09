@@ -27,5 +27,5 @@ Option 1.
 * Scalabilité horizontale limitée (un nœud). Si besoin un jour : migrer les
   données vers Postgres ; `internal/domain` et le contrat `/api/occ` restent.
 * Les montants sont stockés en centimes `int` (pas de float).
-* PocketBase est épinglé en **v0.36.6** (dernière série compatible Go 1.24) ;
-  les montées de version passent par une PR dédiée.
+* PocketBase est épinglé en **v0.40.5** (Go 1.27.2, Node 24 LTS, alpine 3.24 — mise à
+  niveau du 2026-10-09) ; les montées de version passent par une PR dédiée.

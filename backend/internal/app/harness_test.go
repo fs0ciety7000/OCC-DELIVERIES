@@ -52,7 +52,7 @@ func buildTemplate(dir string) error {
 	defer ta.Cleanup()
 	// close the db connections (WAL checkpoint) then copy the migrated clone
 	// back into the template dir
-	if err := ta.ResetBootstrapState(); err != nil {
+	if err := ta.ClearBootstrap(); err != nil {
 		return err
 	}
 	return os.CopyFS(dir, os.DirFS(ta.DataDir()))

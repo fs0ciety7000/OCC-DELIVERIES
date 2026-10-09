@@ -9,7 +9,7 @@ chacun rembourse le payeur en scannant un QR code.
 
 ## Démarrer
 ```bash
-# Prérequis : Go 1.24+, Node 22+
+# Prérequis : Go 1.27.2+ (auto via GOTOOLCHAIN), Node 24 LTS (`.nvmrc`)
 cd frontend && npm ci && cd ..
 make dev            # API http://127.0.0.1:8090  ·  front http://localhost:5173
 ```
@@ -22,7 +22,7 @@ Scénario complet hôte + 2 invités (dont mobile 390×844) contre une instance 
 `cd e2e && npm ci && E2E_BASE_URL=http://localhost:8090 npx playwright test` (Chromium de `/opt/pw-browsers` ou `PLAYWRIGHT_BROWSERS_PATH` ; `E2E_DEBUG=1` ajoute des captures).
 
 ## Stack
-PocketBase v0.36 (Go, SQLite, realtime) · React 19 · Vite · Tailwind v4 ·
+PocketBase v0.40 (Go 1.27, SQLite, realtime) · React 19 · Vite · Tailwind v4 ·
 TanStack Query · Docker · Coolify.
 
 ## Documentation

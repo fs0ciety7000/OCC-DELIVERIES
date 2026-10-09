@@ -8,7 +8,7 @@
 ```
 ┌──────────────────────────── Docker image (1 conteneur) ───────────────────────────┐
 │                                                                                    │
-│   occ (binaire Go = PocketBase v0.36 étendu)                                       │
+│   occ (binaire Go = PocketBase v0.40 étendu)                                       │
 │   ├── /api/collections/*   CRUD + realtime (SSE) PocketBase, protégés par rules   │
 │   ├── /api/occ/*           endpoints métier (state machine, résumé, paiements…)   │
 │   ├── /_/                  admin PocketBase (superuser)                           │
@@ -161,7 +161,7 @@ Rules : list/view `active = true` ; écriture superuser uniquement.
 
 Rules :
 * list/view : `members.id ?= @request.auth.id`
-  (⚠ PocketBase v0.36 : sur une relation multiple, `members ?= x` compare la
+  (⚠ PocketBase (v0.36 à v0.40) : sur une relation multiple, `members ?= x` compare la
   valeur JSON brute et ne matche jamais → toujours écrire `members.id ?= …`)
 * create : `@request.auth.id != ""` → le hook force `host`, `members=[host]`, `code`, `status=lobby`.
 * update : `host = @request.auth.id` → le hook **refuse** toute modification de

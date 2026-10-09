@@ -1,6 +1,6 @@
 # OCC Deliveries — backend
 
-PocketBase **v0.36.6** used as a Go framework (Go 1.24). Contract: `../docs/ARCHITECTURE.md`.
+PocketBase **v0.40.5** used as a Go framework (Go 1.27.2). Contract: `../docs/ARCHITECTURE.md`.
 
 ```bash
 go run . serve --http=127.0.0.1:8090   # API /api/occ, admin /_/, SPA from ./pb_public
@@ -21,4 +21,4 @@ go build -ldflags "-X main.version=1.2.3" -o occ .
 Les tests d'intégration construisent une fois un `pb_data` migré (temp dir) puis
 clonent ce modèle pour chaque test (`tests.NewTestApp`).
 
-Note : PocketBase v0.36.7+ exige Go ≥ 1.25, d'où l'épinglage en v0.36.6.
+Note : PocketBase v0.40+ exige Go ≥ 1.27 (`encoding/json/v2`) ; le `toolchain go1.27.2` de `go.mod` est téléchargé automatiquement (`GOTOOLCHAIN=auto`).
