@@ -1,0 +1,10 @@
+node_modules/
+frontend/dist/
+backend/pb_data/
+backend/pb_public/
+backend/occ
+*.log
+.env
+.env.local
+.DS_Store
+coverage/

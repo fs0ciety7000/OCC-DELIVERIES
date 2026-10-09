@@ -1,0 +1,31 @@
+# Utilisable tel quel en local et par Coolify (Build Pack « Docker Compose »).
+services:
+  occ:
+    build:
+      context: .
+      args:
+        VERSION: ${SOURCE_COMMIT:-dev}
+    image: occ-deliveries:latest
+    restart: unless-stopped
+    environment:
+      OCC_PUBLIC_URL: ${OCC_PUBLIC_URL:-http://localhost:8090}
+      OCC_ADMIN_EMAIL: ${OCC_ADMIN_EMAIL:-}
+      OCC_ADMIN_PASSWORD: ${OCC_ADMIN_PASSWORD:-}
+      OCC_DEFAULT_LAT: ${OCC_DEFAULT_LAT:-50.4542}
+      OCC_DEFAULT_LNG: ${OCC_DEFAULT_LNG:-3.9567}
+      OCC_DEFAULT_LABEL: ${OCC_DEFAULT_LABEL:-Mons}
+      OCC_SEED_DEMO: ${OCC_SEED_DEMO:-true}
+      OCC_PROVIDERS: ${OCC_PROVIDERS:-ubereats,takeaway}
+    ports:
+      - "8090:8090"
+    volumes:
+      - occ_data:/pb/pb_data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8090/api/occ/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  occ_data:

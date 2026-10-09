@@ -1,0 +1,8 @@
+.git
+**/node_modules
+frontend/dist
+backend/pb_data
+backend/pb_public
+**/*.log
+.env*
+!.env.example
