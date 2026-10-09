@@ -71,10 +71,17 @@ Rules : list/view `@request.auth.id != ""` ; update/delete `id = @request.auth.i
 | holder_name | text | bénéficiaire du virement |
 | iban | text | validé mod-97, stocké sans espaces, majuscules |
 | bic | text | optionnel |
-| payment_link | url | ex. `https://paypal.me/jdoe`, Revolut, Wero… |
+| payment_link | url | ex. `https://paypal.me/jdoe`, Revolut… |
+| wero_id | text | n° de mobile (E.164, ex. `+32470123456`) **ou** e-mail enregistré sur Wero |
+| bancontact_phone | text | n° de mobile (E.164) lié à Bancontact Pay |
+| wero_qr | file | image (png/jpg/webp, ≤ 1 Mo, `protected`) — QR « recevoir » généré dans l'app bancaire |
+| bancontact_qr | file | idem pour Bancontact Pay |
 
 Rules : toutes `user = @request.auth.id` (create : `@request.auth.id != "" && user = @request.auth.id`).
-Jamais exposé aux autres membres : le QR est construit côté serveur.
+Jamais exposé aux autres membres : QR EPC, identifiants Wero/Bancontact et images
+QR ne sortent que via `/api/occ/payments/{id}/qr` et `/wallet-qr/{kind}`, pour les
+membres de la party concernée. Hook : `wero_id` / `bancontact_phone` normalisés
+(mobile → E.164 avec `+32` par défaut si commence par `0` ; e-mail en minuscules) et validés.
 
 ### `restaurants` (lecture publique)
 | champ | type | notes |
@@ -200,7 +207,7 @@ Hooks : valide options (min/max, ids), recalcule prix ; toute écriture remet
 | debtor | R(users) | qui doit |
 | creditor | R(users) | le payeur |
 | amount | number int | cents |
-| method | select | `qr`, `cash`, `later`, `self` |
+| method | select | `qr` (virement EPC), `wero`, `bancontact`, `link`, `cash`, `later`, `self` |
 | status | select | `pending`, `declared`, `confirmed` |
 | reference | text | communication, ex. `OCC K7M2QX Alice` |
 | declared_at, confirmed_at | date | |
@@ -248,10 +255,11 @@ PocketBase `{ "status": 400, "message": "…", "data": {} }`, messages en franç
 | `GET /api/occ/parties/{id}/export` | membre | `format=csv\|txt\|json` | fichier (`Content-Disposition: attachment`) |
 | `POST /api/occ/payments/{id}/action` | voir | `{ "action": "declare"\|"confirm"\|"reset", "method"?: "qr"\|"cash"\|"later" }` | `{ "payment": Payment }` |
 | `GET /api/occ/payments/{id}/qr` | membre | | `PaymentQR` |
+| `GET /api/occ/payments/{id}/wallet-qr/{kind}` | membre | `kind=wero\|bancontact` | image QR du payeur (stream, `Cache-Control: private`) ou 404 |
 | `POST /api/occ/admin/import` | superuser | `RestaurantImport` | `{ "restaurant": id, "items": n }` (upsert par slug) |
 
 Règles `payments/{id}/action` :
-* `declare` — débiteur seulement. `method=qr|cash` → `status=declared` ; `method=later` → `status=pending`.
+* `declare` — débiteur seulement. `method=qr|wero|bancontact|link|cash` → `status=declared` ; `method=later` → `status=pending`.
 * `confirm` — créancier (payeur) ou hôte → `status=confirmed`. Si tous confirmés → party `closed`.
 * `reset` — créancier ou hôte → `status=pending`.
 
@@ -290,11 +298,23 @@ plus grand reste (ordre stable par id) → `Σ total = grandTotal` **exactement*
 ```json
 { "amount": 1400, "reference": "OCC K7M2QX Alice", "beneficiary": "Bob Martin",
   "epc": "BCD\n002\n1\nSCT\n\nBob Martin\nBE71096123456769\nEUR14.00\n\n\nOCC K7M2QX Alice",
-  "link": "https://paypal.me/bob/14.00EUR" }
+  "link": "https://paypal.me/bob/14.00EUR",
+  "wero": { "id": "+32470123456", "hasQr": true },
+  "bancontact": { "phone": "+32470123456", "hasQr": false },
+  "methods": ["qr", "wero", "bancontact", "link", "cash", "later"] }
 ```
 `epc` = payload **EPC069-12** (QR virement SEPA, lu par les apps bancaires
 belges/européennes), `null` si le payeur n'a pas d'IBAN. `link` = lien de paiement
-du payeur (montant ajouté pour paypal.me), `null` sinon.
+du payeur (montant ajouté pour paypal.me), `null` sinon. `wero` / `bancontact` :
+`null` si le payeur n'a rien renseigné ; `hasQr` indique qu'une image est
+disponible via `/wallet-qr/{kind}`. `methods` = moyens réellement proposés
+(selon le profil du payeur), dans l'ordre d'affichage recommandé.
+
+**Wero / Bancontact Pay** n'exposent aucun lien ni QR de demande de paiement
+P2P utilisable par un tiers (leurs API sont réservées aux commerçants). L'UI
+affiche donc : montant + communication à copier, identifiant du payeur à
+copier, QR personnel du payeur s'il l'a téléversé, et un mini-guide
+(« Ouvre ton app bancaire → Wero → Envoyer… »). Voir ADR 0003.
 
 ### `RestaurantImport`
 ```json

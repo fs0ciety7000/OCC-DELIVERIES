@@ -3,7 +3,7 @@
 Plateforme de **commandes groupées** entre collègues : on ouvre une commande
 (« party »), les collègues rejoignent, votent pour un restaurant, chacun compose
 son panier, on envoie vers Uber Eats / Takeaway (ou on exporte), on désigne le
-payeur et chacun rembourse sa part (QR virement SEPA, espèces, plus tard).
+payeur et chacun rembourse sa part (Wero, Bancontact Pay, QR virement SEPA, espèces, plus tard).
 
 Production : `https://eat.fs0ciety.org` (Coolify, Docker).
 
