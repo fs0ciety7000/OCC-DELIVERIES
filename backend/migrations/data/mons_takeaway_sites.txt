@@ -10,3 +10,137 @@ https://www.snack-alibaba.be/
 https://www.lebosphore-mons.be/
 https://www.baalbeckmons.be/
 https://www.lafritemayomons-mons.be/
+
+# --- Ajouts du 2026-10-09 (recherche « scraper un maximum de restaurants », migration 1760000009) ---
+# Chaque site : gabarit Takeaway vérifié (.menucat, microdonnées, meta orderUrl), robots.txt « Allow: / »,
+# analysé par menusync -provider takeaway-site (≥ 5 plats, à ≤ 10 km du centre de Mons). Détails : SOURCES_menusync.md
+# Alaa Snack (Mons) — recherche web « Commander un repas en ligne à … » ; 34 plats au 2026-10-09
+https://www.alaasnack-mons.be/
+# Asia Box Go (Mons) — recherche web « Commander un repas en ligne à … » ; 317 plats au 2026-10-09
+https://www.asiaboxgo.be/
+# Bagel City (Mons) — recherche web « Commander un repas en ligne à … » ; 61 plats au 2026-10-09
+https://www.bagelcity-mons.be/
+# Chez Dona Julia (Mons) — domaine deviné depuis le nom (Deliveroo / weloveat / Uber Eats / Takeaway) ; 66 plats au 2026-10-09
+https://www.chezdonajuliamons.be/
+# CTR Chicken (Mons) — recherche web « Commander un repas en ligne à … » ; 218 plats au 2026-10-09
+https://www.chitir-chicken-mons.be/
+# Donroll's (Mons) — recherche web « Commander un repas en ligne à … » ; 162 plats au 2026-10-09
+https://www.donrolls-mons.be/
+# Dreams Donuts. (Mons) — recherche web « Commander un repas en ligne à … » ; 13 plats au 2026-10-09
+https://www.dreamsdonuts-mons.be/
+# Délice d'Asie (Mons) — recherche web « Commander un repas en ligne à … » ; 178 plats au 2026-10-09
+https://www.delicedasie.be/
+# En Faim (Mons) — recherche web « Commander un repas en ligne à … » ; 97 plats au 2026-10-09
+https://www.en-faim.be/
+# Five Senses (Mons) — domaine deviné depuis le nom (Deliveroo / weloveat / Uber Eats / Takeaway) ; 56 plats au 2026-10-09
+https://www.five-senses.be/
+# Friterie Grand'Place (Mons) — recherche web « Commander un repas en ligne à … » ; 124 plats au 2026-10-09
+https://www.friterie-grandplace.be/
+# Khao soi (Mons) — recherche web « Commander un repas en ligne à … » ; 44 plats au 2026-10-09
+https://www.khaosoi-mons.be/
+# L'Atelier Libanais (Mons) — recherche web « Commander un repas en ligne à … » ; 72 plats au 2026-10-09
+https://www.latelierlibanais.be/
+# La Cédraie (Mons) — domaine deviné depuis le nom (Deliveroo / weloveat / Uber Eats / Takeaway) ; 228 plats au 2026-10-09
+https://www.lacedraie.be/
+# La Petite Couscoussière (Mons) — recherche web « Commander un repas en ligne à … » ; 41 plats au 2026-10-09
+https://www.la-petite-couscoussiere-mons.be/
+# La Sandwicherie de La Guinguette Montoise (Mons) — recherche web « Commander un repas en ligne à … » ; 69 plats au 2026-10-09
+https://www.lasandwicheriedelaguinguettemontoise-mons.be/
+# Le Copenhagen (Mons) — recherche web « Commander un repas en ligne à … » ; 104 plats au 2026-10-09
+https://www.le-copenhagen.be/
+# Melanza Mons (Mons) — recherche web « Commander un repas en ligne à … » ; 129 plats au 2026-10-09
+https://www.melanza-mons.be/
+# New China Restaurant (Mons) — recherche web « Commander un repas en ligne à … » ; 77 plats au 2026-10-09
+https://www.newchinarestaurantmons.be/
+# O'Tacos Centre ville de Mons (Mons) — recherche web « Commander un repas en ligne à … » ; 85 plats au 2026-10-09
+https://www.otacosmons.be/
+# Pacific Traiteur Asiatique (Mons) — recherche web « Commander un repas en ligne à … » ; 84 plats au 2026-10-09
+https://www.pacific-traiteur-asiatique.be/
+# Pastella Mons (Mons) — recherche web « Commander un repas en ligne à … » ; 50 plats au 2026-10-09
+https://www.pastella-mons.be/
+# Pitta Mons (Mons) — recherche web « Commander un repas en ligne à … » ; 240 plats au 2026-10-09
+https://www.pittamons.be/
+# Pitta Shop (Mons) — recherche web « Commander un repas en ligne à … » ; 214 plats au 2026-10-09
+https://www.pittashop.be/
+# Sandwicherie Boulangerie Montoise (Mons) — recherche web « Commander un repas en ligne à … » ; 105 plats au 2026-10-09
+https://www.sandwicherie-boulangerie-montoise.be/
+# Season's (Mons) — recherche web « Commander un repas en ligne à … » ; 33 plats au 2026-10-09
+https://www.seasons-mons.be/
+# Snack du Lido (Mons) — recherche web « Commander un repas en ligne à … » ; 188 plats au 2026-10-09
+https://www.snackdulido.be/
+# Snack Pitta Grec Akropolis (Mons) — recherche web « Commander un repas en ligne à … » ; 306 plats au 2026-10-09
+https://www.snack-pitta-grill-akropolis.be/
+# Snack à la Gare (Mons) — demandé par l'utilisateur (takeaway.com/be-fr/menu/snack-a-la-gare), site trouvé par recherche web « Commander un repas en ligne à … » ; 196 plats au 2026-10-09
+https://www.snack-a-la-gare.be/
+# Sushi Flower (Mons) — recherche web « Commander un repas en ligne à … » ; 151 plats au 2026-10-09
+https://www.sushiflower.be/
+# Sushi Home (Mons) — recherche web « Commander un repas en ligne à … » ; 101 plats au 2026-10-09
+https://www.sushi-home-mons-mons.be/
+# Sushi House (Mons) — recherche web « Commander un repas en ligne à … » ; 136 plats au 2026-10-09
+https://www.sushi-house-mons.be/
+# Victory's (Mons, page en anglais « Order food online in Mons », adresse non publiée) — domaine deviné depuis le nom (Deliveroo / weloveat / Uber Eats / Takeaway) ; 65 plats au 2026-10-09
+https://www.victorysmons.be/
+# Wang de Fu (Mons) — recherche web « Commander un repas en ligne à … » ; 123 plats au 2026-10-09
+https://www.wang-de-fu.be/
+# Zenzou (Mons) — recherche web « Commander un repas en ligne à … » ; 100 plats au 2026-10-09
+https://www.zenzou.be/
+# L'Alighieri (Cuesmes) — recherche web « Commander un repas en ligne à … » ; 105 plats au 2026-10-09
+https://www.lalighieri.be/
+# Arrivo pizza (Frameries) — recherche web « Commander un repas en ligne à … » ; 86 plats au 2026-10-09
+https://www.arrivopizzaframeries.be/
+# Couscous Dellys Frameries (Frameries) — recherche web « Commander un repas en ligne à … » ; 27 plats au 2026-10-09
+https://www.couscousdellysframeries-frameries.be/
+# Garibaldi (Frameries) — recherche web « Commander un repas en ligne à … » ; 74 plats au 2026-10-09
+https://www.garibaldiframeries.be/
+# Pékin Express (Frameries) — recherche web « Commander un repas en ligne à … » ; 145 plats au 2026-10-09
+https://www.pekin-express.be/
+# Sushi Flower (Frameries) — recherche web « Commander un repas en ligne à … » ; 119 plats au 2026-10-09
+https://www.sushiflower-frameries.be/
+# Ap Pizza Street Food Napoletano (Ghlin) — recherche web « Commander un repas en ligne à … » ; 103 plats au 2026-10-09
+https://www.ap-pizza-street-food.be/
+# Pizza Régal (Ghlin) — domaine deviné depuis le nom (Deliveroo / weloveat / Uber Eats / Takeaway) ; 157 plats au 2026-10-09
+https://www.pizza-regal.be/
+# Pizzeria Reggina (Ghlin) — recherche web « Commander un repas en ligne à … » ; 135 plats au 2026-10-09
+https://www.pizzeriareggina.be/
+# Pizza House (Hyon) — recherche web « Commander un repas en ligne à … » ; 209 plats au 2026-10-09
+https://www.pizzahousemons.be/
+# Bella Napoli.it (Jemappes) — recherche web « Commander un repas en ligne à … » ; 101 plats au 2026-10-09
+https://www.bella-napoliit.be/
+# Eliz Shop (Jemappes) — recherche web « Commander un repas en ligne à … » ; 213 plats au 2026-10-09
+https://www.eliz-shop-mons.be/
+# Friterie de Jemappes chez Jean (Jemappes) — recherche web « Commander un repas en ligne à … » ; 300 plats au 2026-10-09
+https://www.friterie-de-jemappes-chez-jean.be/
+# La Chine (Jemappes) — recherche web « Commander un repas en ligne à … » ; 154 plats au 2026-10-09
+https://www.lachine-jemappes.be/
+# Super Asia (Jemappes) — recherche web « Commander un repas en ligne à … » ; 95 plats au 2026-10-09
+https://www.super-asia.be/
+# Touchdown Grill (Jemappes) — recherche web « Commander un repas en ligne à … » ; 15 plats au 2026-10-09
+https://www.touchdown-grill-mons.be/
+# China Express (Nimy) — recherche web « Commander un repas en ligne à … » ; 134 plats au 2026-10-09
+https://www.chinaexpressbergen.be/
+# Ciao Pizza (Nimy) — recherche web « Commander un repas en ligne à … » ; 65 plats au 2026-10-09
+https://www.ciaopizza-nimy.be/
+# Imako - Poke Bowls (Nimy) — recherche web « Commander un repas en ligne à … » ; 72 plats au 2026-10-09
+https://www.imako-nimy.be/
+# Bubble Mood (Quaregnon) — recherche web « Commander un repas en ligne à … » ; 87 plats au 2026-10-09
+https://www.bubblemood-quaregnon.be/
+# Burger City (Quaregnon) — recherche web « Commander un repas en ligne à … » ; 180 plats au 2026-10-09
+https://www.burgercity-quaregnon.be/
+# Dal Fratello (Quaregnon) — recherche web « Commander un repas en ligne à … » ; 90 plats au 2026-10-09
+https://www.dal-fratello.be/
+# Friterie Meknes (Quaregnon) — recherche web « Commander un repas en ligne à … » ; 183 plats au 2026-10-09
+https://www.friteriemeknes.be/
+# Le Snack Thessaloniki (Quaregnon) — recherche web « Commander un repas en ligne à … » ; 77 plats au 2026-10-09
+https://www.le-snack-thessaloniki-quaregnon.be/
+# New Asia Quaregnon (Quaregnon) — recherche web « Commander un repas en ligne à … » ; 137 plats au 2026-10-09
+https://www.lepalaisdubonheurwasmuel.be/
+# Pita star (Quaregnon) — recherche web « Commander un repas en ligne à … » ; 176 plats au 2026-10-09
+https://www.pitastar.be/
+# Snack chez Tevfik (Quaregnon) — recherche web « Commander un repas en ligne à … » ; 124 plats au 2026-10-09
+https://www.cheztevfik.be/
+# Snack Junior (Quaregnon) — recherche web « Commander un repas en ligne à … » ; 287 plats au 2026-10-09
+https://www.snackjuniorquaregnon.be/
+# Nota Bene Sympho (Saint-Symphorien) — recherche web « Commander un repas en ligne à … » ; 163 plats au 2026-10-09
+https://www.nota-bene-sympho.be/
+# Little Italy (Spiennes) — recherche web « Commander un repas en ligne à … » ; 97 plats au 2026-10-09
+https://www.littleitaly-spiennes.be/

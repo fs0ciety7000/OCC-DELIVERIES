@@ -152,8 +152,7 @@ func seedSyncSources(app core.App, col *core.Collection) error {
 		return app.Save(r)
 	}
 	for i, u := range TakeawaySiteURLs() {
-		label := strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(strings.TrimPrefix(u, "https://"), "http://"), "www."), "/")
-		if err := add("takeaway-site", "Site "+label, u, 10+i); err != nil {
+		if err := add("takeaway-site", takeawaySiteLabel(u), u, min(takeawaySiteFirstPriority+i, takeawaySiteLastPriority)); err != nil {
 			return err
 		}
 	}
