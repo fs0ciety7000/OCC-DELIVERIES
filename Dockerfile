@@ -14,8 +14,10 @@ WORKDIR /src
 COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 COPY backend/ ./
-ARG VERSION=dev
-RUN CGO_ENABLED=0 go build -trimpath -tags timetzdata -ldflags "-s -w -X main.version=${VERSION}" -o /out/occ .
+# Coolify transmet SOURCE_COMMIT si « Include Source Commit in Build » est activé.
+ARG SOURCE_COMMIT
+ARG VERSION=${SOURCE_COMMIT}
+RUN CGO_ENABLED=0 go build -trimpath -tags timetzdata -ldflags "-s -w -X main.version=${VERSION:-dev}" -o /out/occ .
 
 # ---------- 3. Runtime ----------
 FROM alpine:3.24
