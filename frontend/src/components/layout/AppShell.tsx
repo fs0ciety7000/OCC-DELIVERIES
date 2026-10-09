@@ -87,6 +87,18 @@ export function AppShell() {
         <Suspense fallback={<FoodLoader className="py-24" />}>
           <Outlet />
         </Suspense>
+        <footer className="mt-16 border-t border-border pt-6 text-center text-xs text-subtle">
+          Développé par{' '}
+          <a
+            href="https://studios.fs0ciety.org/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-muted underline-offset-4 hover:text-fg hover:underline focus-visible:text-fg"
+          >
+            OCC MONS Studios
+          </a>{' '}
+          · © {new Date().getFullYear()}
+        </footer>
       </main>
 
       {/* Barre d'onglets mobile */}
