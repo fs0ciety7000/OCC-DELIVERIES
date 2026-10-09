@@ -135,20 +135,45 @@
     }
   }
 
-  // ---------- 2. États embarqués (heuristique) ----------
+  // ---------- 2. États embarqués / données chargées par la page (heuristique) ----------
+  var NAME_KEYS = ['title', 'name', 'displayName']
+  function pickName(o) {
+    for (var i = 0; i < NAME_KEYS.length; i++) {
+      var v = o[NAME_KEYS[i]]
+      if (typeof v === 'string' && v.trim()) return v
+      if (v && typeof v === 'object' && typeof v.text === 'string') return v.text
+    }
+    return ''
+  }
+  function rawPrice(o) {
+    var cands = [o.price, o.priceTagline, o.basePrice, o.prices, o.amount, o.unitPrice]
+    if (Array.isArray(o.variations) && o.variations.length) {
+      var v = o.variations[0]
+      cands.push(v.basePrice, v.price, v.prices)
+    }
+    for (var i = 0; i < cands.length; i++) {
+      var c = cands[i]
+      if (c == null || c === '') continue
+      if (typeof c === 'object' && !Array.isArray(c)) {
+        c = c.delivery != null ? c.delivery : c.deliveryPrice != null ? c.deliveryPrice : c.price != null ? c.price : c.amount != null ? c.amount : c.value
+        if (c && typeof c === 'object') c = c.amount != null ? c.amount : c.value
+      }
+      if (c != null && c !== '') return c
+    }
+    return null
+  }
   function itemFromState(o) {
-    var name = o.title || o.name
-    if (typeof name !== 'string' || !name.trim()) return null
-    var raw = o.price != null ? o.price : o.priceTagline != null ? o.priceTagline : o.prices
+    var name = pickName(o)
+    if (!name) return null
+    var raw = rawPrice(o)
     if (raw == null) return null
-    // Uber Eats : centimes entiers ; Takeaway : euros décimaux ou objet { delivery }
+    // Uber Eats / Takeaway API : centimes entiers ; ailleurs : euros décimaux
     var cents = typeof raw === 'number' && Number.isInteger(raw) && raw >= 100
-    if (raw && typeof raw === 'object' && !Array.isArray(raw)) raw = raw.delivery != null ? raw.delivery : raw.deliveryPrice != null ? raw.deliveryPrice : raw.price
     var price = toCents(raw, cents)
     if (price <= 0 || price > 50000) return null
     return {
       name: clean(name, 120),
-      description: clean(o.itemDescription || o.description, 400),
+      description: clean(o.itemDescription || o.description || (o.description && o.description.text), 400),
       price: price,
       tags: [],
       option_groups: [],
@@ -156,9 +181,53 @@
     }
   }
 
-  function fromEmbeddedState(doc) {
+  /** Cherche des sections { nom, plats[] } dans des objets JSON quelconques. */
+  function categoriesFromBlobs(blobs) {
+    var categories = []
+    var seen = {}
+    var title = ''
+    // index des plats par identifiant (catégories qui ne listent que des ids)
+    var byId = {}
+    function index(o, depth) {
+      if (!o || typeof o !== 'object' || depth > 40) return
+      if (Array.isArray(o)) { o.forEach(function (x) { index(x, depth + 1) }); return }
+      var id = o.id || o.uuid || o.itemId || o.productId
+      if ((typeof id === 'string' || typeof id === 'number') && pickName(o) && rawPrice(o) != null) byId[String(id)] = o
+      for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) index(o[k], depth + 1)
+    }
+    blobs.forEach(function (b) { index(b, 0) })
+    // objets { id: plat } (dictionnaires de plats)
+    function push(secName, items) {
+      var key = secName + '|' + items.map(function (x) { return x.name }).join(',')
+      if (!seen[key]) { seen[key] = 1; categories.push({ name: clean(secName, 80) || 'Menu', items: items }) }
+    }
+    function visit(o, depth) {
+      if (!o || typeof o !== 'object' || depth > 40) return
+      if (Array.isArray(o)) { o.forEach(function (x) { visit(x, depth + 1) }); return }
+      var secName = pickName(o)
+      var listKey = ['itemList', 'items', 'products', 'menuItems', 'catalogItems', 'itemIds', 'productIds', 'children'].filter(function (k) {
+        return Array.isArray(o[k]) && o[k].length
+      })[0]
+      if (listKey && secName) {
+        var list = o[listKey]
+        var items = list.map(function (x) {
+          if (x && typeof x === 'object') return itemFromState(x) || (x.id != null && byId[String(x.id)] ? itemFromState(byId[String(x.id)]) : null)
+          if (typeof x === 'string' || typeof x === 'number') return byId[String(x)] ? itemFromState(byId[String(x)]) : null
+          return null
+        }).filter(Boolean)
+        if (items.length >= 1 && items.length >= list.length / 2) { push(secName, items); return }
+      }
+      if (!title && typeof o.title === 'string' && o.location) title = o.title
+      for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) visit(o[k], depth + 1)
+    }
+    blobs.forEach(function (b) { visit(b, 0) })
+    if (!categories.length) return null
+    return { name: title, categories: categories }
+  }
+
+  function embeddedBlobs(doc) {
     var blobs = []
-    var nodes = doc.querySelectorAll('script[type="application/json"], script#__NEXT_DATA__')
+    var nodes = doc.querySelectorAll('script[type="application/json"], script#__NEXT_DATA__, script[type="application/x-json"]')
     for (var i = 0; i < nodes.length; i++) {
       var t = nodes[i].textContent || ''
       if (t.length < 50) continue
@@ -169,38 +238,69 @@
         blobs.push(parsed)
       } catch (e) { /* ignoré */ }
     }
-    var categories = []
+    return blobs
+  }
+
+  function fromEmbeddedState(doc) {
+    return categoriesFromBlobs(embeddedBlobs(doc))
+  }
+
+  // ---------- 3. lecture de la page affichée (secours) ----------
+  var PRICE_RE = /(?:€\s*\d{1,3}(?:[.,]\d{2})|\d{1,3}(?:[.,]\d{2})\s*€)/
+  function fromDom(doc) {
+    var cats = []
+    var all = doc.querySelectorAll('h1,h2,h3,h4,h5,h6,[data-qa*="heading"],[class*="name"],[class*="title"]')
     var seen = {}
-    var title = ''
-    function visit(o, depth) {
-      if (!o || typeof o !== 'object' || depth > 40) return
-      if (Array.isArray(o)) { o.forEach(function (x) { visit(x, depth + 1) }); return }
-      var listKey = ['itemList', 'items', 'products', 'menuItems', 'catalogItems'].filter(function (k) {
-        return Array.isArray(o[k]) && o[k].length
-      })[0]
-      var secName = o.title || o.name
-      if (listKey && typeof secName === 'string') {
-        var items = o[listKey].map(function (x) { return x && typeof x === 'object' ? itemFromState(x) : null }).filter(Boolean)
-        if (items.length >= 1 && items.length >= o[listKey].length / 2) {
-          var key = secName + '|' + items.map(function (x) { return x.name }).join(',')
-          if (!seen[key]) { seen[key] = 1; categories.push({ name: clean(secName, 80), items: items }) }
-          return
-        }
-      }
-      if (!title && typeof o.title === 'string' && (o.location || o.storeUuid || o.uuid) && o.location) title = o.title
-      for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) visit(o[k], depth + 1)
+    var current = null
+    var priceCount = function (t) { return (t.match(new RegExp(PRICE_RE.source, 'g')) || []).length }
+    for (var i = 0; i < all.length; i++) {
+      var el = all[i]
+      if (el.closest && el.closest('#occ-export')) continue
+      var text = clean(el.textContent, 120)
+      if (!text || text.length < 2) continue
+      if (/^H[12]$/.test(el.tagName)) { current = { name: text, items: [] }; cats.push(current); continue }
+      // la carte du plat : plus proche ancêtre (≤ 4 niveaux) contenant exactement un prix
+      var card = el.parentElement
+      for (var d = 0; card && d < 4 && !PRICE_RE.test(card.textContent || ''); d++) card = card.parentElement
+      if (!card) continue
+      var t = card.textContent || ''
+      if (t.length > 400 || priceCount(t) !== 1) continue
+      var m = t.match(PRICE_RE)
+      if (seen[text + m[0]]) continue
+      seen[text + m[0]] = 1
+      if (!current) { current = { name: 'Menu', items: [] }; cats.push(current) }
+      current.items.push({ name: text, description: '', price: toCents(m[0]), tags: [], option_groups: [], popular: false })
     }
-    blobs.forEach(function (b) { visit(b, 0) })
-    if (!categories.length) return null
-    return { name: title, categories: categories }
+    cats = cats.filter(function (c) { return c.items.length })
+    return cats.length ? { categories: cats } : null
+  }
+
+  // ---------- 4. données que la page a chargées elle-même ----------
+  function loadedResources(win) {
+    try {
+      return win.performance.getEntriesByType('resource').map(function (e) { return e.name }).filter(function (u) {
+        return /menu|restaurant|catalog|store|product|items|shop/i.test(u) && !/\.(png|jpe?g|webp|gif|svg|css|woff2?|js)(\?|$)/i.test(u)
+      }).slice(-15)
+    } catch (e) { return [] }
+  }
+  function fetchJsonBlobs(win, urls) {
+    return Promise.all(urls.map(function (u) {
+      return win.fetch(u, { credentials: 'include', cache: 'force-cache' }).then(function (r) {
+        return r.ok ? r.text() : ''
+      }).then(function (t) { try { return t ? JSON.parse(t) : null } catch (e) { return null } }).catch(function () { return null })
+    })).then(function (list) { return list.filter(Boolean) })
   }
 
   // ---------- assemblage ----------
-  function extract(doc, href) {
+  function extract(doc, href, extraBlobs) {
     var url
     try { url = new URL(href) } catch (e) { url = { hostname: '', href: href } }
     var ld = fromJsonLd(doc) || {}
-    var st = (!ld.categories || !ld.categories.length) ? fromEmbeddedState(doc) : null
+    var st = (!ld.categories || !ld.categories.length) ? categoriesFromBlobs(embeddedBlobs(doc).concat(extraBlobs || [])) : null
+    if (!st && (!ld.categories || !ld.categories.length)) {
+      st = fromDom(doc)
+      if (st) st.dom = true
+    }
     var categories = (ld.categories && ld.categories.length ? ld.categories : (st && st.categories) || [])
     var ogTitle = doc.querySelector('meta[property="og:title"]')
     var name = ld.name || (st && st.name) || clean(ogTitle && ogTitle.getAttribute('content'), 120) || clean(doc.title, 120)
@@ -235,14 +335,42 @@
         source_urls: [pageUrl],
         menu_checked_at: new Date().toISOString().slice(0, 10),
       },
-      stats: { categories: categories.length, items: count, source: ld.categories && ld.categories.length ? 'json-ld' : st ? 'état embarqué' : 'aucune' },
+      stats: { categories: categories.length, items: count, source: ld.categories && ld.categories.length ? 'json-ld' : st ? (st.dom ? 'page affichée' : (extraBlobs && extraBlobs.length ? 'données chargées' : 'état embarqué')) : 'aucune' },
     }
   }
 
   // ---------- interface (navigateur) ----------
+  function diagnostic(win, urls) {
+    var doc = win.document
+    var scripts = Array.prototype.slice.call(doc.scripts).map(function (sc) {
+      return (sc.id ? '#' + sc.id + ' ' : '') + (sc.type || 'js') + ' ' + (sc.src ? sc.src.split('?')[0] : (sc.textContent || '').length + ' car. ' + (sc.textContent || '').slice(0, 60).replace(/\s+/g, ' '))
+    })
+    return ['OCC export — diagnostic', 'page: ' + win.location.href.split('?')[0], 'titre: ' + doc.title,
+      'scripts (' + scripts.length + '):'].concat(scripts.slice(0, 60), ['ressources candidates:'], urls).join('\n')
+  }
+
   function run(win) {
     var doc = win.document
     var res = extract(doc, win.location.href)
+    // le menu n'est pas dans la page : relire les données que la page a elle-même chargées
+    if (!res.stats.items || res.stats.source === 'page affichée') {
+      var urls = loadedResources(win)
+      if (urls.length) {
+        show(win, res, urls, true)
+        return fetchJsonBlobs(win, urls).then(function (blobs) {
+          var again = extract(doc, win.location.href, blobs)
+          if (again.stats.items >= res.stats.items) res = again
+          show(win, res, urls, false)
+          return res
+        })
+      }
+    }
+    show(win, res, loadedResources(win), false)
+    return res
+  }
+
+  function show(win, res, urls, loading) {
+    var doc = win.document
     var r = res.restaurant
     var json = JSON.stringify(r, null, 2)
     var old = doc.getElementById('occ-export')
@@ -256,18 +384,21 @@
     box.innerHTML =
       '<div style="font-weight:700;font-size:16px;margin-bottom:4px">🔥 Exporter vers OCC</div>' +
       '<div style="color:#A3A1AB;margin-bottom:12px">' +
-      (ok ? '<b style="color:#F6F4EF"></b><br>' + res.stats.categories + ' catégories · ' + res.stats.items + ' plats · source : ' + res.stats.source
-          : 'Aucun menu détecté sur cette page. Ouvrez la page d’un restaurant (pas la liste) et attendez qu’elle soit chargée.') +
+      (loading ? 'Lecture des données chargées par la page…' : ok ? '<b style="color:#F6F4EF"></b><br>' + res.stats.categories + ' catégories · ' + res.stats.items + ' plats · source : ' + res.stats.source
+          : 'Aucun menu détecté sur cette page. Faites défiler toute la carte puis réessayez ; sinon copiez le diagnostic et envoyez-le.') +
+      (ok && res.stats.source === 'page affichée' ? '<br><span style="color:#F5B83D">Lu depuis l’affichage : vérifiez les prix (restaurant fermé = prix masqués).</span>' : '') +
       (ok && (!r.lat || !r.address) ? '<br><span style="color:#F5B83D">Adresse/coordonnées à compléter dans /admin.</span>' : '') +
       '</div>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
       (ok ? '<button data-a="dl" style="flex:1;padding:10px;border-radius:12px;border:0;background:linear-gradient(135deg,#FF6A3D,#FFB547);color:#1A0B05;font-weight:700;cursor:pointer">Télécharger .json</button>' +
             '<button data-a="cp" style="flex:1;padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:#1A1A21;color:#F6F4EF;cursor:pointer">Copier</button>' : '') +
+      (!ok && !loading ? '<button data-a="dg" style="flex:1;padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:#1A1A21;color:#F6F4EF;cursor:pointer">Copier le diagnostic</button>' : '') +
       '<button data-a="x" style="padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:transparent;color:#A3A1AB;cursor:pointer">Fermer</button></div>'
     if (ok) box.querySelector('b').textContent = r.name
     box.addEventListener('click', function (e) {
       var a = e.target && e.target.getAttribute && e.target.getAttribute('data-a')
       if (a === 'x') box.remove()
+      if (a === 'dg' && win.navigator.clipboard) win.navigator.clipboard.writeText(diagnostic(win, urls)).then(function () { e.target.textContent = 'Copié ✓' })
       if (a === 'cp' && win.navigator.clipboard) win.navigator.clipboard.writeText(json).then(function () { e.target.textContent = 'Copié ✓' })
       if (a === 'dl') {
         var blob = new win.Blob([json], { type: 'application/json' })
@@ -281,7 +412,7 @@
     return res
   }
 
-  var api = { extract: extract, toCents: toCents, slugify: slugify, run: run }
+  var api = { extract: extract, toCents: toCents, slugify: slugify, run: run, categoriesFromBlobs: categoriesFromBlobs }
   if (typeof module === 'object' && module.exports) module.exports = api
   root.OCCMenuExport = api
   if (typeof window !== 'undefined' && !root.__OCC_EXPORT_NO_RUN__) run(window)
