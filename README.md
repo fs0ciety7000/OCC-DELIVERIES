@@ -17,6 +17,10 @@ ou en conteneur : `cp .env.example .env && docker compose up --build` → http:/
 
 Admin PocketBase : `/_/` (identifiants `OCC_ADMIN_EMAIL` / `OCC_ADMIN_PASSWORD`).
 
+## Tests end-to-end (Playwright)
+Scénario complet hôte + 2 invités (dont mobile 390×844) contre une instance qui tourne :
+`cd e2e && npm ci && E2E_BASE_URL=http://localhost:8090 npx playwright test` (Chromium de `/opt/pw-browsers` ou `PLAYWRIGHT_BROWSERS_PATH` ; `E2E_DEBUG=1` ajoute des captures).
+
 ## Stack
 PocketBase v0.36 (Go, SQLite, realtime) · React 19 · Vite · Tailwind v4 ·
 TanStack Query · Docker · Coolify.
