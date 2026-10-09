@@ -8,6 +8,13 @@
 - [x] Remboursements : QR EPC SEPA, Wero, Bancontact Pay, lien de paiement, espèces, plus tard
 - [x] Docker mono-conteneur, CI GitHub Actions, guide Coolify
 
+## v0.1.1 — Administration & données réelles
+- [x] Rôle `admin` (bootstrap `OCC_ADMIN_EMAIL` / `OCC_ADMINS`, promotion depuis l'app, anti auto-promotion)
+- [x] Panneau `/admin` : tableau de bord, restaurants (géocodage Nominatim), éditeur de menu (catégories, articles, options), commandes (annulation forcée), utilisateurs
+- [x] Import JSON (objet ou tableau) et CSV (décimales françaises) avec aperçu / dry run, export JSON de sauvegarde
+- [x] Restaurants réels de Mons embarqués (`migrations/data`), démo fictive retirée ; outil d'export Uber Eats / Takeaway (`/outils/export-menu.html`)
+- [x] E2E indépendant des données (restaurants et articles choisis via l'API)
+
 ## v0.2 — Confort
 - [ ] Notifications push Web (PWA) : « le vote est ouvert », « tout le monde est prêt »
 - [ ] Échéances automatiques (clôture du vote / de la commande à `*_ends_at`)
@@ -16,7 +23,9 @@
 - [ ] Modération de l'hôte : retirer un membre, transférer l'hôte
 
 ## v0.3 — Données restaurants
-- [ ] Import de menus assisté (CSV, coller un lien → formulaire pré-rempli)
+- [x] Import de menus CSV / JSON avec aperçu (panneau `/admin`)
+- [ ] Import assisté : coller un lien Uber Eats / Takeaway → formulaire pré-rempli (côté serveur)
+- [ ] Journal d'audit des actions admin ; upload d'images (cover / plats) depuis `/admin`
 - [ ] Carte (MapLibre) des restaurants autour du bureau
 - [ ] Horaires d'ouverture & disponibilité
 - [ ] Adaptateur partenaire (Uber Direct / JET Connect) si accès obtenu — ADR 0002

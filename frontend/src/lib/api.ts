@@ -1,6 +1,12 @@
 import { pb } from './pb'
 import type {
+  AdminStats,
+  AdminUserList,
+  AdminUser,
   AppConfig,
+  ImportReport,
+  PartyStatus,
+  UserRole,
   DeclareMethod,
   Dispatch,
   DispatchMethod,
@@ -110,8 +116,86 @@ export const occ = {
 
   paymentQR: (paymentId: string) => pb.send<PaymentQR>(`/api/occ/payments/${paymentId}/qr`, { method: 'GET' }),
 
-  adminImport: (body: RestaurantImport) =>
-    pb.send<{ restaurant: string; items: number }>('/api/occ/admin/import', json(body)),
+}
+
+/* ------------------------------------------------------------ /api/occ/admin */
+
+/** Télécharge une réponse authentifiée en fichier (export JSON…). */
+async function downloadAuthed(path: string, fallbackName: string) {
+  const res = await fetch(pb.buildURL(path), { headers: { Authorization: pb.authStore.token } })
+  if (!res.ok) throw new Error("Le téléchargement a échoué.")
+  const disposition = res.headers.get('Content-Disposition') ?? ''
+  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition)
+  saveBlob(await res.blob(), match?.[1] ? decodeURIComponent(match[1]) : fallbackName)
+}
+
+/** Déclenche l'enregistrement d'un blob côté navigateur. */
+export function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 2000)
+}
+
+export interface ImportResponse {
+  report: ImportReport
+  restaurant?: string
+  items?: number
+}
+
+export const adminApi = {
+  stats: () => pb.send<AdminStats>('/api/occ/admin/stats', { method: 'GET' }),
+
+  /** Import JSON (un objet ou un tableau). `dryRun` valide sans rien écrire. */
+  importJson: (body: RestaurantImport | RestaurantImport[], dryRun: boolean) =>
+    pb.send<ImportResponse>(`/api/occ/admin/import${dryRun ? '?dryRun=1' : ''}`, json(body)),
+
+  importCsv: (file: File, dryRun: boolean) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return pb.send<ImportResponse>(`/api/occ/admin/import/csv${dryRun ? '?dryRun=1' : ''}`, { method: 'POST', body: fd })
+  },
+
+  exportAll: () => pb.send<RestaurantImport[]>('/api/occ/admin/export', { method: 'GET' }),
+
+  downloadExport: () => downloadAuthed('/api/occ/admin/export', 'occ-restaurants.json'),
+
+  users: (q: string, page = 1, role?: UserRole) =>
+    pb.send<AdminUserList>('/api/occ/admin/users', { method: 'GET', query: { q, page, perPage: 50, ...(role ? { role } : {}) } }),
+
+  setRole: (userId: string, role: UserRole) =>
+    pb.send<{ user: AdminUser }>(`/api/occ/admin/users/${userId}/role`, { method: 'PATCH', body: JSON.stringify({ role }), headers: { 'Content-Type': 'application/json' } }),
+
+  cancelParty: (partyId: string) => pb.send<{ party: Party }>(`/api/occ/admin/parties/${partyId}/cancel`, json({})),
+
+  /* --- catalogue (collections, rules « role = admin ») --- */
+
+  restaurants: () => pb.collection('restaurants').getFullList<Restaurant>({ sort: 'name' }),
+  restaurant: (id: string) => pb.collection('restaurants').getOne<Restaurant>(id),
+  saveRestaurant: (id: string | null, data: Partial<Restaurant>) =>
+    id ? pb.collection('restaurants').update<Restaurant>(id, data) : pb.collection('restaurants').create<Restaurant>(data),
+  deleteRestaurant: (id: string) => pb.collection('restaurants').delete(id),
+
+  saveCategory: (id: string | null, data: Partial<MenuCategory>) =>
+    id ? pb.collection('menu_categories').update<MenuCategory>(id, data) : pb.collection('menu_categories').create<MenuCategory>(data),
+  deleteCategory: (id: string) => pb.collection('menu_categories').delete(id),
+
+  saveItem: (id: string | null, data: Partial<MenuItem>) =>
+    id ? pb.collection('menu_items').update<MenuItem>(id, data) : pb.collection('menu_items').create<MenuItem>(data),
+  deleteItem: (id: string) => pb.collection('menu_items').delete(id),
+
+  /* --- commandes (lecture admin via les rules) --- */
+
+  parties: (status: PartyStatus | '', page = 1) =>
+    pb.collection('parties').getList<Party>(page, 50, {
+      sort: '-created',
+      expand: 'host,restaurant',
+      ...(status ? { filter: pb.filter('status = {:s}', { s: status }) } : {}),
+    }),
 }
 
 /* ------------------------------------------------- collections (CRUD SDK) */

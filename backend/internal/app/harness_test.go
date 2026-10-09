@@ -22,7 +22,7 @@ import (
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/catalog"
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/domain"
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/providers"
-	_ "github.com/fs0ciety7000/occ-deliveries/backend/migrations"
+	"github.com/fs0ciety7000/occ-deliveries/backend/migrations"
 )
 
 // templateDir is a pb_data directory with every migration applied (schema +
@@ -30,6 +30,9 @@ import (
 var templateDir string
 
 func TestMain(m *testing.M) {
+	// Deterministic catalogue: the integration tests rely on the demo seed,
+	// whatever real data is embedded in migrations/data.
+	migrations.SetRealDataForTesting([]byte("[]"))
 	dir, err := os.MkdirTemp("", "occ-test-template-*")
 	if err != nil {
 		panic(err)
@@ -77,6 +80,22 @@ func newTestApp(t testing.TB) *tests.TestApp {
 	return ta
 }
 
+// newEnvWith builds an env with a custom config; before runs before the
+// OnServe hooks (e.g. to create records that the bootstrap must see).
+func newEnvWith(t *testing.T, cfg Config, before func(app *tests.TestApp)) *env {
+	t.Helper()
+	ta, err := tests.NewTestApp(templateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	Register(ta, cfg)
+	t.Cleanup(ta.Cleanup)
+	if before != nil {
+		before(ta)
+	}
+	return serveEnv(t, ta)
+}
+
 type env struct {
 	t   *testing.T
 	app *tests.TestApp
@@ -87,7 +106,11 @@ func newEnv(t *testing.T) *env {
 	t.Helper()
 	ta := newTestApp(t)
 	t.Cleanup(ta.Cleanup)
+	return serveEnv(t, ta)
+}
 
+func serveEnv(t *testing.T, ta *tests.TestApp) *env {
+	t.Helper()
 	r, err := apis.NewRouter(ta)
 	if err != nil {
 		t.Fatal(err)
@@ -137,6 +160,21 @@ func (e *env) do(method, url, token string, body any) resp {
 	}
 	req := httptest.NewRequest(method, url, rd)
 	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", token)
+	}
+	rec := httptest.NewRecorder()
+	e.mux.ServeHTTP(rec, req)
+	return resp{status: rec.Code, body: rec.Body.Bytes(), header: rec.Header()}
+}
+
+// doRaw performs a request with a raw body and content type.
+func (e *env) doRaw(method, url, token, contentType string, body io.Reader) resp {
+	e.t.Helper()
+	req := httptest.NewRequest(method, url, body)
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
 	if token != "" {
 		req.Header.Set("Authorization", token)
 	}

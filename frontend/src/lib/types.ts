@@ -16,12 +16,16 @@ export interface BaseRecord {
 
 /* ------------------------------------------------------------------ users */
 
+export type UserRole = 'user' | 'admin'
+
 export interface User extends BaseRecord {
   email?: string
   name: string
   avatar?: string
   color?: string
   verified?: boolean
+  /** `admin` donne accès au panneau /admin (OCC_ADMIN_EMAIL / OCC_ADMINS ou promotion). */
+  role?: UserRole | ''
 }
 
 /** Utilisateur « allégé » tel que renvoyé par `Summary`. */
@@ -324,9 +328,108 @@ export interface TransitionBody {
   restaurant?: string
 }
 
+/* ------------------------------------------------------------------ admin */
+
+/** Article au format d'import (`POST /api/occ/admin/import`). */
+export interface ItemImport {
+  name: string
+  description?: string
+  price: Cents
+  emoji?: string
+  tags?: string[]
+  option_groups?: OptionGroup[]
+  popular?: boolean
+  available?: boolean
+}
+
+export interface CategoryImport {
+  name: string
+  items: ItemImport[]
+}
+
+/** Restaurant + menu au format d'import / export (les clés inconnues sont ignorées). */
 export interface RestaurantImport {
   slug: string
   name: string
-  categories: { name: string; items: Array<Partial<MenuItem> & { name: string; price: Cents }> }[]
+  description?: string
+  emoji?: string
+  cover_url?: string
+  cuisines?: string[]
+  address?: string
+  lat?: number
+  lng?: number
+  phone?: string
+  rating?: number
+  rating_count?: number
+  price_level?: number
+  eta_min?: number
+  eta_max?: number
+  delivery_fee?: Cents
+  min_order?: Cents
+  providers?: RestaurantProviderLink[]
+  active?: boolean
+  categories: CategoryImport[]
   [key: string]: unknown
+}
+
+export interface ImportPreviewItem {
+  category: string
+  name: string
+  price: Cents
+  tags: string[]
+  popular: boolean
+  available: boolean
+  options: number
+}
+
+export interface ImportRestaurantReport {
+  slug: string
+  name: string
+  exists: boolean
+  active: boolean
+  categories: number
+  items: number
+  errors: string[]
+  warnings: string[]
+  menu: ImportPreviewItem[]
+  restaurant?: string
+}
+
+export interface ImportReport {
+  dryRun: boolean
+  valid: boolean
+  errors: string[]
+  restaurants: ImportRestaurantReport[]
+  items: number
+}
+
+export interface AdminStats {
+  users: number
+  admins: number
+  restaurants: { total: number; active: number }
+  menuItems: number
+  parties: { total: number; byStatus: Record<PartyStatus, number> }
+  partiesPerDay: { date: string; count: number }[]
+  orderedTotal: Cents
+  orderedLines: number
+  topRestaurants: { id: string; name: string; slug: string; emoji: string; parties: number; amount: Cents }[]
+}
+
+export interface AdminUser {
+  id: string
+  name: string
+  email: string
+  role: UserRole
+  color: string
+  avatar: string
+  verified: boolean
+  created: ISODate
+  parties: number
+}
+
+export interface AdminUserList {
+  page: number
+  perPage: number
+  totalItems: number
+  items: AdminUser[]
 }

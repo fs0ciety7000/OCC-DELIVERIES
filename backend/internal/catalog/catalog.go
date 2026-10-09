@@ -3,8 +3,10 @@
 package catalog
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
@@ -64,47 +66,73 @@ type ItemImport struct {
 
 var slugRe = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 
-// Validate checks the import payload (French messages).
+// Validate checks the import payload (French messages) and returns the first problem.
 func (in *RestaurantImport) Validate() error {
+	if p := in.Problems(); len(p) > 0 {
+		return domain.Errf("%s", p[0])
+	}
+	return nil
+}
+
+// Problems normalizes the payload (slug, name) and lists every validation
+// problem (French messages). An empty list means the payload is importable.
+func (in *RestaurantImport) Problems() []string {
 	in.Slug = strings.TrimSpace(strings.ToLower(in.Slug))
 	in.Name = strings.TrimSpace(in.Name)
-	if !slugRe.MatchString(in.Slug) {
-		return domain.Errf("Slug invalide (lettres minuscules, chiffres et tirets).")
+	out := []string{}
+	add := func(format string, args ...any) { out = append(out, fmt.Sprintf(format, args...)) }
+	if !slugRe.MatchString(in.Slug) || len(in.Slug) > 120 {
+		add("Slug invalide (lettres minuscules, chiffres et tirets).")
 	}
 	if in.Name == "" {
-		return domain.Errf("Le nom du restaurant est requis.")
+		add("Le nom du restaurant est requis.")
+	} else if utf8.RuneCountInString(in.Name) > 120 {
+		add("Le nom du restaurant est trop long (120 caractères maximum).")
 	}
 	if in.Rating < 0 || in.Rating > 5 {
-		return domain.Errf("La note doit être comprise entre 0 et 5.")
+		add("La note doit être comprise entre 0 et 5.")
 	}
 	if in.PriceLevel != 0 && (in.PriceLevel < 1 || in.PriceLevel > 4) {
-		return domain.Errf("Le niveau de prix doit être compris entre 1 et 4.")
+		add("Le niveau de prix doit être compris entre 1 et 4.")
 	}
 	if in.DeliveryFee < 0 || in.MinOrder < 0 || in.EtaMin < 0 || in.EtaMax < 0 || in.RatingCount < 0 {
-		return domain.Errf("Les montants et durées ne peuvent pas être négatifs.")
+		add("Les montants et durées ne peuvent pas être négatifs.")
+	}
+	if in.Lat < -90 || in.Lat > 90 || in.Lng < -180 || in.Lng > 180 {
+		add("Coordonnées GPS invalides.")
 	}
 	for _, p := range in.Providers {
 		if p.ID != providers.UberEats && p.ID != providers.Takeaway {
-			return domain.Errf("Fournisseur inconnu : %q.", p.ID)
+			add("Fournisseur inconnu : %q.", p.ID)
 		}
 	}
 	for _, c := range in.Categories {
 		if strings.TrimSpace(c.Name) == "" {
-			return domain.Errf("Catégorie sans nom.")
+			add("Catégorie sans nom.")
 		}
 		for _, it := range c.Items {
 			if strings.TrimSpace(it.Name) == "" {
-				return domain.Errf("Article sans nom dans « %s ».", c.Name)
+				add("Article sans nom dans « %s ».", c.Name)
+				continue
 			}
 			if it.Price < 0 {
-				return domain.Errf("Prix négatif pour « %s ».", it.Name)
+				add("Prix négatif pour « %s ».", it.Name)
 			}
 			if err := domain.ValidateOptionGroups(it.OptionGroups); err != nil {
-				return domain.Errf("« %s » : %s", it.Name, err.Error())
+				add("« %s » : %s", it.Name, err.Error())
 			}
 		}
 	}
-	return nil
+	return out
+}
+
+// ItemCount is the number of menu items of the payload.
+func (in *RestaurantImport) ItemCount() int {
+	n := 0
+	for _, c := range in.Categories {
+		n += len(c.Items)
+	}
+	return n
 }
 
 func orEmpty[T any](s []T) []T {
@@ -131,6 +159,16 @@ func Import(app core.App, in RestaurantImport) (string, int, error) {
 				return err
 			}
 			rest = core.NewRecord(col)
+		}
+		// A partial payload (e.g. the Uber Eats / Takeaway export tool) carries
+		// no coordinates / address: keep the ones already known.
+		if !rest.IsNew() {
+			if in.Lat == 0 && in.Lng == 0 {
+				in.Lat, in.Lng = rest.GetFloat("lat"), rest.GetFloat("lng")
+			}
+			if strings.TrimSpace(in.Address) == "" {
+				in.Address = rest.GetString("address")
+			}
 		}
 
 		active := true

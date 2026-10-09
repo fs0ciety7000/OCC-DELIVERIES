@@ -14,4 +14,14 @@ export const qk = {
   myParties: (userId: string) => ['myParties', userId] as const,
   payout: (userId: string) => ['payout', userId] as const,
   authMethods: ['authMethods'] as const,
+  admin: {
+    all: ['admin'] as const,
+    stats: ['admin', 'stats'] as const,
+    restaurants: ['admin', 'restaurants'] as const,
+    restaurant: (id: string) => ['admin', 'restaurant', id] as const,
+    menu: (id: string) => ['admin', 'menu', id] as const,
+    parties: (status: string, page: number) => ['admin', 'parties', status, page] as const,
+    party: (id: string) => ['admin', 'party', id] as const,
+    users: (q: string, role: string) => ['admin', 'users', q, role] as const,
+  },
 }

@@ -12,6 +12,14 @@ const RestaurantsPage = lazy(() => import('@/features/restaurants/RestaurantsPag
 const RestaurantDetailPage = lazy(() => import('@/features/restaurants/RestaurantDetailPage').then((m) => ({ default: m.RestaurantDetailPage })))
 const PartyPage = lazy(() => import('@/features/party/PartyPage').then((m) => ({ default: m.PartyPage })))
 const JoinPage = lazy(() => import('@/features/party/JoinPage').then((m) => ({ default: m.JoinPage })))
+const AdminLayout = lazy(() => import('@/features/admin/AdminLayout').then((m) => ({ default: m.AdminLayout })))
+const DashboardPage = lazy(() => import('@/features/admin/DashboardPage').then((m) => ({ default: m.DashboardPage })))
+const RestaurantsAdminPage = lazy(() => import('@/features/admin/RestaurantsAdminPage').then((m) => ({ default: m.RestaurantsAdminPage })))
+const MenuEditorPage = lazy(() => import('@/features/admin/MenuEditorPage').then((m) => ({ default: m.MenuEditorPage })))
+const ImportPage = lazy(() => import('@/features/admin/ImportPage').then((m) => ({ default: m.ImportPage })))
+const PartiesAdminPage = lazy(() => import('@/features/admin/PartiesAdminPage').then((m) => ({ default: m.PartiesAdminPage })))
+const PartyAdminDetailPage = lazy(() => import('@/features/admin/PartiesAdminPage').then((m) => ({ default: m.PartyAdminDetailPage })))
+const UsersAdminPage = lazy(() => import('@/features/admin/UsersAdminPage').then((m) => ({ default: m.UsersAdminPage })))
 const ProfilePage = lazy(() => import('@/features/profile/ProfilePage').then((m) => ({ default: m.ProfilePage })))
 
 export const router = createBrowserRouter([
@@ -47,6 +55,19 @@ export const router = createBrowserRouter([
             <ProfilePage />
           </RequireAuth>
         ),
+      },
+      {
+        path: '/admin',
+        element: <AdminLayout />,
+        children: [
+          { index: true, element: <DashboardPage /> },
+          { path: 'restaurants', element: <RestaurantsAdminPage /> },
+          { path: 'restaurants/:id', element: <MenuEditorPage /> },
+          { path: 'import', element: <ImportPage /> },
+          { path: 'commandes', element: <PartiesAdminPage /> },
+          { path: 'commandes/:id', element: <PartyAdminDetailPage /> },
+          { path: 'utilisateurs', element: <UsersAdminPage /> },
+        ],
       },
       { path: '*', element: <NotFoundPage /> },
     ],

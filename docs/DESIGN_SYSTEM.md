@@ -157,6 +157,34 @@ un parcours critique, toutes interruptibles.
    * *Paiement* : ma part + QR EPC / lien / espèces / plus tard ; vue payeur avec
      la liste des parts et confirmation.
 5. **Profil** — nom, couleur, IBAN, lien de paiement, thème.
+6. **Administration** (`/admin`, rôle `admin`) — mêmes tokens et composants, densité
+   plus « outil » (listes compactes, actions icônes 44 px avec `aria-label`).
+   * *Mise en page* : barre latérale 220 px (≥ 768 px, entrées `rounded-md`, icône braise
+     sur l'entrée active) ; en mobile, onglets en pills défilants horizontalement sous
+     l'en-tête (conteneur `relative` pour les `sr-only`). Accès : lien « Admin » dans la
+     nav desktop, icône bouclier dans l'en-tête mobile.
+   * *Tableau de bord* : 4 tuiles chiffrées (display 32 px, `tabular-nums`, méta en `subtle`),
+     histogramme SVG maison des commandes par jour (série unique en braise, barres fines
+     à bouts arrondis 4 px posées sur la ligne de base, écart 2 px, grille discrète, infobulle
+     au survol/focus, tableau `sr-only` en alternative — pas de librairie de graphiques),
+     répartition par statut en badges, top restaurants.
+   * *Restaurants* : recherche + `Segmented` (Tous / Visibles / Masqués), lignes avec emoji,
+     badges « Masqué » / « Sans coordonnées » (warning), interrupteur de visibilité
+     (`Toggle`, `role="switch"`), actions Menu / Modifier. Formulaire en `Sheet lg` par
+     sections (Identité, Adresse + bouton *Géocoder*, Livraison, Plateformes), montants
+     saisis en euros (`12,50`) et convertis en centimes.
+   * *Éditeur de menu* : une carte par catégorie (↑ ↓, renommer, supprimer), lignes
+     d'articles (prix à droite, étiquettes en badges, interrupteur « disponible », étoile
+     « populaire », ↑ ↓, modifier, supprimer) ; article barré si indisponible. Sheet article :
+     étiquettes en `Chip` (presets + libres), options en groupes encadrés (min / max, choix
+     + supplément en euros). Confirmations destructives en `Sheet` avec bouton `danger`.
+   * *Import* : zone de dépôt pointillée (bordure braise au survol), aperçu par restaurant
+     (badge Nouveau / Mise à jour, erreurs `danger`, avertissements `warning`, menu dans un
+     `details`), barre d'action collante avec l'unique `primary` « Importer » (désactivé tant
+     qu'il reste des erreurs) ; cartes latérales Modèles et « Depuis Uber Eats / Takeaway ».
+   * *Commandes* : chips de statut, lignes cliquables vers le détail, annulation forcée
+     (icône `Ban`, confirmation). *Utilisateurs* : recherche, filtre de rôle, bouton
+     « Promouvoir / Retirer admin » (désactivé pour soi-même).
 
 ## 5. Ton éditorial
 

@@ -30,7 +30,9 @@ func SeedEnabled() bool {
 }
 
 func upSeed(app core.App) error {
-	if !SeedEnabled() {
+	// Fresh installs with real data (migrations/data) skip the fictional demo:
+	// 1760000003_replace_demo imports the real restaurants instead.
+	if !SeedEnabled() || HasRealData() {
 		return nil
 	}
 	for _, r := range DemoRestaurants() {

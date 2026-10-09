@@ -41,11 +41,13 @@ backend/
     geo.go                   haversine
   internal/providers/        adaptateurs Uber Eats / Takeaway / manuel + tests
   internal/app/              hooks PocketBase + routes /api/occ (glue)
-  migrations/                migrations Go (schéma + seed démo)
+  internal/catalog/           import / export des menus (JSON, CSV, rapport de validation)
+  migrations/                migrations Go (schéma, seed démo, rôles admin, données réelles)
+    data/                    mons_restaurants.json (données réelles embarquées)
 frontend/
   src/lib/                   pb client, types, api, format, hooks realtime
   src/components/ui/         design system (Button, Card, Sheet, Badge, Avatar…)
-  src/features/<domaine>/    party, restaurants, auth, profile, payments
+  src/features/<domaine>/    party, restaurants, auth, profile, payments, admin
   src/routes/                pages
 docs/                        architecture, design system, workflow, déploiement, ADR
 ```
@@ -61,8 +63,15 @@ Toutes les collections de base ont `created` / `updated` (autodate).
 | name | text | affiché partout |
 | avatar | file | optionnel |
 | color | text | couleur d'avatar générée (`#RRGGBB`) si vide |
+| role | select `user` \| `admin` | `user` par défaut (hook) ; `admin` ouvre le panneau `/admin` |
 
 Rules : list/view `@request.auth.id != ""` ; update/delete `id = @request.auth.id`.
+Rôle : un hook refuse (403) toute création/modification de `role` par la collection
+si le demandeur n'est ni `admin` ni superuser ; les admins changent les rôles via
+`PATCH /api/occ/admin/users/{id}/role` (on ne peut pas retirer ses propres droits).
+Bootstrap : au démarrage, les comptes dont l'e-mail figure dans `OCC_ADMIN_EMAIL`
+ou `OCC_ADMINS` passent `admin` ; un compte créé plus tard avec un de ces e-mails
+(mot de passe, OAuth2, admin `/_/`) naît `admin`.
 
 ### `payout_profiles` — coordonnées de remboursement (privées)
 | champ | type | notes |
@@ -105,10 +114,17 @@ membres de la party concernée. Hook : `wero_id` / `bancontact_phone` normalisé
 | providers | json | `[{ "id": "ubereats"|"takeaway", "url": "https://…" }]` |
 | active | bool | |
 
-Rules : list/view `active = true` ; écriture superuser uniquement.
+Rules : list/view `active = true || @request.auth.role = "admin"` ;
+create/update/delete `@request.auth.role = "admin"` (superusers : toujours).
+Hooks (écritures via la collection) : slug/nom normalisés, slug unique (message clair),
+`cuisines` nettoyées (minuscules, sans doublon), `providers` limités à
+`ubereats`/`takeaway` en `https://` (liens vides retirés), `eta_min ≤ eta_max` ;
+**suppression refusée** si le restaurant apparaît dans une party (le désactiver).
 
 ### `menu_categories` (lecture publique)
 `restaurant` R(restaurants, cascade) · `name` · `position` int.
+Rules : list/view `""` ; create/update/delete `@request.auth.role = "admin"`.
+Supprimer une catégorie ne supprime pas ses articles (ils passent « sans catégorie »).
 
 ### `menu_items` (lecture publique)
 | champ | type | notes |
@@ -125,6 +141,10 @@ Rules : list/view `active = true` ; écriture superuser uniquement.
 | popular | bool | |
 | available | bool | |
 | position | number int | |
+
+Rules : list/view `""` ; create/update/delete `@request.auth.role = "admin"`.
+Hook : `option_groups` validés (`domain.ValidateOptionGroups`), `tags` nettoyés,
+la catégorie doit appartenir au même restaurant, `restaurant` immuable.
 
 ```json
 "option_groups": [
@@ -160,7 +180,7 @@ Rules : list/view `active = true` ; écriture superuser uniquement.
 | closed_at | date | |
 
 Rules :
-* list/view : `members.id ?= @request.auth.id`
+* list/view : `members.id ?= @request.auth.id || @request.auth.role = "admin"`
   (⚠ PocketBase (v0.36 à v0.40) : sur une relation multiple, `members ?= x` compare la
   valeur JSON brute et ne matche jamais → toujours écrire `members.id ?= …`)
 * create : `@request.auth.id != ""` → le hook force `host`, `members=[host]`, `code`, `status=lobby`.
@@ -174,13 +194,13 @@ Rules :
 ### `party_members`
 `party` R(parties, cascade) · `user` R(users) · `role` select(`host`,`member`) ·
 `ready` bool. Index unique `(party, user)`.
-Rules : list/view `party.members.id ?= @request.auth.id` ; écriture serveur uniquement.
+Rules : list/view `party.members.id ?= @request.auth.id || @request.auth.role = "admin"` ; écriture serveur uniquement.
 
 ### `votes` — vote par approbation (on peut liker plusieurs restaurants)
 `party` R(parties, cascade) · `user` R(users) · `restaurant` R(restaurants).
 Index unique `(party, user, restaurant)`.
 Rules :
-* list/view `party.members.id ?= @request.auth.id`
+* list/view `party.members.id ?= @request.auth.id || @request.auth.role = "admin"`
 * create `user = @request.auth.id && party.members.id ?= @request.auth.id && party.status = "voting"`
   (+ hook : `restaurant` doit être dans `party.candidates`)
 * delete `user = @request.auth.id && party.status = "voting"` ; update interdit.
@@ -199,7 +219,7 @@ Rules :
 | unit_price | number int | **serveur** : base + options |
 | total | number int | **serveur** : unit_price × quantity |
 
-Rules : list/view membres ; create `user = @request.auth.id && party.members.id ?= @request.auth.id && party.status = "ordering"` ;
+Rules : list/view membres `|| @request.auth.role = "admin"` ; create `user = @request.auth.id && party.members.id ?= @request.auth.id && party.status = "ordering"` ;
 update/delete `user = @request.auth.id && party.status = "ordering"`.
 Hooks : valide options (min/max, ids), recalcule prix ; toute écriture remet
 `party_members.ready = false` pour cet utilisateur.
@@ -216,7 +236,12 @@ Hooks : valide options (min/max, ids), recalcule prix ; toute écriture remet
 | reference | text | communication, ex. `OCC K7M2QX Alice` |
 | declared_at, confirmed_at | date | |
 
-Rules : list/view `party.members.id ?= @request.auth.id` ; écriture serveur uniquement.
+Rules : list/view `party.members.id ?= @request.auth.id || @request.auth.role = "admin"` ; écriture serveur uniquement.
+
+> Les admins **lisent** toutes les parties et leurs enregistrements (support,
+> panneau `/admin/commandes`) mais n'écrivent rien via les collections : l'annulation
+> forcée passe par `POST /api/occ/admin/parties/{id}/cancel`. Les endpoints métier
+> réservés aux membres (`summary`, `export`…) restent réservés aux membres.
 
 ## 4. Cycle de vie d'une party (state machine)
 
@@ -260,7 +285,15 @@ PocketBase `{ "status": 400, "message": "…", "data": {} }`, messages en franç
 | `POST /api/occ/payments/{id}/action` | voir | `{ "action": "declare"\|"confirm"\|"reset", "method"?: "qr"\|"wero"\|"bancontact"\|"link"\|"cash"\|"later" }` | `{ "payment": Payment }` |
 | `GET /api/occ/payments/{id}/qr` | membre | | `PaymentQR` |
 | `GET /api/occ/payments/{id}/wallet-qr/{kind}` | membre | `kind=wero\|bancontact` | image QR du payeur (stream, `Cache-Control: private`) ou 404 |
-| `POST /api/occ/admin/import` | superuser | `RestaurantImport` | `{ "restaurant": id, "items": n }` (upsert par slug) |
+| `GET /api/occ/admin/stats` | admin | | `AdminStats` (ci-dessous) |
+| `POST /api/occ/admin/import` | admin | `RestaurantImport` **ou** `RestaurantImport[]` ; `?dryRun=1` | `{ "report": ImportReport, "restaurant": id, "items": n }` — upsert par slug, tout ou rien ; invalide → **400** `{ status, message, data, report }` (rien n'est écrit) ; en dry run → 200 avec `report.valid=false` |
+| `POST /api/occ/admin/import/csv` | admin | multipart `file` (CSV, voir ci-dessous) ; `?dryRun=1` | idem |
+| `GET /api/occ/admin/export` | admin | | `RestaurantImport[]` (tous les restaurants, actifs ou non, menus complets ; `Content-Disposition: attachment`) — réimportable tel quel |
+| `GET /api/occ/admin/users` | admin | `q` (nom/e-mail), `role`, `page`, `perPage` (≤ 200) | `{ page, perPage, totalItems, items: AdminUser[] }` (`AdminUser` = `id,name,email,role,color,avatar,verified,created,parties`) |
+| `PATCH /api/occ/admin/users/{id}/role` | admin | `{ "role": "user"\|"admin" }` | `{ "user": AdminUser }` (400 si on se retire ses propres droits) |
+| `POST /api/occ/admin/parties/{id}/cancel` | admin | | `{ "party": Party }` — annulation forcée (400 si `closed`/`cancelled`) |
+
+« admin » = utilisateur `role = "admin"` **ou** superuser (401 sans auth, 403 sinon).
 
 Règles `payments/{id}/action` :
 * `declare` — débiteur seulement. `method=qr|wero|bancontact|link|cash` → `status=declared` ; `method=later` → `status=pending`.
@@ -325,9 +358,61 @@ copier, QR personnel du payeur s'il l'a téléversé, et un mini-guide
 
 ### `RestaurantImport`
 ```json
-{ "slug": "…", "name": "…", "...champs restaurant": "…",
-  "categories": [{ "name": "Pizzas", "items": [{ "name": "…", "price": 1250, "option_groups": [] }] }] }
+{ "slug": "…", "name": "…", "...champs restaurant": "…", "active": true,
+  "categories": [{ "name": "Pizzas", "items": [{ "name": "…", "price": 1250, "tags": [], "popular": false,
+                                                 "available": true, "option_groups": [] }] }] }
 ```
+Clés = champs de `restaurants` (sauf `cover`) ; montants en centimes. Les clés
+inconnues (`source_urls`, `menu_checked_at`…) sont ignorées. L'import **remplace**
+le menu du restaurant (même slug). Si un restaurant existant est réimporté sans
+coordonnées (`lat = lng = 0`) ou sans adresse, celles déjà enregistrées sont
+conservées (cas de l'outil `/outils/export-menu.html`).
+
+### `ImportReport`
+```json
+{ "dryRun": true, "valid": true, "errors": ["Ligne 4 : …"], "items": 14,
+  "restaurants": [{ "slug": "chez-mario", "name": "Chez Mario", "exists": false, "active": true,
+    "categories": 2, "items": 14, "errors": [], "warnings": ["Coordonnées manquantes : …"],
+    "menu": [{ "category": "Pizzas", "name": "Margherita", "price": 1250, "tags": ["veggie"],
+               "popular": true, "available": true, "options": 1 }],
+    "restaurant": "id après import" }] }
+```
+Erreurs = bloquantes (slug, nom, prix, options, doublons, lignes CSV) ; avertissements
+= non bloquants (coordonnées / adresse manquantes, menu vide, aucun lien fournisseur).
+
+### CSV d'import (`/admin/import/csv`)
+Une ligne **par article**, UTF-8 (BOM accepté), séparateur `;`, `,` ou tabulation
+(détecté sur l'en-tête). Colonnes (en-tête obligatoire, ordre libre) :
+
+| colonne | requis | notes |
+|---|---|---|
+| `restaurant_slug` | ✔ | regroupe les lignes d'un même restaurant |
+| `restaurant_name` | ✔ pour un nouveau restaurant | une seule ligne suffit |
+| `category` | ✔ | catégories dans l'ordre d'apparition |
+| `item_name` | ✔ | |
+| `description` | | |
+| `price_eur` | ✔ | euros, décimales françaises acceptées : `12,50`, `12.5`, `12€50`, `1 234,50 €` |
+| `tags` | | séparés par `\|`, `,` ou `;` (`veggie\|spicy`) |
+| `popular` | | `oui`/`x`/`1`/`true` ou vide |
+| `address`, `lat`, `lng`, `cuisines`, `phone`, `ubereats_url`, `takeaway_url` | | infos restaurant facultatives (première valeur non vide) ; `lat`/`lng` en `50,4542` ou `50.4542` |
+| `emoji`, `available` | | facultatifs, par article |
+
+Restaurant existant : seules les colonnes fournies remplacent ses infos ; le menu
+est remplacé par celui du fichier ; un article du même nom garde ses `option_groups`
+(et son emoji / sa description si la colonne est absente). Les options se gèrent
+dans l'éditeur de menu ou en JSON.
+
+### `AdminStats`
+```json
+{ "users": 42, "admins": 2, "restaurants": { "total": 13, "active": 12 }, "menuItems": 183,
+  "parties": { "total": 30, "byStatus": { "lobby": 1, "voting": 0, "ordering": 2, "review": 0,
+               "paying": 1, "closed": 24, "cancelled": 2 } },
+  "partiesPerDay": [{ "date": "2026-09-10", "count": 0 }],
+  "orderedTotal": 123450, "orderedLines": 210,
+  "topRestaurants": [{ "id": "…", "name": "…", "slug": "…", "emoji": "🍕", "parties": 7, "amount": 45600 }] }
+```
+`partiesPerDay` : 30 derniers jours (UTC, jours vides inclus) ; montants hors parties
+annulées ; top 5 par nombre de parties.
 
 ## 6. Fournisseurs de livraison (`internal/providers`)
 
@@ -342,15 +427,25 @@ Ni Uber Eats ni Takeaway (Just Eat Takeaway) n'offrent d'API publique permettant
 * Extension future : un adaptateur « API partenaire » (Uber Direct / Marketplace,
   JET Connect) se branche derrière la même interface sans toucher au front.
 
-Import des menus : `POST /api/occ/admin/import` (JSON) ou admin PocketBase `/_/`.
+Import des menus : panneau `/admin` (JSON / CSV, aperçu puis confirmation),
+`POST /api/occ/admin/import[/csv]`, ou admin PocketBase `/_/`.
+
+### Données réelles (`backend/migrations/data/mons_restaurants.json`)
+Embarqué (`go:embed`) au format `RestaurantImport[]`. La migration
+`1760000003_replace_demo` l'importe (upsert) puis retire les 9 restaurants **fictifs**
+de démo (désactivés plutôt que supprimés s'ils apparaissent dans une party). Fichier
+absent, vide ou sans restaurant valide → aucune modification. Les entrées invalides
+sont ignorées (journalisées) sans bloquer le démarrage. Sur une installation neuve
+avec des données réelles, le seed de démo (`1760000001`) ne fait rien.
 
 ## 7. Configuration (variables d'environnement)
 
 | variable | défaut | rôle |
 |---|---|---|
-| `OCC_ADMIN_EMAIL` / `OCC_ADMIN_PASSWORD` | — | crée/met à jour le superuser au démarrage |
+| `OCC_ADMIN_EMAIL` / `OCC_ADMIN_PASSWORD` | — | crée/met à jour le superuser au démarrage ; le compte **utilisateur** de même e-mail reçoit le rôle `admin` |
+| `OCC_ADMINS` | — | e-mails (séparés par des virgules) promus `admin` au démarrage ou à l'inscription |
 | `OCC_PUBLIC_URL` | `http://localhost:8090` | URL publique (liens d'invitation, `meta.appURL`) |
 | `OCC_DEFAULT_LAT` / `OCC_DEFAULT_LNG` / `OCC_DEFAULT_LABEL` | `50.4542` / `3.9567` / `Mons` | position par défaut |
-| `OCC_SEED_DEMO` | `true` | charge les restaurants de démo au 1er démarrage |
+| `OCC_SEED_DEMO` | `true` | charge les restaurants de démo au 1er démarrage (ignoré si `migrations/data` contient des restaurants réels) |
 | `OCC_PROVIDERS` | `ubereats,takeaway` | fournisseurs activés |
 | `OCC_PUBLIC_DIR` | `./pb_public` | dossier de la SPA |

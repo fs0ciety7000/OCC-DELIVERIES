@@ -124,18 +124,3 @@ func (h *handlers) nearby(e *core.RequestEvent) error {
 	}
 	return ok(e, map[string]any{"items": items})
 }
-
-func (h *handlers) adminImport(e *core.RequestEvent) error {
-	var in catalog.RestaurantImport
-	if err := bindJSON(e, &in); err != nil {
-		return err
-	}
-	id, n, err := catalog.Import(e.App, in)
-	if err != nil {
-		if domain.IsDomainError(err) {
-			return toAPIError(err)
-		}
-		return badRequest("Import impossible : " + err.Error())
-	}
-	return ok(e, map[string]any{"restaurant": id, "items": n})
-}

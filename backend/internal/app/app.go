@@ -40,6 +40,8 @@ type Config struct {
 	DefaultLabel string
 	// Providers are the enabled delivery platforms (OCC_PROVIDERS).
 	Providers []string
+	// AdminEmails get the "admin" role (OCC_ADMIN_EMAIL + OCC_ADMINS), lower-cased.
+	AdminEmails []string
 }
 
 // ConfigFromEnv reads the OCC_* environment variables.
@@ -51,6 +53,7 @@ func ConfigFromEnv(version string) Config {
 		DefaultLng:   envFloat("OCC_DEFAULT_LNG", 3.9567),
 		DefaultLabel: envOr("OCC_DEFAULT_LABEL", "Mons"),
 	}
+	cfg.AdminEmails = parseEmails(os.Getenv("OCC_ADMIN_EMAIL") + "," + os.Getenv("OCC_ADMINS"))
 	for _, p := range strings.Split(envOr("OCC_PROVIDERS", "ubereats,takeaway"), ",") {
 		p = strings.ToLower(strings.TrimSpace(p))
 		if providers.IsPlatform(p) && !slices.Contains(cfg.Providers, p) {
@@ -58,6 +61,18 @@ func ConfigFromEnv(version string) Config {
 		}
 	}
 	return cfg
+}
+
+// parseEmails splits a comma/semicolon/space separated list of e-mails.
+func parseEmails(s string) []string {
+	out := []string{}
+	for _, e := range strings.FieldsFunc(s, func(r rune) bool { return r == ',' || r == ';' || r == ' ' || r == '\n' }) {
+		e = strings.ToLower(strings.TrimSpace(e))
+		if strings.Contains(e, "@") && !slices.Contains(out, e) {
+			out = append(out, e)
+		}
+	}
+	return out
 }
 
 func envOr(key, def string) string {
@@ -82,7 +97,12 @@ func (c Config) providerEnabled(id string) bool {
 func Register(app core.App, cfg Config) {
 	h := &handlers{cfg: cfg}
 	bindHooks(app)
+	bindRoleHooks(app, cfg)
+	bindCatalogHooks(app)
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
+		if err := promoteAdmins(se.App, cfg.AdminEmails); err != nil {
+			return err
+		}
 		h.routes(se.Router)
 		return se.Next()
 	})
@@ -111,7 +131,15 @@ func (h *handlers) routes(r *router.Router[*core.RequestEvent]) {
 	g.GET("/payments/{id}/qr", h.paymentQR).Bind(user)
 	g.GET("/payments/{id}/wallet-qr/{kind}", h.walletQR).Bind(user)
 
-	g.POST("/admin/import", h.adminImport).Bind(apis.RequireSuperuserAuth())
+	admin := g.Group("/admin")
+	admin.BindFunc(requireAdmin)
+	admin.GET("/stats", h.adminStats)
+	admin.POST("/import", h.adminImport)
+	admin.POST("/import/csv", h.adminImportCSV)
+	admin.GET("/export", h.adminExport)
+	admin.GET("/users", h.adminUsers)
+	admin.PATCH("/users/{id}/role", h.adminSetRole)
+	admin.POST("/parties/{id}/cancel", h.adminCancelParty)
 }
 
 // ---------------------------------------------------------------- helpers

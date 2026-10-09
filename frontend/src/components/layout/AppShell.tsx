@@ -1,4 +1,4 @@
-import { Home, Plus, User, UtensilsCrossed } from 'lucide-react'
+import { Home, Plus, ShieldCheck, User, UtensilsCrossed } from 'lucide-react'
 import { Suspense, useState, type CSSProperties } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { FoodLoader } from '@/components/food'
@@ -14,6 +14,7 @@ const NAV = [
 
 export function AppShell() {
   const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const location = useLocation()
   const navigate = useNavigate()
   const [createOpen, setCreateOpen] = useState(false)
@@ -48,8 +49,21 @@ export function AppShell() {
                 {n.label}
               </NavLink>
             ))}
+            {isAdmin && (
+              <NavLink
+                to="/admin"
+                className={({ isActive }) => cn('rounded-full px-3.5 py-2 text-sm font-semibold transition-colors', isActive ? 'bg-fg/[0.08] text-fg' : 'text-muted hover:text-fg')}
+              >
+                Admin
+              </NavLink>
+            )}
           </nav>
           <div className="ml-auto flex items-center gap-1">
+            {isAdmin && (
+              <Link to="/admin" className={cn(buttonClass('ghost', 'icon'), 'md:hidden')} aria-label="Administration">
+                <ShieldCheck className="size-5" aria-hidden />
+              </Link>
+            )}
             <ThemeToggle />
             {showHeaderCta && (
               <button type="button" onClick={launch} className={cn(buttonClass('secondary', 'sm'), 'hidden md:inline-flex')}>

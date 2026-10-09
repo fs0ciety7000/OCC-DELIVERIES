@@ -9,9 +9,9 @@ import { expect, test, type Browser, type BrowserContext, type BrowserContextOpt
 const RUN = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
 const PASSWORD = 'e2e-pass-1234'
 
-const CANDIDATES = ['La Bella Nonna', 'Friterie du Beffroi', 'Les Jardins du Cèdre'] as const
-const WINNER = 'La Bella Nonna'
-const DELIVERY_FEE = 299
+// Position par défaut de l'app (OCC_DEFAULT_LAT / OCC_DEFAULT_LNG) et rayon du salon.
+const DEFAULT_LAT = 50.4542
+const DEFAULT_LNG = 3.9567
 
 const MOBILE: BrowserContextOptions = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true }
 const DESKTOP: BrowserContextOptions = { viewport: { width: 1280, height: 860 } }
@@ -89,7 +89,7 @@ async function addItem(
   item: string,
   opts: { pick?: string[]; quantity?: number; note: string; expectedLine: number; requiredGroup?: string },
 ) {
-  await page.getByRole('button', { name: new RegExp(`^${item}`) }).first().click()
+  await page.getByRole('button', { name: new RegExp(`^${esc(item)}`) }).first().click()
   const sheet = dialog(page, item)
   await expect(sheet).toBeVisible()
   if (opts.requiredGroup) {
@@ -106,10 +106,89 @@ async function addItem(
   await expect(page.getByText(`${item} ajouté à ton panier`).first()).toBeVisible()
 }
 
+
+// ---------------------------------------------------------------------------
+// Scénario construit depuis les données réelles du serveur (aucun nom codé en dur)
+
+interface ApiChoice { id: string; name: string; price: number }
+interface ApiGroup { id: string; name: string; min: number; max: number; choices: ApiChoice[] }
+interface ApiItem { id: string; name: string; price: number; category: string; available: boolean; option_groups: ApiGroup[] | null }
+interface ApiRestaurant { id: string; name: string; delivery_fee: number }
+
+/** Un article à commander : options obligatoires à cocher et prix unitaire attendu (serveur). */
+interface Pick {
+  name: string
+  /** Groupe radio obligatoire (affiche « Obligatoire »), s'il y en a un. */
+  requiredGroup?: string
+  /** Libellés de choix à cocher (groupes obligatoires à choix multiples). */
+  pick: string[]
+  unit: number
+}
+
+const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+function pickOf(item: ApiItem): Pick {
+  let unit = item.price
+  let requiredGroup: string | undefined
+  const pick: string[] = []
+  for (const g of item.option_groups ?? []) {
+    if (g.min < 1) continue
+    if (g.max === 1) {
+      // l'app présélectionne le premier choix des groupes radio obligatoires
+      requiredGroup ??= g.name
+      unit += g.choices[0]!.price
+    } else {
+      for (const c of g.choices.slice(0, g.min)) {
+        pick.push(c.name)
+        unit += c.price
+      }
+    }
+  }
+  return { name: item.name, requiredGroup, pick, unit }
+}
+
+async function api<T>(base: string, path: string): Promise<T> {
+  const res = await fetch(new URL(path, base))
+  if (!res.ok) throw new Error(`${path} → ${res.status}`)
+  return (await res.json()) as T
+}
+
+/** Choisit 3 restaurants proches et 4 articles du gagnant (le 1er avec une option obligatoire s'il existe). */
+async function buildScenario(base: string) {
+  const { items: nearby } = await api<{ items: ApiRestaurant[] }>(base, `/api/occ/restaurants/nearby?lat=${DEFAULT_LAT}&lng=${DEFAULT_LNG}&radiusKm=10`)
+  // noms non ambigus : aucun n'est contenu dans un autre (sélecteurs par texte)
+  const unambiguous = nearby.filter((r) => !nearby.some((o) => o.id !== r.id && o.name.toLowerCase().includes(r.name.toLowerCase())))
+  for (const winner of unambiguous) {
+    const { items } = await api<{ items: ApiItem[] }>(base, `/api/collections/menu_items/records?perPage=500&sort=position,name&filter=${encodeURIComponent(`restaurant='${winner.id}' && available=true`)}`)
+    const { items: cats } = await api<{ items: { name: string }[] }>(base, `/api/collections/menu_categories/records?perPage=200&filter=${encodeURIComponent(`restaurant='${winner.id}'`)}`)
+    // un nom d'article ne doit préfixer ni un autre article ni un onglet de catégorie (sélecteur « ^nom »)
+    const labels = [...items.map((o) => ({ id: o.id, name: o.name })), ...cats.map((c) => ({ id: '', name: c.name }))]
+    const usable = items.filter((it) => !labels.some((o) => o.id !== it.id && o.name.startsWith(it.name)))
+    if (usable.length < 4) continue
+    const withRequired = usable.find((it) => (it.option_groups ?? []).some((g) => g.min >= 1))
+    const first = withRequired ?? usable[0]!
+    const rest = usable.filter((it) => it.id !== first.id)
+    const others = unambiguous.filter((r) => r.id !== winner.id).slice(0, 2)
+    if (others.length < 2) break
+    return {
+      winner,
+      candidates: [winner.name, ...others.map((r) => r.name)],
+      alice: pickOf(first),
+      bob: pickOf(rest[0]!),
+      chloe: [pickOf(rest[1]!), pickOf(rest[2]!)] as const,
+    }
+  }
+  throw new Error('Pas assez de restaurants / articles près de la position par défaut pour le scénario E2E.')
+}
+
 // ---------------------------------------------------------------------------
 
 test('commande groupée complète : vote → paniers → récap → dispatch → remboursements', async ({ browser, baseURL }) => {
   const base = baseURL!
+  const sc = await buildScenario(base)
+  const CANDIDATES = sc.candidates
+  const WINNER = sc.winner.name
+  const DELIVERY_FEE = sc.winner.delivery_fee
   const alice = await newActor(browser, 'Alice', DESKTOP, base)
   const bob = await newActor(browser, 'Bob', MOBILE, base)
   const chloe = await newActor(browser, 'Chloé', MOBILE, base)
@@ -171,23 +250,23 @@ test('commande groupée complète : vote → paniers → récap → dispatch →
       await ap.getByRole('button', { name: 'Lancer le vote (3)' }).click()
       for (const a of members) await expect(a.page.getByRole('heading', { name: 'Vote pour tes restos préférés' })).toBeVisible()
 
-      const meter = (p: Page, n: number, r: string) => p.getByRole('meter', { name: `${n} vote(s) pour ${r}` })
+      const meter = (p: Page, n: number, r: string) => p.getByRole('meter', { name: `${n} vote(s) pour ${r}`, exact: true })
 
-      await bob.page.getByRole('button', { name: `Voter pour ${WINNER}` }).click()
-      await bob.page.getByRole('button', { name: 'Voter pour Friterie du Beffroi' }).click()
+      await bob.page.getByRole('button', { name: `Voter pour ${WINNER}`, exact: true }).click()
+      await bob.page.getByRole('button', { name: `Voter pour ${CANDIDATES[1]}`, exact: true }).click()
       // Visible chez Alice et Chloé sans rechargement.
       for (const a of [alice, chloe]) {
         await expect(meter(a.page, 1, WINNER)).toBeVisible()
-        await expect(meter(a.page, 1, 'Friterie du Beffroi')).toBeVisible()
+        await expect(meter(a.page, 1, CANDIDATES[1]!)).toBeVisible()
       }
-      await chloe.page.getByRole('button', { name: `Voter pour ${WINNER}` }).click()
-      await chloe.page.getByRole('button', { name: 'Voter pour Les Jardins du Cèdre' }).click()
-      await chloe.page.getByRole('button', { name: 'Retirer mon vote pour Les Jardins du Cèdre' }).click()
+      await chloe.page.getByRole('button', { name: `Voter pour ${WINNER}`, exact: true }).click()
+      await chloe.page.getByRole('button', { name: `Voter pour ${CANDIDATES[2]}`, exact: true }).click()
+      await chloe.page.getByRole('button', { name: `Retirer mon vote pour ${CANDIDATES[2]}`, exact: true }).click()
       await expect(meter(alice.page, 2, WINNER)).toBeVisible()
       await expect(meter(bob.page, 2, WINNER)).toBeVisible()
-      await expect(meter(bob.page, 0, 'Les Jardins du Cèdre')).toBeVisible()
+      await expect(meter(bob.page, 0, CANDIDATES[2]!)).toBeVisible()
 
-      await ap.getByRole('button', { name: `Voter pour ${WINNER}` }).click()
+      await ap.getByRole('button', { name: `Voter pour ${WINNER}`, exact: true }).click()
       for (const a of members) {
         await expect(meter(a.page, 3, WINNER)).toBeVisible()
         await expect(a.page.getByText('3/3 ont voté')).toBeVisible()
@@ -201,16 +280,17 @@ test('commande groupée complète : vote → paniers → récap → dispatch →
     await shot(members, '2-voting-closed')
     // Lignes attendues (prix serveur) : base + options, × quantité.
     const expected = {
-      Alice: 1050 + 300 + 150, // Margherita Large + Mozzarella
-      Bob: (1350 + 100) * 2, // 2 × Regina Moyenne + Champignons
-      Chloé: 300 + 100 + 650, // San Pellegrino 50 cl + Tiramisu
+      Alice: sc.alice.unit,
+      Bob: sc.bob.unit * 2,
+      Chloé: sc.chloe[0].unit + sc.chloe[1].unit,
     }
 
     await test.step('3. Paniers avec options + note, prêts visibles en direct', async () => {
-      await addItem(alice.page, 'Margherita', { requiredGroup: 'Taille', pick: ['Large (34 cm)', 'Mozzarella'], note: 'Sans basilic svp', expectedLine: 1500 })
-      await addItem(bob.page, 'Regina', { requiredGroup: 'Taille', pick: ['Champignons'], quantity: 2, note: 'Bien cuite', expectedLine: 2900 })
-      await addItem(chloe.page, 'San Pellegrino', { requiredGroup: 'Format', pick: ['50 cl'], note: 'Bien fraîche', expectedLine: 400 })
-      await addItem(chloe.page, 'Tiramisu maison', { note: 'Deux cuillères', expectedLine: 650 })
+      const [c1, c2] = sc.chloe
+      await addItem(alice.page, sc.alice.name, { requiredGroup: sc.alice.requiredGroup, pick: sc.alice.pick, note: 'Sans basilic svp', expectedLine: expected.Alice })
+      await addItem(bob.page, sc.bob.name, { requiredGroup: sc.bob.requiredGroup, pick: sc.bob.pick, quantity: 2, note: 'Bien cuite', expectedLine: expected.Bob })
+      await addItem(chloe.page, c1.name, { requiredGroup: c1.requiredGroup, pick: c1.pick, note: 'Bien fraîche', expectedLine: c1.unit })
+      await addItem(chloe.page, c2.name, { requiredGroup: c2.requiredGroup, pick: c2.pick, note: 'Deux cuillères', expectedLine: c2.unit })
 
       // Prix serveur : le panier (sous-total) reprend les totaux calculés côté Go.
       for (const a of members) {
@@ -219,7 +299,6 @@ test('commande groupée complète : vote → paniers → récap → dispatch →
       }
       await chloe.page.getByRole('button', { name: /^Mon panier/ }).click()
       const cart = dialog(chloe.page, 'Mon panier')
-      await expect(cart).toContainText('50 cl')
       await expect(cart).toContainText('« Bien fraîche »')
       await expect(cart).toContainText('« Deux cuillères »')
       await cart.getByRole('button', { name: 'Fermer' }).click()
@@ -239,6 +318,7 @@ test('commande groupée complète : vote → paniers → récap → dispatch →
     })
 
     await shot(members, '3-ordering')
+    const [c1n, c2n] = [sc.chloe[0].name, sc.chloe[1].name]
     await test.step('4. Récap : Σ parts = total ; dispatch Uber Eats ; export CSV', async () => {
       const ap = alice.page
       await ap.getByRole('button', { name: 'Passer au récap' }).click()
@@ -259,8 +339,10 @@ test('commande groupée complète : vote → paniers → récap → dispatch →
       expect(grandTotal).toBe(itemsSubtotal + DELIVERY_FEE)
       expect(Object.keys(byName).sort()).toEqual(['Alice', 'Bob', 'Chloé'])
       expect(Object.values(byName).reduce((x, y) => x + y.total, 0), 'Σ parts = total général').toBe(grandTotal)
-      // Frais de livraison partagés à parts égales, au centime près (plus grand reste) : 100 / 100 / 99.
-      expect(Object.values(byName).map((v) => v.fee).sort()).toEqual([100, 100, 99].sort())
+      // Frais de livraison partagés à parts égales, au centime près (plus grand reste).
+      const share = Math.floor(DELIVERY_FEE / 3)
+      const fees = [0, 1, 2].map((i) => share + (i < DELIVERY_FEE % 3 ? 1 : 0))
+      expect(Object.values(byName).map((v) => v.fee).sort()).toEqual(fees.sort())
       for (const [who, v] of Object.entries(byName)) {
         expect(v.total - v.fee, `sous-total ${who}`).toBe(expected[who as keyof typeof expected])
         shares[who] = v.total
@@ -277,7 +359,7 @@ test('commande groupée complète : vote → paniers → récap → dispatch →
       expect(await ue.locator('ol > li').count()).toBeGreaterThan(0)
       await expect(ue.getByRole('link', { name: /Ouvrir Uber Eats/ })).toHaveAttribute('href', /^https:\/\/www\.ubereats\.com\//)
       const recap = (await ue.locator('pre').textContent())!
-      for (const word of ['Margherita', 'Regina', 'San Pellegrino', 'Tiramisu']) expect(recap).toContain(word)
+      for (const word of [sc.alice.name, sc.bob.name, c1n, c2n]) expect(recap).toContain(word)
       await ue.getByRole('button', { name: 'Copier le récap' }).click()
       await expect(ap.getByText('Récap copié').first()).toBeVisible()
       expect(await ap.evaluate(() => navigator.clipboard.readText())).toBe(recap)
@@ -291,7 +373,7 @@ test('commande groupée complète : vote → paniers → récap → dispatch →
       const [download] = await Promise.all([ap.waitForEvent('download'), ex.getByRole('button', { name: 'CSV', exact: true }).click()])
       expect(download.suggestedFilename()).toMatch(/\.csv$/)
       const csv = await readFile((await download.path())!, 'utf8')
-      for (const word of ['Alice', 'Bob', 'Chloé', 'Margherita', 'Regina', 'Tiramisu', 'Sans basilic svp']) expect(csv).toContain(word)
+      for (const word of ['Alice', 'Bob', 'Chloé', sc.alice.name, sc.bob.name, c2n, 'Sans basilic svp']) expect(csv).toContain(word)
       await expect(ap.getByText('Export CSV téléchargé').first()).toBeVisible()
       await ex.getByRole('button', { name: 'Fermer' }).click()
       await expect(ex).toBeHidden()

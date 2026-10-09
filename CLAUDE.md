@@ -73,6 +73,17 @@ docker compose up --build         # http://localhost:8090
 Les apprentissages importants (pièges PocketBase, décisions d'UX) sont ajoutés
 ci-dessous, du plus récent au plus ancien.
 
+* 2026-10-09 — **Panneau `/admin`** + rôle `users.role` (`user`/`admin`). Bootstrap par
+  `OCC_ADMIN_EMAIL` / `OCC_ADMINS` (au démarrage et à l'inscription). Rules catalogue
+  `@request.auth.role = "admin"` ; lecture des parties ouverte aux admins (`… || @request.auth.role = "admin"`).
+  - la rule update de `users` reste `id = @request.auth.id` : un admin change les rôles via
+    `PATCH /api/occ/admin/users/{id}/role`, jamais par la collection ;
+  - import tout-ou-rien (`catalog.ImportAll` en transaction) avec rapport / `?dryRun=1` ; CSV avec décimales FR ;
+  - données réelles embarquées (`go:embed data`, `migrations/data/mons_restaurants.json`) ; les tests
+    d'intégration figent le catalogue sur la démo via `migrations.SetRealDataForTesting([]byte("[]"))` ;
+  - E2E : restaurants / articles choisis via l'API (plus de noms codés en dur) ; attention aux
+    sélecteurs `^nom` qui attrapent aussi les onglets de catégorie (« Frites & desserts »).
+
 * 2026-10-09 — **Mise en production** sur `https://eat.fs0ciety.org` (Coolify, app
   `ichbnb7y7rucoiqfcs0xlhfd`, branche `main`, auto-deploy). CI GitHub verte (build Docker
   complet inclus). API Coolify 4.4 : `POST /api/v1/deploy` (plus de GET),
