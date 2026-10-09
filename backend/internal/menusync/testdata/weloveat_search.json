@@ -1,0 +1,30 @@
+{
+ "establishments": {
+  "data": [
+   {
+    "name": "TOMO RAMEN",
+    "slug": "tomo-ramen",
+    "address": "Rue d'Enghien 11, 7000 Mons, Belgique",
+    "latitude": "50.4543472",
+    "longitude": "3.9512159",
+    "type": "restaurant",
+    "score_float": 4.8,
+    "nbr_evaluation": 123,
+    "minimum_per_order": null,
+    "shipping_cost": null
+   },
+   {
+    "name": "HARD RIBS",
+    "slug": "hard-ribs",
+    "address": "Av. de l'Enseignement 1, 7330 Saint-Ghislain, Belgique",
+    "latitude": "50.4476168",
+    "longitude": "3.8198839",
+    "type": "restaurant",
+    "score_float": 4.2,
+    "nbr_evaluation": 5,
+    "minimum_per_order": null,
+    "shipping_cost": null
+   }
+  ]
+ }
+}

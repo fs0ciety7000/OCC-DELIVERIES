@@ -1,0 +1,84 @@
+{
+ "data": {
+  "name": {
+   "fr": "Classic Ramen"
+  },
+  "slug": "classic-ramen-7615",
+  "price": "13.00",
+  "__": [
+   {
+    "id": 355,
+    "name": {
+     "fr": "Suppléments"
+    },
+    "display": 1,
+    "visible": 1,
+    "multi_select": 1,
+    "pivot": {
+     "multi_select": 1
+    },
+    "products": [
+     {
+      "id": 5021,
+      "name": {
+       "fr": "Œuf mollet"
+      },
+      "price": 2,
+      "display": 1,
+      "visible": 1
+     },
+     {
+      "id": 5022,
+      "name": {
+       "fr": "Feuilles d’algue séchée ( 2pcs)"
+      },
+      "price": 1,
+      "display": 1,
+      "visible": 1
+     },
+     {
+      "id": 5023,
+      "name": {
+       "fr": "Pousses de bambou piquantes"
+      },
+      "price": 1,
+      "display": 1,
+      "visible": 1
+     }
+    ]
+   },
+   {
+    "id": 9001,
+    "name": {
+     "fr": "Bouillon"
+    },
+    "display": 1,
+    "visible": 1,
+    "multi_select": 0,
+    "pivot": {
+     "multi_select": 0
+    },
+    "products": [
+     {
+      "id": 9101,
+      "name": {
+       "fr": "Classique"
+      },
+      "price": 0,
+      "display": 1,
+      "visible": 1
+     },
+     {
+      "id": 9102,
+      "name": {
+       "fr": "Épicé"
+      },
+      "price": "0.50",
+      "display": 1,
+      "visible": 1
+     }
+    ]
+   }
+  ]
+ }
+}

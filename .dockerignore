@@ -6,3 +6,4 @@ backend/pb_public
 **/*.log
 .env*
 !.env.example
+**/.menusync-cache

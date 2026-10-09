@@ -1,12 +1,19 @@
 import { Bike, Clock, MapPin, Star } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
-import { Badge, Card, Money } from '@/components/ui'
+import { Badge, Card, Money, type BadgeVariant } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { formatDistance, formatEta, formatRating, priceLevel } from '@/lib/format'
-import type { NearbyRestaurant, Restaurant } from '@/lib/types'
+import type { NearbyRestaurant, ProviderId, Restaurant } from '@/lib/types'
 import { RestaurantCover } from './RestaurantCover'
-import { cuisineLabel } from './visual'
+import { cuisineLabel, PROVIDER_LABELS } from './visual'
+
+const PROVIDER_BADGES: Record<ProviderId, BadgeVariant> = {
+  ubereats: 'ubereats',
+  takeaway: 'takeaway',
+  deliveroo: 'deliveroo',
+  weloveat: 'weloveat',
+}
 
 export function ProviderBadges({ restaurant, className }: { restaurant: Pick<Restaurant, 'providers'>; className?: string }) {
   const providers = restaurant.providers ?? []
@@ -14,8 +21,8 @@ export function ProviderBadges({ restaurant, className }: { restaurant: Pick<Res
   return (
     <div className={cn('flex flex-wrap gap-1.5', className)}>
       {providers.map((p) => (
-        <Badge key={p.id} variant={p.id === 'ubereats' ? 'ubereats' : 'takeaway'}>
-          {p.id === 'ubereats' ? 'Uber Eats' : 'Takeaway'}
+        <Badge key={p.id} variant={PROVIDER_BADGES[p.id] ?? 'neutral'}>
+          {PROVIDER_LABELS[p.id] ?? p.id}
         </Badge>
       ))}
     </div>

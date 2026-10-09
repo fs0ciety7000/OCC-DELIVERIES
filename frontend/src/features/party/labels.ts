@@ -53,6 +53,8 @@ export function declareLabel(method: DeclareMethod): string {
 export const DISPATCH_LABELS: Record<Dispatch['method'], string> = {
   ubereats: 'Uber Eats',
   takeaway: 'Takeaway',
+  deliveroo: 'Deliveroo',
+  weloveat: 'weloveat',
   export: 'Export',
   phone: 'Téléphone',
 }

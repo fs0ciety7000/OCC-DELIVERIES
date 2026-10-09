@@ -2,7 +2,7 @@
  * OCC DELIVERIES — « Exporter vers OCC »
  *
  * Bookmarklet / snippet console : lit les données structurées déjà présentes
- * dans la page d'un restaurant (Uber Eats, Takeaway/Just Eat, ou site du resto)
+ * dans la page d'un restaurant (Uber Eats, Takeaway/Just Eat, Deliveroo, weloveat ou site du resto)
  * et produit un JSON au format d'import d'OCC (voir docs/ARCHITECTURE.md,
  * `RestaurantImport`). Aucun appel réseau, aucune connexion : uniquement le
  * contenu de la page que vous consultez.
@@ -19,6 +19,8 @@
   var PROVIDERS = [
     { id: 'ubereats', re: /(^|\.)ubereats\.com$/ },
     { id: 'takeaway', re: /(^|\.)(takeaway\.com|just-eat\.[a-z.]+|lieferando\.[a-z]+|thuisbezorgd\.nl)$/ },
+    { id: 'deliveroo', re: /(^|\.)deliveroo\.[a-z.]+$/ },
+    { id: 'weloveat', re: /(^|\.)weloveat\.be$/ },
   ]
 
   function slugify(s) {

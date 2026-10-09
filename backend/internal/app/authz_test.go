@@ -247,7 +247,7 @@ func TestPublicEndpoints(t *testing.T) {
 		{
 			Name: "config", Method: http.MethodGet, URL: "/api/occ/config",
 			ExpectedStatus:  200,
-			ExpectedContent: []string{`"currency":"EUR"`, `"label":"Mons"`, `"id":"ubereats"`, `"id":"takeaway"`, `"enabled":true`},
+			ExpectedContent: []string{`"currency":"EUR"`, `"label":"Mons"`, `"id":"ubereats"`, `"id":"takeaway"`, `"id":"deliveroo"`, `"id":"weloveat"`, `"enabled":true`, `"enabled":false`},
 			TestAppFactory:  factory,
 		},
 		{

@@ -59,5 +59,7 @@ export const TAG_LABELS: Record<string, { label: string; emoji: string }> = {
 export const PROVIDER_LABELS: Record<string, string> = {
   ubereats: 'Uber Eats',
   takeaway: 'Takeaway',
+  deliveroo: 'Deliveroo',
+  weloveat: 'weloveat',
   manual: 'Manuel',
 }

@@ -102,7 +102,7 @@ func (in *RestaurantImport) Problems() []string {
 		add("Coordonnées GPS invalides.")
 	}
 	for _, p := range in.Providers {
-		if p.ID != providers.UberEats && p.ID != providers.Takeaway {
+		if !providers.IsPlatform(p.ID) {
 			add("Fournisseur inconnu : %q.", p.ID)
 		}
 	}

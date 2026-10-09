@@ -17,7 +17,7 @@ import (
 // such as "source_urls" or "menu_checked_at" are ignored.
 const RealDataFile = "data/mons_restaurants.json"
 
-//go:embed data
+//go:embed data/mons_restaurants.json
 var dataFS embed.FS
 
 var (

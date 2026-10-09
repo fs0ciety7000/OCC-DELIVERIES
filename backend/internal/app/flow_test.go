@@ -187,7 +187,13 @@ func TestHappyPath(t *testing.T) {
 		} `json:"dispatch"`
 	}
 	e.expect(403, "POST", path("/api/occ/parties/%s/dispatch", pid), bob.token, map[string]any{"method": "ubereats"})
-	e.expect(400, "POST", path("/api/occ/parties/%s/dispatch", pid), alice.token, map[string]any{"method": "deliveroo"})
+	e.expect(400, "POST", path("/api/occ/parties/%s/dispatch", pid), alice.token, map[string]any{"method": "glovo"})
+	// weloveat is a known platform but disabled in the test config
+	e.expect(400, "POST", path("/api/occ/parties/%s/dispatch", pid), alice.token, map[string]any{"method": "weloveat"})
+	e.expect(200, "POST", path("/api/occ/parties/%s/dispatch", pid), alice.token, map[string]any{"method": "deliveroo"}).json(t, &dr)
+	if dr.Dispatch.URL != "https://deliveroo.be/fr/" || dr.Party.Provider != "deliveroo" || dr.Party.Dispatch["method"] != "deliveroo" {
+		t.Fatalf("deliveroo dispatch: %+v", dr)
+	}
 	e.expect(200, "POST", path("/api/occ/parties/%s/dispatch", pid), alice.token, map[string]any{"method": "ubereats"}).json(t, &dr)
 	if dr.Dispatch.URL != "https://www.ubereats.com/be/store/test-pizza" || !strings.Contains(dr.Dispatch.CartText, "2 × Margherita (Large, Fromage)") ||
 		dr.Party.Provider != "ubereats" || dr.Party.Dispatch["method"] != "ubereats" {

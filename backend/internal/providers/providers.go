@@ -1,7 +1,7 @@
 // Package providers turns a party summary into a "dispatch": a deep link,
 // step by step instructions (French) and a copyable cart recap.
 //
-// Neither Uber Eats nor Takeaway expose a public API to fill a customer cart,
+// Neither Uber Eats, Takeaway, Deliveroo nor weloveat expose a public API to fill a customer cart,
 // see docs/adr/0002-providers.md. A future partner adapter only needs to
 // implement Provider.
 package providers
@@ -16,10 +16,12 @@ import (
 
 // Provider ids.
 const (
-	UberEats = "ubereats"
-	Takeaway = "takeaway"
-	Export   = "export"
-	Phone    = "phone"
+	UberEats  = "ubereats"
+	Takeaway  = "takeaway"
+	Deliveroo = "deliveroo"
+	Weloveat  = "weloveat"
+	Export    = "export"
+	Phone     = "phone"
 )
 
 // Link is a restaurant page on a delivery platform.
@@ -64,10 +66,12 @@ type Provider interface {
 }
 
 var registry = map[string]Provider{
-	UberEats: uberEats{},
-	Takeaway: takeaway{},
-	Export:   export{},
-	Phone:    phone{},
+	UberEats:  uberEats{},
+	Takeaway:  takeaway{},
+	Deliveroo: deliveroo{},
+	Weloveat:  weloveat{},
+	Export:    export{},
+	Phone:     phone{},
 }
 
 // Get returns a registered provider.
@@ -87,7 +91,7 @@ func IDs() []string {
 }
 
 // Platforms are the delivery platforms that can be enabled through OCC_PROVIDERS.
-var Platforms = []string{UberEats, Takeaway}
+var Platforms = []string{UberEats, Takeaway, Deliveroo, Weloveat}
 
 // IsPlatform reports whether id is a delivery platform (vs. export/phone).
 func IsPlatform(id string) bool {
@@ -180,6 +184,56 @@ func (p takeaway) Dispatch(r Restaurant, s domain.Summary) Dispatch {
 			"Ajoutez au panier les articles du récapitulatif ci-dessous, avec leurs options.",
 			"Indiquez les remarques (sans oignon…) dans le champ commentaire de la commande.",
 			"Vérifiez l'adresse de livraison puis validez et payez la commande.",
+			"Revenez ici pour désigner le payeur : chacun verra sa part à rembourser.",
+		},
+	}
+}
+
+type deliveroo struct{}
+
+func (deliveroo) ID() string    { return Deliveroo }
+func (deliveroo) Name() string  { return "Deliveroo" }
+func (deliveroo) Color() string { return "#00CCBC" }
+
+func (p deliveroo) Dispatch(r Restaurant, s domain.Summary) Dispatch {
+	u := r.LinkFor(Deliveroo)
+	if u == "" {
+		u = "https://deliveroo.be/fr/"
+	}
+	return Dispatch{
+		Method:   Deliveroo,
+		URL:      u,
+		CartText: CartText(r, s),
+		Instructions: []string{
+			fmt.Sprintf("Ouvrez la page de « %s » dans l'app ou le site Deliveroo (bouton ci-dessus).", r.Name),
+			"Vérifiez que l'adresse de livraison est la bonne : Deliveroo adapte la carte et les frais à l'adresse.",
+			"Ajoutez au panier les articles du récapitulatif ci-dessous, avec leurs options (ou lancez une « commande de groupe » Deliveroo et partagez son lien).",
+			"Indiquez les remarques (sans oignon…) dans les instructions pour le restaurant, puis validez et payez la commande.",
+			"Revenez ici pour désigner le payeur : chacun verra sa part à rembourser.",
+		},
+	}
+}
+
+type weloveat struct{}
+
+func (weloveat) ID() string    { return Weloveat }
+func (weloveat) Name() string  { return "weloveat" }
+func (weloveat) Color() string { return "#113B3A" }
+
+func (p weloveat) Dispatch(r Restaurant, s domain.Summary) Dispatch {
+	u := r.LinkFor(Weloveat)
+	if u == "" {
+		u = "https://weloveat.be/restaurants"
+	}
+	return Dispatch{
+		Method:   Weloveat,
+		URL:      u,
+		CartText: CartText(r, s),
+		Instructions: []string{
+			fmt.Sprintf("Ouvrez la page de « %s » sur weloveat.be (bouton ci-dessus).", r.Name),
+			"Choisissez « Livraison » et saisissez l'adresse de livraison pour vérifier que le restaurant livre chez vous.",
+			"Ajoutez au panier les articles du récapitulatif ci-dessous, avec leurs suppléments.",
+			"Indiquez les remarques (sans oignon…) dans le commentaire de la commande, puis validez et payez.",
 			"Revenez ici pour désigner le payeur : chacun verra sa part à rembourser.",
 		},
 	}

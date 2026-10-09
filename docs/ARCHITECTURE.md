@@ -39,7 +39,9 @@ backend/
     code.go                  génération code de party
     epc.go / iban.go         payload QR EPC (SEPA), validation IBAN
     geo.go                   haversine
-  internal/providers/        adaptateurs Uber Eats / Takeaway / manuel + tests
+  internal/providers/        adaptateurs Uber Eats / Takeaway / Deliveroo / weloveat / manuel + tests
+  internal/menusync/         lecture des flux restaurants + menus (Deliveroo, weloveat, sites) + tests
+  cmd/menusync/              outil CLI `menusync` (binaire séparé, /pb/menusync dans l'image)
   internal/app/              hooks PocketBase + routes /api/occ (glue)
   internal/catalog/           import / export des menus (JSON, CSV, rapport de validation)
   migrations/                migrations Go (schéma, seed démo, rôles admin, données réelles)
@@ -111,7 +113,7 @@ membres de la party concernée. Hook : `wero_id` / `bancontact_phone` normalisé
 | eta_min, eta_max | number int | minutes |
 | delivery_fee | number int | cents |
 | min_order | number int | cents |
-| providers | json | `[{ "id": "ubereats"|"takeaway", "url": "https://…" }]` |
+| providers | json | `[{ "id": "ubereats"|"takeaway"|"deliveroo"|"weloveat", "url": "https://…" }]` |
 | active | bool | |
 
 Rules : list/view `active = true || @request.auth.role = "admin"` ;
@@ -166,7 +168,7 @@ la catégorie doit appartenir au même restaurant, `restaurant` immuable.
 | status | select | `lobby`, `voting`, `ordering`, `review`, `paying`, `closed`, `cancelled` |
 | candidates | R(restaurants) multi | restaurants soumis au vote |
 | restaurant | R(restaurants) | restaurant retenu |
-| provider | select | `ubereats`, `takeaway`, `manual` |
+| provider | select | `ubereats`, `takeaway`, `deliveroo`, `weloveat`, `manual` |
 | delivery_address | text | |
 | notes | text | |
 | voting_ends_at | date | indicatif (affiché en compte à rebours) |
@@ -279,7 +281,7 @@ PocketBase `{ "status": 400, "message": "…", "data": {} }`, messages en franç
 | `POST /api/occ/parties/{id}/transition` | hôte | `{ "to": Status, "restaurant"?: id }` | `{ "party": Party }` |
 | `POST /api/occ/parties/{id}/ready` | membre | `{ "ready": bool }` | `{ "member": PartyMember }` (status `ordering` uniquement) |
 | `GET /api/occ/parties/{id}/summary` | membre | | `Summary` (ci-dessous) |
-| `POST /api/occ/parties/{id}/dispatch` | hôte | `{ "method": "ubereats"\|"takeaway"\|"export"\|"phone" }` | `{ "party": Party, "dispatch": Dispatch }` (status review/paying) |
+| `POST /api/occ/parties/{id}/dispatch` | hôte | `{ "method": "ubereats"\|"takeaway"\|"deliveroo"\|"weloveat"\|"export"\|"phone" }` (plateforme désactivée par `OCC_PROVIDERS` → 400) | `{ "party": Party, "dispatch": Dispatch }` (status review/paying) |
 | `POST /api/occ/parties/{id}/payer` | hôte | `{ "payer": userId }` | `{ "party": Party, "payments": Payment[] }` (review → paying ; en paying : recalcule si aucun paiement tiers confirmé) |
 | `GET /api/occ/parties/{id}/export` | membre | `format=csv\|txt\|json` | fichier (`Content-Disposition: attachment`) |
 | `POST /api/occ/payments/{id}/action` | voir | `{ "action": "declare"\|"confirm"\|"reset", "method"?: "qr"\|"wero"\|"bancontact"\|"link"\|"cash"\|"later" }` | `{ "payment": Payment }` |
@@ -416,13 +418,17 @@ annulées ; top 5 par nombre de parties.
 
 ## 6. Fournisseurs de livraison (`internal/providers`)
 
-Ni Uber Eats ni Takeaway (Just Eat Takeaway) n'offrent d'API publique permettant
-à un tiers de **créer un panier client**. Stratégie :
+Ni Uber Eats, ni Takeaway (Just Eat Takeaway), ni Deliveroo, ni weloveat n'offrent
+d'API publique permettant à un tiers de **créer un panier client**. Stratégie :
 
 * `Provider` interface : `ID()`, `Name()`, `Color()`, `Dispatch(restaurant, summary) Dispatch`.
 * **Uber Eats** : deep link vers la page du restaurant (`providers[].url`) + guide
   pour lancer une *commande groupée Uber Eats* + récap copiable.
 * **Takeaway** : deep link `takeaway.com` + récap copiable.
+* **Deliveroo** (`#00CCBC`) : deep link vers la page du restaurant (`deliveroo.be/fr/menu/…`,
+  repli `deliveroo.be/fr/`) + guide (adresse, panier ou « commande de groupe ») + récap.
+* **weloveat** (`#113B3A`, plateforme belge, SPA Angular) : deep link `weloveat.be/{slug}`
+  (repli `weloveat.be/restaurants`) + guide + récap.
 * **Export** : CSV / TXT / JSON. **Téléphone** : script de commande à dicter.
 * Extension future : un adaptateur « API partenaire » (Uber Direct / Marketplace,
   JET Connect) se branche derrière la même interface sans toucher au front.
@@ -437,6 +443,16 @@ de démo (désactivés plutôt que supprimés s'ils apparaissent dans une party)
 absent, vide ou sans restaurant valide → aucune modification. Les entrées invalides
 sont ignorées (journalisées) sans bloquer le démarrage. Sur une installation neuve
 avec des données réelles, le seed de démo (`1760000001`) ne fait rien.
+Les plateformes de `restaurants.providers` sont celles de `providers.Platforms`.
+
+**Flux de menus (`menusync`)** — outil séparé, jamais appelé par le serveur : il lit
+les pages publiques (Deliveroo : `__NEXT_DATA__` des pages liste et menu ; weloveat :
+l'API JSON anonyme qu'appelle la SPA ; sites satellites Takeaway : microdonnées
+schema.org ; sites quelconques : JSON-LD/microdonnées), produit des `RestaurantImport`
+(+ `source`, `source_urls`, `menu_checked_at`, ignorés par l'import), fusionne les
+sources (`menusync merge`) et peut importer via l'endpoint admin. Politesse obligatoire :
+User-Agent identifié, requêtes séquentielles ≥ 2,5 s, robots.txt appliqué, cache disque,
+arrêt net sur 403 / page anti-robot (aucun contournement). Voir `docs/DEPLOYMENT.md`.
 
 ## 7. Configuration (variables d'environnement)
 
@@ -447,5 +463,5 @@ avec des données réelles, le seed de démo (`1760000001`) ne fait rien.
 | `OCC_PUBLIC_URL` | `http://localhost:8090` | URL publique (liens d'invitation, `meta.appURL`) |
 | `OCC_DEFAULT_LAT` / `OCC_DEFAULT_LNG` / `OCC_DEFAULT_LABEL` | `50.4542` / `3.9567` / `Mons` | position par défaut |
 | `OCC_SEED_DEMO` | `true` | charge les restaurants de démo au 1er démarrage (ignoré si `migrations/data` contient des restaurants réels) |
-| `OCC_PROVIDERS` | `ubereats,takeaway` | fournisseurs activés |
+| `OCC_PROVIDERS` | `ubereats,takeaway,deliveroo,weloveat` | plateformes de livraison activées (config + dispatch) |
 | `OCC_PUBLIC_DIR` | `./pb_public` | dossier de la SPA |

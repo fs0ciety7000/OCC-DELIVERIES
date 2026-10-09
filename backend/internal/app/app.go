@@ -54,7 +54,7 @@ func ConfigFromEnv(version string) Config {
 		DefaultLabel: envOr("OCC_DEFAULT_LABEL", "Mons"),
 	}
 	cfg.AdminEmails = parseEmails(os.Getenv("OCC_ADMIN_EMAIL") + "," + os.Getenv("OCC_ADMINS"))
-	for _, p := range strings.Split(envOr("OCC_PROVIDERS", "ubereats,takeaway"), ",") {
+	for _, p := range strings.Split(envOr("OCC_PROVIDERS", "ubereats,takeaway,deliveroo,weloveat"), ",") {
 		p = strings.ToLower(strings.TrimSpace(p))
 		if providers.IsPlatform(p) && !slices.Contains(cfg.Providers, p) {
 			cfg.Providers = append(cfg.Providers, p)

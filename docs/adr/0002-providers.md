@@ -21,3 +21,11 @@ aux restaurants/partenaires, sous contrat. Le scraping viole leurs CGU.
   (`Dispatch` qui crée réellement la commande) sans toucher au front ni au schéma.
 * Le prix affiché peut différer légèrement de celui de la plateforme ; l'UI le
   signale (« prix indicatifs »).
+
+## Mise à jour — 2026-10-09 : Deliveroo, weloveat, `menusync`
+* Deux adaptateurs de même nature (deep link + guide + récap) : `deliveroo` et `weloveat`
+  (plateforme belge). Aucune n'offre d'API publique de panier.
+* Les **menus** peuvent être lus par l'outil séparé `menusync` (pages publiques, API anonyme de
+  la SPA weloveat, sites satellites Takeaway) : usage ponctuel par un admin, robots.txt appliqué,
+  requêtes espacées, arrêt sur 403/anti-robot, aucun contournement. Le serveur ne fait jamais
+  ces requêtes ; les données passent par l'import admin après relecture.
