@@ -75,6 +75,40 @@ Polices auto-hébergées via `@fontsource-variable/*` (aucun appel externe).
 * Évènements live (vote, prêt, paiement) : *pulse* 600 ms sur l'avatar concerné.
 * `prefers-reduced-motion` → opacité uniquement.
 
+### Deux moteurs, deux rôles (ADR 0004)
+| moteur | rôle | exemples |
+|---|---|---|
+| **`motion`** | UI fonctionnelle, déclarative, liée à l'état React | entrées de listes, sheets, `layout`, `AnimatePresence`, hover/tap |
+| **GSAP 3.15** + `@gsap/react` (`useGSAP`) | moments « signature », timelines, SVG, trajectoires, physique | animations culinaires ci-dessous |
+
+Règles GSAP : toujours `useGSAP({ scope })` (nettoyage auto), plugins
+enregistrés une seule fois dans `src/lib/gsap.ts` (`Flip`, `MotionPathPlugin`,
+`MorphSVGPlugin`, `Physics2DPlugin`, `SplitText`), import dynamique des scènes
+lourdes (`React.lazy`), `gsap.matchMedia()` avec
+`(prefers-reduced-motion: reduce)` → version statique. Animer uniquement
+`transform` / `opacity` (et attributs SVG) ; 60 fps sur mobile milieu de gamme.
+
+### Animations culinaires (« Food motion »)
+Illustrations **SVG maison** (style flat, tokens de couleur, trait 2 px) dans
+`src/components/food/` — pas d'images lourdes, pas de Lottie.
+
+| moment | animation | technique |
+|---|---|---|
+| Accueil — héros | ingrédients flottants (tomate, basilic, piment, sushi, frite, feuille) en parallaxe lente autour du titre « Qu'est-ce qu'on mange ? » ; titre révélé lettre par lettre | timeline GSAP en boucle `yoyo`, `SplitText`, parallaxe au pointeur (desktop) |
+| Chargement | `FoodLoader` : une pizza dont les parts se découpent puis se recomposent ; variante bol de ramen fumant | timeline SVG, `MorphSVG` pour la vapeur |
+| Vote | cœur qui « explose » en mini-ingrédients de la cuisine du resto votée ; barre de score qui se remplit comme une jauge de sauce | `Physics2D` (particules), `motion` pour la barre |
+| Restaurant gagnant | carte qui se retourne + emoji qui rebondit, couverts qui s'entrechoquent | timeline GSAP |
+| Ajout au panier | la vignette du plat « vole » en arc jusqu'au sac de commande, qui se gonfle | `Flip` + `MotionPath` |
+| « Je suis prêt » | cloche de service *ding* (rotation + onde) sur l'avatar | timeline courte |
+| Tout le monde prêt | petite vapeur qui monte au-dessus de la AvatarStack | `MorphSVG` |
+| Envoi (dispatch) | scooter de livraison qui parcourt une route pointillée jusqu'au bureau | `MotionPath` + `drawSVG`-like `strokeDashoffset` |
+| Paiement confirmé | pièce/billet qui tombe dans une tirelire-burger | timeline GSAP |
+| Party clôturée | pluie d'emojis 🍕🍣🍔🥟🌮🍜 avec gravité, ~1,5 s, une seule fois | `Physics2D` sur un calque `pointer-events:none` |
+| États vides | assiette vide avec fourchette qui tapote, oscillation douce | boucle GSAP lente |
+
+Budget : chaque scène ≤ 6 Ko gzip, aucune animation bloquante (> 1,5 s) sur
+un parcours critique, toutes interruptibles.
+
 ## 3. Composants (`frontend/src/components/ui`)
 
 | composant | variantes | notes |
