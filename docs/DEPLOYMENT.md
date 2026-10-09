@@ -1,5 +1,13 @@
 # Déploiement — Coolify (`eat.fs0ciety.org`)
 
+> **État actuel (2026-10-09)** — en production sur `https://eat.fs0ciety.org`.
+> Coolify `coolify.fs0ciety.org` · projet *Main Stack* / `production` · app
+> « OCC Deliveries » (uuid `ichbnb7y7rucoiqfcs0xlhfd`) · source GitHub App
+> privée · branche **`main`** · auto-deploy activé (chaque push sur `main`
+> redéploie) · volume `/pb/pb_data` · healthcheck `/api/occ/health`.
+> Pilotable via l'API Coolify (`COOLIFY_API_URL` / `COOLIFY_API_TOKEN` dans
+> l'environnement cloud ; `POST /api/v1/deploy {"uuid": …}` pour redéployer).
+
 Un seul conteneur : le binaire Go sert l'API, le realtime, l'admin et la SPA.
 Données : SQLite dans le volume `/pb/pb_data` (**à sauvegarder**).
 

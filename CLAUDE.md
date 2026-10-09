@@ -73,6 +73,12 @@ docker compose up --build         # http://localhost:8090
 Les apprentissages importants (pièges PocketBase, décisions d'UX) sont ajoutés
 ci-dessous, du plus récent au plus ancien.
 
+* 2026-10-09 — **Mise en production** sur `https://eat.fs0ciety.org` (Coolify, app
+  `ichbnb7y7rucoiqfcs0xlhfd`, branche `main`, auto-deploy). CI GitHub verte (build Docker
+  complet inclus). API Coolify 4.4 : `POST /api/v1/deploy` (plus de GET),
+  `PATCH /applications/{uuid}/envs/bulk`, `POST /applications/{uuid}/storages`.
+  `/api/occ/health` renvoie `version: dev` tant que « Include Source Commit in Build »
+  n'est pas activé dans Coolify.
 * 2026-10-09 — E2E Playwright (`e2e/`) : parcours complet hôte + 2 invités + non-membre,
   vert sur PocketBase v0.36 puis v0.40.5. Exception de version : `@playwright/test`
   épinglé en **1.56.1** pour correspondre au Chromium préinstallé de l'environnement
