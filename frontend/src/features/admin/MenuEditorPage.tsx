@@ -85,7 +85,7 @@ export function MenuEditorPage() {
   const moveItem = (list: MenuItem[], index: number, delta: number) => run.mutate(() => persistOrder(move(list, index, delta), (iid, position) => adminApi.saveItem(iid, { position })))
   const patchItem = (item: MenuItem, data: Partial<MenuItem>) => {
     // toute modification d'un article le verrouille côté serveur (sauf l'interrupteur lui-même)
-    const next = 'locked' in data ? data : { ...data, locked: true }
+    const next = data
     qc.setQueryData<Menu>(qk.admin.menu(id), (old) => old && { ...old, items: old.items.map((x) => (x.id === item.id ? { ...x, ...next } : x)) })
     run.mutate(() => adminApi.saveItem(item.id, data))
   }

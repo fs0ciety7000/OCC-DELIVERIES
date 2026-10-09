@@ -220,13 +220,15 @@ func TestSyncReconcilesIntoDatabase(t *testing.T) {
 		t.Fatalf("second run must be a no-op from the cache: %+v %v %+v", run.Stats, run.Changes, run.Sources)
 	}
 
-	// an admin edit through the API locks the item: the sync leaves it alone
+	// an admin edit alone does not lock (the sync would restore the price);
+	// locking is explicit: a locked item is left alone by the sync
 	admin := e.admin("Root")
 	menuID := e.item(tomoID, "Menu classique ramen").Id
 	edited := e.expect(200, "PATCH", "/api/collections/menu_items/records/"+menuID, admin.token, map[string]any{"price": 1450}).m(t)
-	if edited["locked"] != true {
-		t.Fatalf("edited item must be locked: %v", edited)
+	if edited["locked"] != false {
+		t.Fatalf("an edit must not lock by itself: %v", edited)
 	}
+	e.expect(200, "PATCH", "/api/collections/menu_items/records/"+menuID, admin.token, map[string]any{"price": 1450, "locked": true})
 	e.runSync(triggerManual)
 	if p := e.item(tomoID, "Menu classique ramen").GetInt("price"); p != 1450 {
 		t.Fatalf("locked item modified: %d", p)
@@ -239,14 +241,14 @@ func TestSyncReconcilesIntoDatabase(t *testing.T) {
 	if p := e.item(tomoID, "Menu classique ramen").GetInt("price"); p != 1600 {
 		t.Fatalf("unlocked item price %d", p)
 	}
-	// a restaurant edit locks the restaurant; a visibility toggle does not
-	e.expect(200, "PATCH", "/api/collections/restaurants/records/"+tomoID, admin.token, map[string]any{"active": true})
-	if r, _ := e.app.FindRecordById(colRestaurants, tomoID); r.GetBool("locked") {
-		t.Fatal("visibility toggle must not lock")
-	}
+	// restaurant edits never lock implicitly; the explicit toggle does
 	e.expect(200, "PATCH", "/api/collections/restaurants/records/"+tomoID, admin.token, map[string]any{"phone": "065 00 00 00"})
+	if r, _ := e.app.FindRecordById(colRestaurants, tomoID); r.GetBool("locked") {
+		t.Fatal("restaurant edit must not lock by itself")
+	}
+	e.expect(200, "PATCH", "/api/collections/restaurants/records/"+tomoID, admin.token, map[string]any{"locked": true})
 	if r, _ := e.app.FindRecordById(colRestaurants, tomoID); !r.GetBool("locked") {
-		t.Fatal("restaurant edit must lock")
+		t.Fatal("explicit toggle must lock")
 	}
 
 	// a source disappears → its restaurants become stale (never deleted)

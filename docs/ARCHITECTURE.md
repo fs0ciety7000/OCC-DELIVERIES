@@ -118,7 +118,7 @@ membres de la party concernée. Hook : `wero_id` / `bancontact_phone` normalisé
 | active | bool | |
 | source_key | text (index) | synchronisation : clé stable `<source>:<url normalisée>` (ex. `takeaway-site:tomomons.be`) |
 | sources | json | synchronisation : `[{ "provider": "deliveroo", "url": "https://…", "checked_at": "2026-10-09" }]` |
-| locked | bool | verrouillé : la synchronisation ne le modifie plus (posé par toute modification admin) |
+| locked | bool | verrouillé : la synchronisation ne le modifie plus (choix **explicite** de l'admin, jamais automatique) |
 | stale_since | date | obsolète : plus proposé par aucune source activée depuis cette date (vide sinon) ; reste actif |
 | partial_menu | bool | **carte partielle** : seuls quelques plats sont connus (catégorie « Aperçu », instantané Uber Eats) ; badge « Aperçu du menu » + bandeau vers Uber Eats — migration `1760000006` |
 | geo_approx | bool | **position approximative** (lieu par défaut `OCC_DEFAULT_LAT/LNG`) : distance masquée dans l'UI, classé après les autres dans `/nearby` |
@@ -129,9 +129,14 @@ Hooks (écritures via la collection) : slug/nom normalisés, slug unique (messag
 `cuisines` nettoyées (minuscules, sans doublon), `providers` limités aux plateformes
 (`ubereats`, `takeaway`, `deliveroo`, `weloveat`) en `https://` (liens vides retirés), `eta_min ≤ eta_max` ;
 **suppression refusée** si le restaurant apparaît dans une party (le désactiver).
-**Verrouillage automatique** : une modification (update) via l'API pose `locked = true`, sauf
-si la requête envoie elle-même `locked` (interrupteur) ou ne touche que `active` / `locked` /
-`partial_menu` / `geo_approx`.
+**Verrouillage** : uniquement explicite (interrupteur « Verrouillé »). Une modification admin ne
+verrouille pas : la synchronisation peut ensuite remettre à jour la fiche (migration `1760000007`
+a levé les verrous posés par l'ancien verrouillage automatique).
+**Import** (`catalog.Import`) : le restaurant visé est retrouvé par slug, sinon par un lien de
+plateforme identique (hôte + chemin, liens génériques type page ville ignorés), sinon par le nom
+normalisé (casse, accents, « (Mons) », « - Mons ») — dans les deux derniers cas seulement si un seul
+restaurant correspond ; le slug existant est conservé, les liens fusionnés et les champs absents du
+fichier (note, délai, frais, cuisines, description…) gardent leur valeur.
 
 ### `menu_categories` (lecture publique)
 `restaurant` R(restaurants, cascade) · `name` · `position` int.
@@ -160,8 +165,7 @@ Supprimer une catégorie ne supprime pas ses articles (ils passent « sans caté
 Rules : list/view `""` ; create/update/delete `@request.auth.role = "admin"`.
 Hook : `option_groups` validés (`domain.ValidateOptionGroups`), `tags` nettoyés,
 la catégorie doit appartenir au même restaurant, `restaurant` immuable.
-**Verrouillage automatique** : création ou modification via l'API → `locked = true`, sauf si la
-requête envoie `locked` ou ne touche que `position`.
+**Verrouillage** : uniquement explicite (interrupteur / cadenas de l'éditeur de menu).
 
 ```json
 "option_groups": [

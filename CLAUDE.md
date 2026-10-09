@@ -73,6 +73,12 @@ docker compose up --build         # http://localhost:8090
 Les apprentissages importants (pièges PocketBase, décisions d'UX) sont ajoutés
 ci-dessous, du plus récent au plus ancien.
 
+* 2026-10-09 — **Verrouillage explicite uniquement** (retour utilisateur : le formulaire admin
+  verrouillait par défaut et empêchait la resynchronisation). `autoLock` supprimé, interrupteur
+  initialisé sur l'état réel, migration `1760000007` qui lève tous les verrous existants.
+  `catalog.Import` retrouve le restaurant par lien de plateforme (hôte + chemin, liens génériques
+  ignorés, correspondance unique) puis par nom normalisé, garde le slug et les champs non fournis :
+  le favori « Exporter vers OCC » complète les cartes partielles Uber Eats sans doublon.
 * 2026-10-09 — **Instantané Uber Eats** (`migrations/data/mons_ubereats.json`, source `ubereats-snapshot`,
   migration `1760000006`, ADR 0002 mise à jour 3). Le connecteur MCP Uber Eats n'existe que dans les
   sessions Claude et limite fortement le débit (429 dès le 2e appel rapproché ; une reconnexion du

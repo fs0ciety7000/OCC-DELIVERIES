@@ -3,10 +3,16 @@
 package catalog
 
 import (
+	"errors"
 	"fmt"
+	"net/url"
 	"regexp"
+	"slices"
 	"strings"
+	"unicode"
 	"unicode/utf8"
+
+	"golang.org/x/text/unicode/norm"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
@@ -146,7 +152,126 @@ func orEmpty[T any](s []T) []T {
 	return s
 }
 
-// Import upserts a restaurant by slug and replaces its whole menu.
+// findExisting finds the restaurant an import refers to: same slug, else a
+// shared platform link (same host + path), else the same normalized name. The
+// export tool builds its slug from the platform page title ("pizza-hut-mons"),
+// which must update the catalogue entry ("pizza-hut") instead of duplicating it.
+func findExisting(tx core.App, in RestaurantImport) (*core.Record, error) {
+	if r, err := tx.FindFirstRecordByData(Restaurants, "slug", in.Slug); err == nil {
+		return r, nil
+	}
+	all, err := tx.FindAllRecords(Restaurants)
+	if err != nil {
+		return nil, err
+	}
+	// a link or a name only identifies a restaurant when exactly one matches
+	// (generic links such as a city page are shared by many restaurants)
+	unique := func(match func(*core.Record) bool) *core.Record {
+		var found *core.Record
+		for _, r := range all {
+			if match(r) {
+				if found != nil {
+					return nil
+				}
+				found = r
+			}
+		}
+		return found
+	}
+	for _, p := range in.Providers {
+		key := linkKey(p.URL)
+		if key == "" {
+			continue
+		}
+		if r := unique(func(r *core.Record) bool {
+			var links []providers.Link
+			_ = r.UnmarshalJSONField("providers", &links)
+			return slices.ContainsFunc(links, func(l providers.Link) bool { return l.ID == p.ID && linkKey(l.URL) == key })
+		}); r != nil {
+			return r, nil
+		}
+	}
+	if n := normName(in.Name); n != "" {
+		if r := unique(func(r *core.Record) bool { return normName(r.GetString("name")) == n }); r != nil {
+			return r, nil
+		}
+	}
+	return nil, errors.New("not found")
+}
+
+// genericLinkRe spots platform links that point to a city / listing page
+// rather than to one restaurant: they never identify a restaurant.
+var genericLinkRe = regexp.MustCompile(`(?i)/(city|livraison|delivery|restaurants|search)(/|$)`)
+
+// linkKey reduces a restaurant page URL to host + path (no query, no trailing
+// slash); "" for generic listing links.
+func linkKey(raw string) string {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u.Host == "" || genericLinkRe.MatchString(u.Path) || strings.Trim(u.Path, "/") == "" {
+		return ""
+	}
+	return strings.ToLower(strings.TrimPrefix(u.Host, "www.")) + strings.TrimRight(u.EscapedPath(), "/")
+}
+
+var nameSuffixRe = regexp.MustCompile(`\s*(\((mons|independant)\)|-\s*mons\b.*$)`)
+var nonAlnumRe = regexp.MustCompile(`[^a-z0-9]+`)
+
+// normName compares restaurant names regardless of case, accents, punctuation
+// and the city suffixes added by the platforms ("(Mons)", " - Mons").
+func normName(s string) string {
+	s = nameSuffixRe.ReplaceAllString(strings.ToLower(strings.TrimSpace(s)), "")
+	var b strings.Builder
+	for _, r := range norm.NFD.String(s) {
+		if unicode.Is(unicode.Mn, r) {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return nonAlnumRe.ReplaceAllString(b.String(), "")
+}
+
+// keepExisting fills the fields a partial payload leaves empty with the
+// stored values, keeps the stored slug and merges the platform links.
+func keepExisting(rest *core.Record, in *RestaurantImport) {
+	in.Slug = rest.GetString("slug")
+	if in.Description == "" {
+		in.Description = rest.GetString("description")
+	}
+	if in.Emoji == "" {
+		in.Emoji = rest.GetString("emoji")
+	}
+	if in.CoverURL == "" {
+		in.CoverURL = rest.GetString("cover_url")
+	}
+	if len(in.Cuisines) == 0 {
+		_ = rest.UnmarshalJSONField("cuisines", &in.Cuisines)
+	}
+	if in.Phone == "" {
+		in.Phone = rest.GetString("phone")
+	}
+	if in.Rating == 0 {
+		in.Rating, in.RatingCount = rest.GetFloat("rating"), rest.GetInt("rating_count")
+	}
+	if in.EtaMin == 0 && in.EtaMax == 0 {
+		in.EtaMin, in.EtaMax = rest.GetInt("eta_min"), rest.GetInt("eta_max")
+	}
+	if in.DeliveryFee == 0 {
+		in.DeliveryFee = rest.GetInt("delivery_fee")
+	}
+	if in.MinOrder == 0 {
+		in.MinOrder = rest.GetInt("min_order")
+	}
+	var stored []providers.Link
+	if rest.UnmarshalJSONField("providers", &stored) == nil {
+		for _, l := range stored {
+			if !slices.ContainsFunc(in.Providers, func(p providers.Link) bool { return p.ID == l.ID }) {
+				in.Providers = append(in.Providers, l)
+			}
+		}
+	}
+}
+
+// Import upserts a restaurant (see findExisting) and replaces its whole menu.
 // It returns the restaurant id and the number of imported items.
 func Import(app core.App, in RestaurantImport) (string, int, error) {
 	if err := in.Validate(); err != nil {
@@ -156,7 +281,7 @@ func Import(app core.App, in RestaurantImport) (string, int, error) {
 	var id string
 	count := 0
 	err := app.RunInTransaction(func(tx core.App) error {
-		rest, err := tx.FindFirstRecordByData(Restaurants, "slug", in.Slug)
+		rest, err := findExisting(tx, in)
 		if err != nil {
 			col, err := tx.FindCollectionByNameOrId(Restaurants)
 			if err != nil {
@@ -174,6 +299,7 @@ func Import(app core.App, in RestaurantImport) (string, int, error) {
 			if strings.TrimSpace(in.Address) == "" {
 				in.Address = rest.GetString("address")
 			}
+			keepExisting(rest, &in)
 		}
 
 		active := true

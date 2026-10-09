@@ -70,9 +70,7 @@ function initial(r: Restaurant | null): FormState {
     active: r?.active ?? true,
     partial_menu: r?.partial_menu ?? false,
     geo_approx: r?.geo_approx ?? false,
-    // enregistrer une modification verrouille la fiche (comme le serveur le
-    // ferait) : l'interrupteur montre ce qui sera enregistré
-    locked: true,
+    locked: r?.locked ?? false,
   }
 }
 
@@ -288,8 +286,8 @@ export function RestaurantForm({ restaurant, open, onClose, onSaved }: { restaur
               showLabel
             />
             <p className="text-xs text-subtle">
-              Enregistrer ici verrouille la fiche, pour que la synchronisation automatique ne l'écrase pas.
-              {restaurant.locked ? '' : ' Elle ne l’est pas encore : désactive l’interrupteur pour qu’elle continue de suivre les sources.'}
+              Désactivé (par défaut) : la synchronisation met à jour cette fiche et son menu.
+              Activé : tes modifications sont protégées et la synchronisation ne touche plus à ce restaurant.
               {restaurant.stale_since ? ' Ce restaurant n’est plus proposé par aucune source (obsolète).' : ''}
             </p>
           </fieldset>

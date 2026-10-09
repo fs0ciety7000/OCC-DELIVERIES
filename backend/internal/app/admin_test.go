@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"mime/multipart"
 	"reflect"
 	"strings"
@@ -439,5 +440,53 @@ func TestAdminImportBookmarkletPayload(t *testing.T) {
 	rest, _ = e.app.FindFirstRecordByData(colRestaurants, "slug", "chez-uber")
 	if rest.GetFloat("lat") != 50.45 || rest.GetString("address") != "Grand-Place 1, 7000 Mons" {
 		t.Fatalf("coordinates lost: %v", rest.PublicExport())
+	}
+}
+
+// The export tool names restaurants after the platform page ("Pizza Hut - Mons"
+// → slug "pizza-hut-mons"): importing it must complete the catalogue entry
+// (matched by platform link or name), not create a duplicate.
+func TestAdminImportMatchesExistingByLinkOrName(t *testing.T) {
+	e := newEnv(t)
+	boss := e.admin("Boss")
+	base := `{"slug":"pizza-hut","name":"Pizza Hut","emoji":"🍕","cuisines":["pizza"],"lat":50.4535,"lng":3.9438,
+		"address":"Place Léopold 7, 7000 Mons","rating":4.5,"rating_count":1000,"eta_min":12,"eta_max":27,"partial_menu":true,
+		"providers":[{"id":"ubereats","url":"https://www.ubereats.com/store/pizza-hut-mons/ISVg"}],
+		"categories":[{"name":"Aperçu","items":[{"name":"The BOX","price":2800}]}]}`
+	if r := e.doRaw("POST", "/api/occ/admin/import", boss.token, "application/json", strings.NewReader(base)); r.status != 200 {
+		t.Fatalf("seed: %d %s", r.status, r.body)
+	}
+	items := `[` + strings.TrimSuffix(strings.Repeat(`{"name":"P%d","price":1200},`, 6), ",") + `]`
+	for i := 1; i <= 6; i++ {
+		items = strings.Replace(items, "%d", fmt.Sprint(i), 1)
+	}
+	// matched by link (other slug, query string, "be/" path variant ignored only by host+path)
+	full := `{"slug":"pizza-hut-mons","name":"Pizza Hut - Mons","lat":0,"lng":0,"address":"",
+		"providers":[{"id":"ubereats","url":"https://www.ubereats.com/store/pizza-hut-mons/ISVg?diningMode=DELIVERY"}],
+		"categories":[{"name":"Pizzas","items":` + items + `}]}`
+	if r := e.doRaw("POST", "/api/occ/admin/import", boss.token, "application/json", strings.NewReader(full)); r.status != 200 {
+		t.Fatalf("import: %d %s", r.status, r.body)
+	}
+	all, _ := e.app.FindAllRecords(colRestaurants)
+	n := 0
+	for _, r := range all {
+		if strings.HasPrefix(r.GetString("slug"), "pizza-hut") {
+			n++
+		}
+	}
+	rest, err := e.app.FindFirstRecordByData(colRestaurants, "slug", "pizza-hut")
+	if n != 1 || err != nil {
+		t.Fatalf("expected one Pizza Hut, got %d (%v)", n, err)
+	}
+	if rest.GetBool("partial_menu") || rest.GetFloat("rating") != 4.5 || rest.GetFloat("lat") != 50.4535 {
+		t.Fatalf("existing fields lost or preview kept: %v", rest.PublicExport())
+	}
+	// matched by name when the payload has no link
+	byName := `{"slug":"pizzahut","name":"PIZZA HUT (Mons)","categories":[{"name":"Pizzas","items":[{"name":"P1","price":1200}]}]}`
+	if r := e.doRaw("POST", "/api/occ/admin/import", boss.token, "application/json", strings.NewReader(byName)); r.status != 200 {
+		t.Fatalf("by name: %d %s", r.status, r.body)
+	}
+	if _, err := e.app.FindFirstRecordByData(colRestaurants, "slug", "pizzahut"); err == nil {
+		t.Fatal("name match must not create a duplicate")
 	}
 }

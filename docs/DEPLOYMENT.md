@@ -140,10 +140,13 @@ journal) et liste des **sources**.
   catégories ajoutés ; un plat qui disparaît passe **indisponible** (il revient tout seul s'il
   réapparaît) ; les champs déjà remplis (adresse, coordonnées, téléphone, nom, emoji…) ne sont
   jamais écrasés, et jamais par une valeur vide. Rien n'est supprimé.
-* **« Verrouillé »** : toute modification d'un restaurant ou d'un article par un admin (panneau,
-  API, `/_/`) le verrouille — la synchronisation ne le touchera plus. Masquer / réafficher un
-  restaurant ou réordonner des articles ne verrouille pas. Pour le rendre à la
-  synchronisation : interrupteur « Verrouillé » du formulaire (ou cadenas dans l'éditeur de menu).
+* **« Verrouillé »** : désactivé par défaut. Active l'interrupteur « Verrouillé » (formulaire du
+  restaurant / de l'article, ou cadenas dans l'éditeur de menu) pour que la synchronisation ne
+  touche plus jamais à cette fiche. Une simple modification ne verrouille pas.
+* **Cartes partielles Uber Eats** : le connecteur ne fournit que quelques plats. Pour la carte
+  complète : ouvre la page du resto sur Uber Eats, favori « Exporter vers OCC », puis
+  `/admin → Import` — le fichier complète la fiche existante (retrouvée par lien ou nom, sans
+  doublon) et retire le badge « Aperçu du menu ».
 * **« Obsolète »** : plus aucune source activée ne propose ce restaurant (fermé, retiré d'une
   plateforme, source supprimée). Il reste **visible** ; le badge disparaît s'il revient. À toi
   de le masquer s'il a vraiment fermé. Une source en échec ou bloquée ce jour-là ne rend rien
