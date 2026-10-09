@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Exporter un menu — OCC Deliveries</title>
+  <link rel="icon" href="/favicon.svg" />
+  <style>
+    :root { --bg:#0A0A0D; --surface:#121217; --elevated:#1A1A21; --border:rgb(255 255 255 / .08); --fg:#F6F4EF; --muted:#A3A1AB; --brand:#FF6A3D; --brand-2:#FFB547; --brand-fg:#1A0B05; --warning:#F5B83D; }
+    @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --bg:#FAF8F4; --surface:#FFFFFF; --elevated:#F3F0EA; --border:rgb(20 16 12 / .08); --fg:#17151A; --muted:#5F5B66; --brand:#C2410C; --warning:#92400E; } }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { max-width: 720px; margin: 0 auto; padding: 32px 16px 64px; }
+    h1 { font-size: 32px; line-height: 1.15; letter-spacing: -.02em; margin: 0 0 8px; }
+    h2 { font-size: 20px; margin: 32px 0 8px; }
+    p, li { color: var(--muted); }
+    b, strong { color: var(--fg); }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 20px; margin-top: 16px; }
+    .bm { display:inline-flex; align-items:center; gap:8px; padding:12px 18px; border-radius:14px; font-weight:700; text-decoration:none;
+          color:var(--brand-fg); background:linear-gradient(135deg,var(--brand),var(--brand-2)); cursor:grab; min-height:44px; }
+    textarea { width:100%; min-height:120px; background:var(--elevated); color:var(--fg); border:1px solid var(--border); border-radius:12px; padding:12px; font:12px/1.4 ui-monospace, monospace; }
+    button { min-height:44px; padding:10px 16px; border-radius:12px; border:1px solid var(--border); background:var(--elevated); color:var(--fg); font-weight:600; cursor:pointer; }
+    .warn { color: var(--warning); }
+    a { color: var(--brand); }
+    ol { padding-left: 20px; }
+  </style>
+</head>
+<body>
+<main>
+  <a href="/">← OCC Deliveries</a>
+  <h1>Exporter un menu vers OCC</h1>
+  <p>Récupère la carte d'un restaurant depuis la page que <b>tu</b> consultes (Uber Eats, Takeaway / Just Eat, ou le site du resto) et la transforme en fichier prêt à importer dans <a href="/admin">/admin</a>.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0">1. Installer le favori</h2>
+    <p>Affiche la barre de favoris (<b>Ctrl/Cmd + Maj + B</b>) puis <b>glisse ce bouton dedans</b> :</p>
+    <p><a class="bm" id="bm" href="#" onclick="alert('Glisse ce bouton dans ta barre de favoris, ne clique pas dessus ici.');return false">🔥 Exporter vers OCC</a></p>
+    <p id="bm-status">Préparation…</p>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">2. L'utiliser</h2>
+    <ol>
+      <li>Ouvre la page d'un restaurant de Mons sur Uber Eats ou Takeaway (connecté·e ou non), attends qu'elle soit entièrement chargée et fais défiler jusqu'en bas si le menu se charge progressivement.</li>
+      <li>Clique sur le favori <b>🔥 Exporter vers OCC</b> : un encart affiche le nombre de catégories et de plats trouvés.</li>
+      <li><b>Télécharger .json</b>, puis dans <a href="/admin">/admin → Import</a> : glisse le fichier, vérifie l'aperçu, confirme.</li>
+      <li>Complète si besoin l'adresse / les coordonnées (bouton « géocoder ») et les frais de livraison.</li>
+    </ol>
+    <p class="warn">Un restaurant à la fois, depuis ta propre navigation. Les options (tailles, suppléments) ne sont pas toujours exposées par les pages : ajoute-les dans l'éditeur de menu. Les prix restent indicatifs.</p>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">Le favori ne fait rien ?</h2>
+    <p>Certains navigateurs bloquent les favoris JavaScript sur certains sites. Alternative : ouvre la console développeur (<b>F12</b> → Console) sur la page du resto, colle ce code et valide.</p>
+    <textarea id="snippet" readonly></textarea>
+    <p><button id="copy">Copier le code</button></p>
+  </div>
+</main>
+<script>
+  fetch('/outils/occ-menu-export.js', { cache: 'no-cache' })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text() })
+    .then(function (code) {
+      // retire les commentaires de bloc pour raccourcir le favori
+      var compact = code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\n\s*\/\/[^\n]*/g, '\n').replace(/\n\s+/g, '\n')
+      document.getElementById('bm').href = 'javascript:' + encodeURIComponent(compact)
+      document.getElementById('bm').onclick = function () { alert('Glisse ce bouton dans ta barre de favoris, ne clique pas dessus ici.'); return false }
+      document.getElementById('bm-status').textContent = 'Prêt (' + Math.round(compact.length / 1024) + ' Ko).'
+      document.getElementById('snippet').value = compact
+    })
+    .catch(function () { document.getElementById('bm-status').textContent = 'Impossible de charger le script.' })
+  document.getElementById('copy').onclick = function (e) {
+    navigator.clipboard.writeText(document.getElementById('snippet').value).then(function () { e.target.textContent = 'Copié ✓' })
+  }
+</script>
+</body>
+</html>
