@@ -8,3 +8,6 @@ backend/occ
 .env.local
 .DS_Store
 coverage/
+.claude/worktrees/
+test-results/
+playwright-report/
