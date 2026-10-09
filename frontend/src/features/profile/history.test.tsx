@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { STATUS_LABELS } from '@/features/party/hooks'
 import type { HistoryEntry, HistoryPage, MyStats } from '@/lib/types'
 import { HistoryCard } from './HistoryCard'
 import { historyBadge } from './historyBadge'
@@ -22,6 +23,7 @@ const page = (items: HistoryEntry[], p = 1, totalPages = 1): HistoryPage => ({ p
 const stats: MyStats = { orders: 4, totalSpent: 5210, favoriteRestaurant: { id: 'r1', name: 'Pizza Nonna', emoji: '🍕', orders: 3 }, favoriteDish: { name: 'Margherita', quantity: 5, orders: 3 } }
 
 let fail = false
+let statsData: MyStats = stats
 const history = vi.fn(async (_page?: number): Promise<HistoryPage> => page([base]))
 vi.mock('@/lib/api', () => ({
   occ: {
@@ -29,7 +31,7 @@ vi.mock('@/lib/api', () => ({
       if (fail) throw new Error('Serveur injoignable')
       return history(p)
     },
-    myStats: vi.fn(async () => stats),
+    myStats: vi.fn(async () => statsData),
   },
   partiesApi: {},
 }))
@@ -51,7 +53,7 @@ describe('historyBadge', () => {
     [{ payment: { id: 'x', method: 'wero', status: 'declared', amount: 1 } }, 'Déclaré · Wero', 'info'],
     [{ payment: { id: 'x', method: '', status: 'pending', amount: 1 }, status: 'paying' }, 'À rembourser', 'warning'],
     [{ status: 'cancelled' }, 'Annulée', 'danger'],
-    [{ payment: null, status: 'ordering' }, 'Commande en cours', 'brand'],
+    [{ payment: null, status: 'ordering' }, STATUS_LABELS.ordering, 'brand'],
     [{ items: [], payment: null }, 'Sans article', 'neutral'],
   ])('%o → %s', (patch, label, variant) => {
     expect(historyBadge({ ...base, ...patch })).toEqual({ label, variant })
@@ -92,6 +94,24 @@ describe('HistoryCard', () => {
     expect(screen.getByText('Annulée')).toBeInTheDocument()
   })
 
+  it('pas de second badge identique au premier (récap sans paiement)', () => {
+    wrap(<HistoryCard entry={{ ...base, status: 'review', payment: null, payer: null }} />)
+    expect(screen.getAllByText(STATUS_LABELS.review)).toHaveLength(1)
+  })
+
+  it('second badge de statut quand il apporte une info', () => {
+    wrap(<HistoryCard entry={{ ...base, status: 'paying' }} />)
+    expect(screen.getByText('Remboursé')).toBeInTheDocument()
+    expect(screen.getByText(STATUS_LABELS.paying)).toBeInTheDocument()
+  })
+
+  it('sans plat : pas de bouton « Aucun plat », part affichée « — »', () => {
+    wrap(<HistoryCard entry={{ ...base, status: 'ordering', items: [], payment: null, payer: null, total: 0 }} />)
+    expect(screen.queryByRole('button', { name: /Aucun plat|Mes plats/ })).not.toBeInTheDocument()
+    expect(screen.getByText('—')).toBeInTheDocument()
+    expect(screen.queryByText(/0,00/)).not.toBeInTheDocument()
+  })
+
   it('restaurant désactivé : pas de relance', () => {
     wrap(<HistoryCard entry={{ ...base, restaurant: { ...base.restaurant!, active: false } }} onRelaunch={vi.fn()} />)
     expect(screen.queryByRole('button', { name: /Relancer ici/ })).not.toBeInTheDocument()
@@ -108,6 +128,7 @@ describe('OrderHistory', () => {
     wrap(<OrderHistory userId="u1" />)
     expect(await screen.findByRole('heading', { name: 'Pizza Nonna' })).toBeInTheDocument()
     const statsList = screen.getByLabelText('Mes statistiques')
+    expect(within(statsList).getByText('Commandes passées')).toBeInTheDocument()
     expect(within(statsList).getByText('4')).toBeInTheDocument()
     expect(within(statsList).getByText(/52,10/)).toBeInTheDocument()
     expect(within(statsList).getByText('🍕 Pizza Nonna')).toBeInTheDocument()
@@ -124,6 +145,16 @@ describe('OrderHistory', () => {
     wrap(<OrderHistory userId="u1" />)
     expect(await screen.findByText('Pas encore de commande')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Lancer une commande/ })).toBeInTheDocument()
+  })
+
+  it('aucune commande passée : pas de tuiles de statistiques', async () => {
+    statsData = { orders: 0, totalSpent: 0, favoriteRestaurant: null, favoriteDish: null }
+    history.mockImplementation(async () => page([{ ...base, status: 'ordering', payment: null }]))
+    const { OrderHistory } = await import('./OrderHistory')
+    wrap(<OrderHistory userId="u1" />)
+    expect(await screen.findByRole('heading', { name: 'Pizza Nonna' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Mes statistiques')).not.toBeInTheDocument()
+    statsData = stats
   })
 
   it('erreur : message + réessayer', async () => {

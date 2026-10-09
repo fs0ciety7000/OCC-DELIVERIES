@@ -17,7 +17,7 @@ import type { AccountInfo, User } from '@/lib/types'
 /** Mot à taper pour supprimer son compte (même règle que le serveur). */
 export const DELETE_WORD = 'SUPPRIMER'
 
-/** Profil → Mes infos → Sécurité : e-mail, mot de passe, comptes connectés, suppression. */
+/** Profil → Mes infos → Sécurité : e-mail, mot de passe, comptes connectés. */
 export function SecurityCard({ user }: { user: User }) {
   const account = useQuery({ queryKey: qk.account(user.id), queryFn: usersApi.account })
   if (account.isPending) return <Skeleton className="h-72 rounded-lg" />
@@ -29,20 +29,17 @@ export function SecurityCard({ user }: { user: User }) {
     )
   const acc = account.data
   return (
-    <>
-      <Card>
-        <CardBody className="space-y-6">
-          <div className="space-y-1">
-            <h2 className="font-display text-lg font-semibold">Sécurité</h2>
-            <p className="text-sm text-muted">Ton adresse, ton mot de passe et les comptes avec lesquels tu te connectes.</p>
-          </div>
-          <EmailSection user={user} acc={acc} />
-          <PasswordSection user={user} acc={acc} />
-          <ProvidersSection user={user} acc={acc} />
-        </CardBody>
-      </Card>
-      <DeleteAccountCard />
-    </>
+    <Card>
+      <CardBody className="space-y-6">
+        <div className="space-y-1">
+          <h2 className="font-display text-lg font-semibold">Sécurité</h2>
+          <p className="text-sm text-muted">Ton adresse, ton mot de passe et les comptes avec lesquels tu te connectes.</p>
+        </div>
+        <EmailSection user={user} acc={acc} />
+        <PasswordSection user={user} acc={acc} />
+        <ProvidersSection user={user} acc={acc} />
+      </CardBody>
+    </Card>
   )
 }
 
@@ -250,7 +247,8 @@ function ProvidersSection({ user, acc }: { user: User; acc: AccountInfo }) {
 
 /* ------------------------------------------------- suppression du compte */
 
-function DeleteAccountCard() {
+/** Profil → Mes infos, juste avant « Se déconnecter » : suppression définitive (anonymisation). */
+export function DeleteAccountCard() {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [typed, setTyped] = useState('')

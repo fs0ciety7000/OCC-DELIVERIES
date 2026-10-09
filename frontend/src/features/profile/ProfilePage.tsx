@@ -19,7 +19,7 @@ import { OrderHistory } from './OrderHistory'
 import { panelId, tabId, type ProfileTab } from './tabs'
 import { MotionPrefRow } from './MotionPrefRow'
 import { ProfileTabs } from './ProfileTabs'
-import { SecurityCard } from './SecurityCard'
+import { DeleteAccountCard, SecurityCard } from './SecurityCard'
 import { NotificationsCard } from '@/features/notifications/NotificationsCard'
 import { VerifyEmailBanner } from './VerifyEmailBanner'
 import { UpgradeCard } from '@/features/teams/UpgradeCard'
@@ -84,6 +84,7 @@ export function ProfilePage() {
           <MotionPrefRow />
         </CardBody>
       </Card>
+      {!user.is_guest && <DeleteAccountCard />}
       <Button
         variant="danger"
         block

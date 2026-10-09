@@ -14,10 +14,10 @@ const ONGOING = ['lobby', 'voting', 'ordering', 'review', 'paying'] as const
 
 function Tile({ label, value, hint }: { label: string; value: ReactNode; hint?: ReactNode }) {
   return (
-    <Card>
+    <Card className="min-w-0">
       <CardBody className="space-y-1">
         <p className="text-sm text-muted">{label}</p>
-        <p className="font-display text-[32px] leading-9 font-bold tabular-nums">{value}</p>
+        <p className="font-display text-[26px] leading-8 font-bold break-words tabular-nums sm:text-[32px] sm:leading-9">{value}</p>
         {hint && <p className="text-xs text-subtle">{hint}</p>}
       </CardBody>
     </Card>
@@ -63,8 +63,8 @@ export function DashboardPage() {
         <Card>
           <CardBody>
             <div className="mb-3 flex items-baseline justify-between gap-3">
-              <h2 className="font-display text-lg font-semibold">Commandes créées par jour</h2>
-              <p className="text-sm text-muted tabular-nums">{s ? `${last30} sur 30 jours` : ''}</p>
+              <h2 className="min-w-0 font-display text-lg font-semibold">Commandes créées par jour</h2>
+              <p className="shrink-0 text-sm whitespace-nowrap text-muted tabular-nums">{s ? `${last30} sur 30 jours` : ''}</p>
             </div>
             {s ? (
               <BarChart
@@ -108,11 +108,13 @@ export function DashboardPage() {
               <li key={r.id} className="flex items-center gap-3 py-2.5">
                 <span className="w-5 text-sm text-subtle tabular-nums">{i + 1}</span>
                 <span aria-hidden className="text-xl">{r.emoji || '🍽️'}</span>
-                <Link to={`/admin/restaurants/${r.id}`} className="min-w-0 flex-1 truncate font-semibold hover:underline">
-                  {r.name}
-                </Link>
-                <span className="text-sm text-muted">{plural(r.parties, 'commande')}</span>
-                <Money cents={r.amount} className="w-24 text-right font-semibold" />
+                <div className="min-w-0 flex-1">
+                  <Link to={`/admin/restaurants/${r.id}`} className="block truncate font-semibold hover:underline">
+                    {r.name}
+                  </Link>
+                  <span className="block text-xs text-subtle tabular-nums">{plural(r.parties, 'commande')}</span>
+                </div>
+                <Money cents={r.amount} className="shrink-0 text-right font-semibold" />
               </li>
             ))}
           </ol>

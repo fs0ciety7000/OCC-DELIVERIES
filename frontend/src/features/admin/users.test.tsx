@@ -54,10 +54,11 @@ describe('UsersAdminPage', () => {
     expect(await screen.findByText('Cléo')).toBeInTheDocument()
     expect(screen.getByText('Suspendu')).toBeInTheDocument()
     expect(screen.getByText(/— spam/)).toBeInTheDocument()
-    expect(screen.getByText('Non vérifié')).toBeInTheDocument()
     expect(screen.getAllByText('Google')).toHaveLength(2)
     expect(await screen.findByText('Désactivés')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Envoyer un e-mail de test' })).toBeDisabled()
+    // e-mails désactivés : ni bouton de test, ni alerte « Non vérifié » (personne ne peut vérifier)
+    expect(screen.queryByRole('button', { name: 'Envoyer un e-mail de test' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Non vérifié')).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('radio', { name: 'Suspendus' }))
     expect(list).toHaveBeenLastCalledWith('', 1, { status: 'banned' })
@@ -80,6 +81,7 @@ describe('UsersAdminPage', () => {
   it('protège son propre compte et réactive un compte suspendu', async () => {
     setup({ ...mailOff, enabled: true, host: 'smtp.example.com', port: 587, senderAddress: 'noreply@fs0ciety.org', senderName: 'OCC Deliveries', fromEnv: true })
     const unban = vi.spyOn(adminApi, 'unban').mockResolvedValue({ user: base })
+    expect(await screen.findByText('Non vérifié')).toBeInTheDocument()
     await userEvent.click(await screen.findByRole('button', { name: 'Actions pour Ana' }))
     let menu = await screen.findByRole('dialog')
     expect(within(menu).getByRole('button', { name: /Suspendre le compte/ })).toBeDisabled()

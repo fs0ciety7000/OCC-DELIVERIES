@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bell, BellOff, Download, Send, Share } from 'lucide-react'
+import { Bell, BellOff, Download, RotateCw, Send, Share } from 'lucide-react'
 import { useSyncExternalStore } from 'react'
 import { toast } from 'sonner'
 import { Badge, Button, Card, CardBody, Skeleton } from '@/components/ui'
@@ -72,6 +72,8 @@ export function NotificationsCard({ userId }: { userId: string }) {
   })
 
   const serverOff = prefs.data && !prefs.data.enabled
+  // Préférences sans effet tant qu'aucun appareil n'est abonné (ni celui-ci, ni un autre du compte).
+  const prefsLocked = subscribed !== true && (prefs.data?.devices ?? 0) === 0
   const status = subscribed ? (
     <Badge variant="success" dot>
       Activées ici
@@ -107,25 +109,31 @@ export function NotificationsCard({ userId }: { userId: string }) {
           <p className="rounded-md border border-border bg-fg/[0.04] p-3 text-sm text-muted">Ce navigateur ne gère pas les notifications push.</p>
         ) : (
           <>
-            {permission === 'denied' && (
-              <p className="rounded-md border border-danger/30 bg-danger/10 p-3 text-sm">Notifications bloquées pour ce site : autorise-les dans les réglages du navigateur, puis réessaie.</p>
-            )}
-            <div className="flex flex-wrap gap-2">
-              {subscribed ? (
-                <>
-                  <Button variant="secondary" leftIcon={<Send className="size-4" />} loading={test.isPending} onClick={() => test.mutate()}>
-                    Envoyer un test
-                  </Button>
-                  <Button variant="ghost" leftIcon={<BellOff className="size-4" />} loading={disable.isPending} onClick={() => disable.mutate()}>
-                    Désactiver sur cet appareil
-                  </Button>
-                </>
-              ) : (
-                <Button leftIcon={<Bell className="size-4" />} loading={enable.isPending} disabled={permission === 'denied' || subscribed === null} onClick={() => enable.mutate(requestPermission())}>
-                  Activer les notifications
+            {permission === 'denied' && !subscribed ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-danger/30 bg-danger/10 p-3 text-sm">
+                <p className="min-w-0 flex-1 basis-56">Notifications bloquées pour ce site : autorise-les dans les réglages du navigateur, puis réessaie.</p>
+                <Button variant="ghost" size="sm" className="min-h-11" leftIcon={<RotateCw className="size-4" />} loading={device.isFetching} onClick={() => void refreshDevice()}>
+                  Réessayer
                 </Button>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {subscribed ? (
+                  <>
+                    <Button variant="secondary" leftIcon={<Send className="size-4" />} loading={test.isPending} onClick={() => test.mutate()}>
+                      Envoyer un test
+                    </Button>
+                    <Button variant="ghost" leftIcon={<BellOff className="size-4" />} loading={disable.isPending} onClick={() => disable.mutate()}>
+                      Désactiver sur cet appareil
+                    </Button>
+                  </>
+                ) : (
+                  <Button leftIcon={<Bell className="size-4" />} loading={enable.isPending} disabled={subscribed === null} onClick={() => enable.mutate(requestPermission())}>
+                    Activer les notifications
+                  </Button>
+                )}
+              </div>
+            )}
           </>
         )}
 
@@ -137,15 +145,18 @@ export function NotificationsCard({ userId }: { userId: string }) {
             ) : prefs.isError ? (
               <p className="text-sm text-danger">{errorMessage(prefs.error)}</p>
             ) : (
-              PREF_ROWS.map((row) => (
+              <>
+              {prefsLocked && <p className="text-xs text-subtle">Active d'abord les notifications sur cet appareil.</p>}
+              {PREF_ROWS.map((row) => (
                 <div key={row.key} className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-medium">{row.label}</p>
                     <p className="text-xs text-muted">{row.hint}</p>
                   </div>
-                  <Toggle label={row.label} checked={prefs.data.prefs[row.key]} onChange={(v) => setPref.mutate({ [row.key]: v })} />
+                  <Toggle label={row.label} disabled={prefsLocked} checked={prefs.data.prefs[row.key]} onChange={(v) => setPref.mutate({ [row.key]: v })} />
                 </div>
-              ))
+              ))}
+              </>
             )}
             {prefs.data && prefs.data.devices > 0 && (
               <p className="pt-1 text-xs text-subtle">

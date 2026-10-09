@@ -79,14 +79,31 @@ describe('NotificationsCard', () => {
     expect(await screen.findByText(/pas encore activées sur ce serveur/)).toBeInTheDocument()
   })
 
-  it('permission bloquée : explication et bouton désactivé', async () => {
+  it('permission bloquée : explication, « Réessayer » relit la permission, pas de bouton « Activer »', async () => {
     vi.spyOn(push, 'pushSupport').mockReturnValue('supported')
-    vi.spyOn(push, 'notificationPermission').mockReturnValue('denied')
+    const perm = vi.spyOn(push, 'notificationPermission').mockReturnValue('denied')
     vi.spyOn(push, 'currentSubscription').mockResolvedValue(null)
     vi.spyOn(pushApi, 'prefs').mockResolvedValue(prefs())
     renderCard()
     expect(await screen.findByText(/Notifications bloquées pour ce site/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Activer les notifications' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Activer les notifications' })).not.toBeInTheDocument()
+    const retry = await screen.findByRole('button', { name: 'Réessayer' })
+    await waitFor(() => expect(retry).toBeEnabled())
+    perm.mockReturnValue('default')
+    await userEvent.click(retry)
+    expect(await screen.findByRole('button', { name: 'Activer les notifications' })).toBeInTheDocument()
+    expect(screen.queryByText(/Notifications bloquées pour ce site/)).not.toBeInTheDocument()
+  })
+
+  it('aucun appareil abonné : préférences désactivées avec une aide', async () => {
+    vi.spyOn(push, 'pushSupport').mockReturnValue('supported')
+    vi.spyOn(push, 'notificationPermission').mockReturnValue('default')
+    vi.spyOn(push, 'currentSubscription').mockResolvedValue(null)
+    vi.spyOn(pushApi, 'prefs').mockResolvedValue(prefs({ devices: 0 }))
+    renderCard()
+    const party = await screen.findByRole('switch', { name: 'Étapes des commandes' })
+    await waitFor(() => expect(party).toBeDisabled())
+    expect(screen.getByText("Active d'abord les notifications sur cet appareil.")).toBeInTheDocument()
   })
 })
 

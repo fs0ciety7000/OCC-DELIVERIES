@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { occ, usersApi } from '@/lib/api'
 import { pb } from '@/lib/pb'
 import type { AccountInfo, User } from '@/lib/types'
-import { SecurityCard } from './SecurityCard'
+import { DeleteAccountCard, SecurityCard } from './SecurityCard'
 import { VerifyEmailBanner } from './VerifyEmailBanner'
 
 const user = { id: 'u1', collectionId: 'c', collectionName: 'users', created: '', updated: '', name: 'Ana', email: 'ana@occ.be', verified: false } as User
@@ -28,6 +28,7 @@ function renderCard(acc: AccountInfo) {
     <QueryClientProvider client={qc}>
       <MemoryRouter>
         <SecurityCard user={user} />
+        <DeleteAccountCard />
       </MemoryRouter>
     </QueryClientProvider>,
   )

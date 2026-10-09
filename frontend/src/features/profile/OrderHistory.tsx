@@ -93,11 +93,13 @@ function StatsHeader({ userId }: { userId: string }) {
   }
   if (stats.isError) return <p className="text-sm text-danger">Statistiques indisponibles : {errorMessage(stats.error)}</p>
   const s = stats.data
+  // Rien à résumer tant qu'aucune commande n'est terminée : la liste (ou l'état vide) suffit.
+  if (s.orders === 0) return null
   const fr = s.favoriteRestaurant
   const fd = s.favoriteDish
   return (
     <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label="Mes statistiques">
-      <Stat label="Commandes" value={<span className="tabular">{s.orders}</span>} />
+      <Stat label="Commandes passées" value={<span className="tabular">{s.orders}</span>} />
       <Stat label="Dépensé" value={<Money cents={s.totalSpent} />} />
       <Stat
         label="Resto chouchou"

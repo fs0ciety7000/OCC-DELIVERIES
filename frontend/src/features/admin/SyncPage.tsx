@@ -1,8 +1,8 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, Clock, ExternalLink, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { ChevronDown, Clock, ExternalLink, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { toast } from 'sonner'
-import { Badge, Button, Card, CardBody, EmptyState, Field, Input, Sheet, Skeleton, Spinner } from '@/components/ui'
+import { Badge, Button, Card, CardBody, EmptyState, Field, Input, Segmented, Sheet, Skeleton, Spinner } from '@/components/ui'
 import { adminApi } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { errorMessage } from '@/lib/errors'
@@ -12,6 +12,7 @@ import type { SyncProvider, SyncRun, SyncSource, SyncStatus } from '@/lib/types'
 import { AdminHeader } from './AdminLayout'
 import { DiscoverCard } from './DiscoverCard'
 import {
+  filterSources,
   formatDuration,
   parseLastStatus,
   PROVIDER_HINT,
@@ -19,8 +20,10 @@ import {
   RUN_STATUS_LABEL,
   RUN_STATUS_VARIANT,
   runDuration,
+  SOURCE_FILTERS,
   SOURCE_STATUS_LABEL,
   SOURCE_STATUS_VARIANT,
+  type SourceFilter,
   statsSummary,
   TRIGGER_LABEL,
 } from './syncFormat'
@@ -270,11 +273,26 @@ function RunRow({ run }: { run: SyncRun }) {
 
 /* --------------------------------------------------------------- sources */
 
+/** Sources affichées avant « Voir les N autres » (≈ 100 sources = 9 650 px sur mobile). */
+const SOURCES_PREVIEW = 15
+
 function SourcesSection() {
   const qc = useQueryClient()
   const sources = useQuery({ queryKey: qk.admin.syncSources, queryFn: adminApi.syncSources, refetchInterval: 30_000 })
   const [editing, setEditing] = useState<SyncSource | null | undefined>(undefined)
   const [deleting, setDeleting] = useState<SyncSource | null>(null)
+  const [q, setQ] = useState('')
+  const [filter, setFilter] = useState<SourceFilter>('all')
+  // « Voir les N autres » vaut pour la recherche et le filtre en cours : repli dès qu'ils changent.
+  const [expanded, setExpanded] = useState(false)
+  const search = (value: string) => {
+    setQ(value)
+    setExpanded(false)
+  }
+  const pickFilter = (value: SourceFilter) => {
+    setFilter(value)
+    setExpanded(false)
+  }
 
   const patch = useMutation({
     mutationFn: ({ s, data }: { s: SyncSource; data: Partial<SyncSource> }) => adminApi.saveSyncSource(s.id, data),
@@ -296,6 +314,9 @@ function SourcesSection() {
   })
 
   const enabled = sources.data?.filter((s) => s.enabled).length ?? 0
+  const matching = sources.data ? filterSources(sources.data, q, filter) : []
+  const visible = expanded ? matching : matching.slice(0, SOURCES_PREVIEW)
+  const hidden = matching.length - visible.length
   return (
     <section aria-labelledby="sync-sources" className="space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -316,8 +337,41 @@ function SourcesSection() {
       {sources.isPending && <Skeleton className="h-40 rounded-lg" />}
       {sources.isError && <EmptyState tone="danger" emoji="⚠️" title="Sources indisponibles" description={errorMessage(sources.error)} />}
       {sources.data?.length === 0 && <EmptyState emoji="🔌" title="Aucune source" description="Ajoute une page Deliveroo, weloveat ou le site d'un restaurant." />}
+      {!!sources.data?.length && (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="min-w-0 flex-1">
+            <Input type="search" aria-label="Rechercher une source" placeholder="Nom, adresse ou fournisseur…" value={q} onChange={(e) => search(e.target.value)} leftIcon={<Search className="size-4" />} />
+          </div>
+          <div className="min-w-0 overflow-x-auto">
+            <Segmented<SourceFilter> label="Filtrer les sources" value={filter} onChange={pickFilter} options={SOURCE_FILTERS} />
+          </div>
+        </div>
+      )}
+      {!!sources.data?.length && (
+        <p className="text-sm text-muted tabular-nums" aria-live="polite">
+          {matching.length === sources.data.length ? plural(matching.length, 'source') : `${plural(matching.length, 'source')} sur ${sources.data.length}`}
+        </p>
+      )}
+      {!!sources.data?.length && matching.length === 0 && (
+        <EmptyState
+          emoji="🔎"
+          title="Aucune source ne correspond"
+          description={filter === 'error' && !q.trim() ? 'Aucune source en erreur lors de la dernière synchronisation.' : 'Essaie un autre mot ou un autre filtre.'}
+          action={
+            <Button
+              variant="secondary"
+              onClick={() => {
+                search('')
+                pickFilter('all')
+              }}
+            >
+              Tout afficher
+            </Button>
+          }
+        />
+      )}
       <ul className="space-y-2" aria-label="Sources de synchronisation">
-        {sources.data?.map((s) => {
+        {visible.map((s) => {
           const last = parseLastStatus(s.last_status)
           return (
             <li key={s.id}>
@@ -377,6 +431,11 @@ function SourcesSection() {
           )
         })}
       </ul>
+      {hidden > 0 && (
+        <Button variant="secondary" block onClick={() => setExpanded(true)}>
+          {hidden > 1 ? `Voir les ${hidden} autres` : "Voir l'autre source"}
+        </Button>
+      )}
       {editing !== undefined && <SourceForm key={editing?.id ?? 'new'} source={editing} nextPriority={(sources.data?.at(-1)?.priority ?? 0) + 10} onClose={() => setEditing(undefined)} />}
       <Sheet
         open={!!deleting}

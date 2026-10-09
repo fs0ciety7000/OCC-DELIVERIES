@@ -29,7 +29,7 @@ export function BarChart({ data, label, height = 140, unit = '' }: { data: BarDa
     <figure className="relative">
       <svg
         viewBox={`0 0 ${width} ${height}`}
-        className="h-auto w-full overflow-visible"
+        className="h-auto w-full overflow-hidden"
         role="img"
         aria-label={`${label} — maximum ${max}${unit}`}
         aria-describedby={tableId}
@@ -71,7 +71,7 @@ export function BarChart({ data, label, height = 140, unit = '' }: { data: BarDa
                   className={active === null || active === i ? 'fill-brand' : 'fill-brand/45'}
                 />
               )}
-              <rect x={x - 1} y={top} width={barW + 2} height={plot} fill="none" strokeWidth={2} rx={4} stroke="transparent" />
+              <rect x={Math.max(1, x - 1)} y={top} width={Math.min(width - 1, x + barW + 1) - Math.max(1, x - 1)} height={plot} fill="none" strokeWidth={2} rx={4} stroke="transparent" />
             </g>
           )
         })}

@@ -97,19 +97,21 @@ export function UsersAdminPage() {
         <span className={cn('grid size-10 shrink-0 place-items-center rounded-full', mailOn ? 'bg-success/12 text-success' : 'bg-warning/12 text-warning')}>
           <Mail aria-hidden className="size-5" />
         </span>
-        <div className="min-w-0 flex-1 text-sm">
-          <p className="font-semibold">
+        <div className="min-w-0 flex-1 basis-56 text-sm">
+          <p className="flex flex-wrap items-center gap-2 font-semibold">
             E-mails {mail.isPending ? '…' : mailOn ? <Badge variant="success">Actifs</Badge> : <Badge variant="warning">Désactivés</Badge>}
           </p>
-          <p className="truncate text-xs text-subtle">
+          <p className="text-xs break-words text-subtle">
             {mailOn && mail.data
               ? `${mail.data.senderName} <${mail.data.senderAddress}> · ${mail.data.host}:${mail.data.port}${mail.data.fromEnv ? ' · OCC_SMTP_*' : ''}`
               : 'Renseigne OCC_SMTP_HOST, OCC_SMTP_USERNAME, OCC_SMTP_PASSWORD et OCC_MAIL_FROM puis redéploie : vérification, mot de passe oublié et liens de réinitialisation.'}
           </p>
         </div>
-        <Button variant="secondary" size="sm" leftIcon={<Send className="size-4" />} disabled={!mailOn} loading={testMail.isPending} onClick={() => testMail.mutate()}>
-          Envoyer un e-mail de test
-        </Button>
+        {mailOn && (
+          <Button variant="secondary" size="sm" className="w-full sm:w-auto" leftIcon={<Send className="size-4" />} loading={testMail.isPending} onClick={() => testMail.mutate()}>
+            Envoyer un e-mail de test
+          </Button>
+        )}
       </Card>
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -137,7 +139,7 @@ export function UsersAdminPage() {
                     {isMe && <Badge>Toi</Badge>}
                     {u.deleted ? <Badge>Supprimé</Badge> : u.banned && <Badge variant="danger">Suspendu</Badge>}
                     {!u.deleted && u.isGuest && <Badge variant="info">Invité</Badge>}
-                    {!u.deleted && !u.verified && !u.isGuest && <Badge variant="warning">Non vérifié</Badge>}
+                    {mailOn && !u.deleted && !u.verified && !u.isGuest && <Badge variant="warning">Non vérifié</Badge>}
                     {u.providers.map((p) => (
                       <Badge key={p} variant="info">
                         {providerLabel(p)}

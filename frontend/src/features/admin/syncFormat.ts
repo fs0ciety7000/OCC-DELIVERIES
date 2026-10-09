@@ -1,5 +1,6 @@
 import type { BadgeVariant } from '@/components/ui'
-import type { SyncDiscoverStatus, SyncProvider, SyncRunStatus, SyncSourceStatus, SyncStats, SyncTrigger } from '@/lib/types'
+import type { SyncDiscoverStatus, SyncProvider, SyncRunStatus, SyncSource, SyncSourceStatus, SyncStats, SyncTrigger } from '@/lib/types'
+import { fold } from './text'
 
 export const RUN_STATUS_LABEL: Record<SyncRunStatus, string> = {
   running: 'En cours',
@@ -111,4 +112,27 @@ export const DISCOVER_STATUS_VARIANT: Record<SyncDiscoverStatus, BadgeVariant> =
   other: 'neutral',
   invalid: 'warning',
   skipped: 'neutral',
+}
+
+/** Filtre de la liste des sources (page Synchronisation). */
+export type SourceFilter = 'all' | 'enabled' | 'error'
+
+export const SOURCE_FILTERS: { value: SourceFilter; label: string }[] = [
+  { value: 'all', label: 'Toutes' },
+  { value: 'enabled', label: 'Activées' },
+  { value: 'error', label: 'En erreur' },
+]
+
+/** Sources visibles : recherche (nom, URL, fournisseur ; casse et accents ignorés) + filtre. */
+export function filterSources(sources: SyncSource[], query: string, filter: SourceFilter): SyncSource[] {
+  const q = fold(query.trim())
+  return sources.filter((s) => {
+    if (filter === 'enabled' && !s.enabled) return false
+    if (filter === 'error') {
+      const last = parseLastStatus(s.last_status)
+      if (!last || last.status === 'ok') return false
+    }
+    if (!q) return true
+    return fold(`${s.label} ${s.url} ${PROVIDER_LABEL[s.provider]}`).includes(q)
+  })
 }

@@ -1,4 +1,4 @@
-import { ChevronDown, ExternalLink, RotateCcw } from 'lucide-react'
+import { ArrowRight, ChevronDown, RotateCcw } from 'lucide-react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useId, useState } from 'react'
 import { Link } from 'react-router'
@@ -27,6 +27,10 @@ export function HistoryCard({ entry: e, onRelaunch }: HistoryCardProps) {
   const active = ACTIVE.has(e.status)
   const heading = e.restaurant?.name ?? e.title ?? 'Commande groupée'
   const count = e.items.reduce((n, i) => n + i.quantity, 0)
+  const hasItems = e.items.length > 0
+  // Statut de la commande en second badge, seulement s'il apporte une information.
+  const statusLabel = STATUS_LABELS[e.status]
+  const showStatus = active && hasItems && !!statusLabel && statusLabel !== badge.label
 
   return (
     <Card className="overflow-hidden">
@@ -48,33 +52,41 @@ export function HistoryCard({ entry: e, onRelaunch }: HistoryCardProps) {
             <Badge variant={badge.variant} dot={active}>
               {badge.label}
             </Badge>
-            {active && e.items.length > 0 && <Badge variant="neutral">{STATUS_LABELS[e.status]}</Badge>}
+            {showStatus && <Badge variant="neutral">{statusLabel}</Badge>}
           </div>
         </div>
         <div className="shrink-0 text-right">
-          <Money cents={e.total} className="font-display text-lg font-bold" />
+          {hasItems ? (
+            <Money cents={e.total} className="font-display text-lg font-bold" />
+          ) : (
+            <p className="font-display text-lg font-bold text-subtle">
+              <span aria-hidden>—</span>
+              <span className="sr-only">Aucun plat</span>
+            </p>
+          )}
           <p className="text-xs text-subtle">ma part</p>
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-1 border-t border-border px-2 py-1.5 sm:px-3">
-        <button
-          type="button"
-          aria-expanded={open}
-          aria-controls={panelId}
-          disabled={e.items.length === 0}
-          onClick={() => setOpen((v) => !v)}
-          className={cn(buttonClass('ghost', 'sm'), 'min-h-11')}
-        >
-          {e.items.length ? `Mes plats (${count})` : 'Aucun plat'}
-          <ChevronDown aria-hidden className={cn('size-4 transition-transform duration-200 motion-reduce:transition-none', open && 'rotate-180')} />
-        </button>
+        {hasItems && (
+          <button
+            type="button"
+            aria-expanded={open}
+            aria-controls={panelId}
+            onClick={() => setOpen((v) => !v)}
+            className={cn(buttonClass('ghost', 'sm'), 'min-h-11')}
+          >
+            {`Mes plats (${count})`}
+            <ChevronDown aria-hidden className={cn('size-4 transition-transform duration-200 motion-reduce:transition-none', open && 'rotate-180')} />
+          </button>
+        )}
         <span className="flex-1" />
         {e.status !== 'cancelled' && (
           <Link to={`/party/${e.id}`} className={cn(buttonClass('ghost', 'sm'), 'min-h-11')}>
-            <ExternalLink aria-hidden className="size-4" />
             {active ? 'Reprendre' : 'Voir'}{' '}
             <span className="sr-only">la commande « {e.title || heading} »</span>
+            <ArrowRight aria-hidden className="size-4" />
           </Link>
         )}
         {onRelaunch && e.restaurant?.active && !active && (
@@ -86,7 +98,7 @@ export function HistoryCard({ entry: e, onRelaunch }: HistoryCardProps) {
       </div>
 
       <AnimatePresence initial={false}>
-        {open && (
+        {open && hasItems && (
           <motion.div
             id={panelId}
             initial={{ height: 0, opacity: 0 }}
