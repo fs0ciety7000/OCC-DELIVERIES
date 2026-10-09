@@ -1,0 +1,157 @@
+/*
+ * Design system « Ember » — tokens.
+ * Les composants n'utilisent QUE ces variables (via les utilitaires Tailwind).
+ * Thème sombre par défaut, surcharge claire via [data-theme="light"].
+ */
+@theme static {
+  --color-*: initial;
+
+  --color-bg: #0a0a0d;
+  --color-surface: #121217;
+  --color-elevated: #1a1a21;
+  --color-border: rgb(255 255 255 / 0.08);
+  --color-border-strong: rgb(255 255 255 / 0.16);
+  --color-fg: #f6f4ef;
+  --color-muted: #a3a1ab;
+  --color-subtle: #6e6c77;
+  --color-brand: #ff6a3d;
+  --color-brand-2: #ffb547;
+  --color-brand-fg: #1a0b05;
+  --color-success: #3dd68c;
+  --color-warning: #f5b83d;
+  --color-danger: #f26d6d;
+  --color-info: #6aa8ff;
+  --color-ubereats: #06c167;
+  --color-takeaway: #ff8000;
+  /* Wallets belges : aplats de marque + texte dédié (contraste AA vérifié). */
+  --color-wero: #ffe500;
+  --color-wero-fg: #1a1a1a;
+  --color-bancontact: #005498;
+  --color-bancontact-fg: #ffffff;
+
+  /* Texte posé sur une couleur d'avatar (choisi selon la luminance). */
+  --color-ink: #17151a;
+  --color-paper: #ffffff;
+  /* QR codes : toujours noir sur blanc, quel que soit le thème (lisibilité scanners). */
+  --color-qr-bg: #ffffff;
+  --color-qr-fg: #000000;
+  /* Illustrations culinaires (SVG maison, docs/DESIGN_SYSTEM.md « Food motion »). */
+  --color-food-crust: #e7a65a;
+  --color-food-cheese: #ffd166;
+  --color-food-tomato: #ef4f3c;
+  --color-food-basil: #3fae5a;
+  --color-food-chili: #e23d28;
+  --color-food-bun: #f0a24b;
+  --color-food-patty: #6b3a24;
+  --color-food-lettuce: #7ccf56;
+  --color-food-rice: #f7f3ea;
+  --color-food-nori: #22302a;
+  --color-food-salmon: #ff8a65;
+  --color-food-broth: #f3b562;
+  --color-food-bowl: #d9534f;
+  --color-food-steel: #c7c9d1;
+  --color-food-gold: #ffc53d;
+  --color-food-ink: #2a1a12;
+
+  /* Voile des modales. */
+  --color-scrim: rgb(5 5 8 / 0.66);
+
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Bricolage Grotesque Variable", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+
+  --shadow-card: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 8px 24px -12px rgb(0 0 0 / 0.6);
+  --shadow-glow: 0 0 0 1px rgb(255 106 61 / 0.35), 0 12px 32px -8px rgb(255 106 61 / 0.45);
+  --shadow-sheet: 0 -12px 48px -12px rgb(0 0 0 / 0.7);
+
+  --ease-ember: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-live: live-pulse 600ms var(--ease-ember);
+  --animate-spin: spin 0.8s linear infinite;
+  --animate-float: float 6s ease-in-out infinite;
+
+  @keyframes shimmer {
+    from { background-position: 200% 0; }
+    to { background-position: -200% 0; }
+  }
+  @keyframes live-pulse {
+    0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-brand) 70%, transparent); }
+    100% { box-shadow: 0 0 0 10px color-mix(in oklab, var(--color-brand) 0%, transparent); }
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+}
+
+:root {
+  --gradient-ember: linear-gradient(135deg, var(--color-brand), var(--color-brand-2));
+  --header-h: calc(56px + env(safe-area-inset-top));
+  --tabbar-h: 64px;
+  --content-max: 1200px;
+  --reading-max: 680px;
+  --aurora-1: rgb(255 106 61 / 0.18);
+  --aurora-2: rgb(255 181 71 / 0.08);
+  --grain-opacity: 0.03;
+
+  /* Tuiles générées pour les restaurants sans visuel (dégradés « braise »). */
+  --tile-1: linear-gradient(135deg, #3a1a12, #7a2e17 55%, #c4532a);
+  --tile-2: linear-gradient(135deg, #2b1630, #5d2547 55%, #a8444f);
+  --tile-3: linear-gradient(135deg, #12282a, #1d4f4a 55%, #3f8b6c);
+  --tile-4: linear-gradient(135deg, #2c2410, #6b4f16 55%, #c18a2a);
+  --tile-5: linear-gradient(135deg, #161c33, #2b3a6b 55%, #5a6fb5);
+  --tile-6: linear-gradient(135deg, #2a1414, #6a2323 55%, #b8483a);
+
+  color-scheme: dark;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --header-h: 64px;
+    --tabbar-h: 0px;
+  }
+}
+
+[data-theme="light"] {
+  --color-bg: #faf8f4;
+  --color-surface: #ffffff;
+  --color-elevated: #f3f0ea;
+  --color-border: rgb(20 16 12 / 0.08);
+  --color-border-strong: rgb(20 16 12 / 0.16);
+  --color-fg: #17151a;
+  --color-muted: #5f5b66;
+  --color-subtle: #8e8a95;
+  --color-brand: #f2542d;
+  --color-brand-2: #f59e0b;
+  --color-brand-fg: #1a0b05;
+  --color-success: #12a564;
+  --color-warning: #b7791f;
+  --color-danger: #d64545;
+  --color-info: #2f6fd6;
+  --color-scrim: rgb(23 21 26 / 0.4);
+
+  --shadow-card: 0 1px 0 rgb(255 255 255 / 0.6) inset, 0 8px 24px -14px rgb(40 24 12 / 0.22);
+  --shadow-glow: 0 0 0 1px rgb(242 84 45 / 0.3), 0 12px 28px -10px rgb(242 84 45 / 0.4);
+  --shadow-sheet: 0 -12px 40px -16px rgb(40 24 12 / 0.3);
+
+  --aurora-1: rgb(242 84 45 / 0.12);
+  --aurora-2: rgb(245 158 11 / 0.08);
+  --grain-opacity: 0.025;
+
+  --tile-1: linear-gradient(135deg, #ffd9c7, #ffb08a 55%, #f2793f);
+  --tile-2: linear-gradient(135deg, #f8d5e3, #eea2bd 55%, #d4677f);
+  --tile-3: linear-gradient(135deg, #d4efe3, #9ddbbf 55%, #4fae86);
+  --tile-4: linear-gradient(135deg, #fbe9c3, #f5cd7a 55%, #df9b2b);
+  --tile-5: linear-gradient(135deg, #dce3fb, #aab8f0 55%, #6b82d6);
+  --tile-6: linear-gradient(135deg, #fbd6d0, #f2a195 55%, #d9604d);
+
+  color-scheme: light;
+}

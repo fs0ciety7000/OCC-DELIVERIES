@@ -1,0 +1,17 @@
+export const qk = {
+  config: ['config'] as const,
+  nearby: (lat: number, lng: number, radiusKm: number, q: string) => ['nearby', lat, lng, radiusKm, q] as const,
+  restaurant: (id: string) => ['restaurant', id] as const,
+  menu: (id: string) => ['menu', id] as const,
+  party: (id: string) => ['party', id] as const,
+  partyDetail: (id: string) => ['party', id, 'detail'] as const,
+  members: (id: string) => ['party', id, 'members'] as const,
+  votes: (id: string) => ['party', id, 'votes'] as const,
+  items: (id: string) => ['party', id, 'items'] as const,
+  payments: (id: string) => ['party', id, 'payments'] as const,
+  summary: (id: string) => ['party', id, 'summary'] as const,
+  paymentQR: (paymentId: string) => ['paymentQR', paymentId] as const,
+  myParties: (userId: string) => ['myParties', userId] as const,
+  payout: (userId: string) => ['payout', userId] as const,
+  authMethods: ['authMethods'] as const,
+}

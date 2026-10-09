@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="OCC Deliveries">
+  <defs>
+    <linearGradient id="ember" x1="10" y1="6" x2="54" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFB547"/>
+      <stop offset="0.55" stop-color="#FF6A3D"/>
+      <stop offset="1" stop-color="#E5482A"/>
+    </linearGradient>
+    <radialGradient id="core" cx="32" cy="42" r="14" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFE3A3"/>
+      <stop offset="1" stop-color="#FFB547" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="#121217"/>
+  <path d="M32 8c3 7 12 12.5 12 24.5C44 41.6 38.6 50 32 50s-12-8.4-12-17.5c0-5.4 2.4-9 5-11.6.4 3.6 2 6 4.4 7.1C29 20.6 30 14 32 8Z" fill="url(#ember)"/>
+  <circle cx="32" cy="40" r="9" fill="url(#core)"/>
+  <rect x="16" y="52" width="32" height="4" rx="2" fill="#FF6A3D" opacity=".55"/>
+</svg>
