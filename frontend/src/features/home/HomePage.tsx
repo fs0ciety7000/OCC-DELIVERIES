@@ -4,6 +4,7 @@ import { Suspense, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { FoodHero } from '@/components/food'
 import { AvatarStack, Badge, Button, Card, EmptyState, Skeleton } from '@/components/ui'
+import { ResumeHero } from '@/features/party/ActiveParties'
 import { CreatePartySheet } from '@/features/party/CreatePartySheet'
 import { STATUS_LABELS, useMyParties } from '@/features/party/hooks'
 import { JoinByCode } from '@/features/party/JoinByCode'
@@ -25,9 +26,16 @@ export function HomePage() {
   const parties = useMyParties(user?.id)
 
   const launch = () => (user ? setCreateOpen(true) : navigate('/login?next=/'))
+  // Une seule commande en cours (ex. retour après connexion) : on la met en avant tout en haut.
+  const only = parties.data?.length === 1 ? parties.data[0]! : null
 
   return (
     <div className="space-y-10">
+      {user && only && (
+        <section aria-label="Commande en cours" className="pt-2">
+          <ResumeHero party={{ id: only.id, title: only.title || 'Commande groupée', status: only.status, restaurant: only.expand?.restaurant }} />
+        </section>
+      )}
       <section className="relative space-y-6 pt-4 sm:pt-10">
         <p className="text-sm font-semibold tracking-wide text-brand uppercase">{user ? `Salut ${user.name?.split(' ')[0] || ''} 👋` : 'Commandes groupées entre collègues'}</p>
         <Suspense fallback={<h1 className="font-display text-[40px] leading-[44px] font-bold sm:text-[56px] sm:leading-[60px]">{TITLE}</h1>}>
@@ -44,7 +52,7 @@ export function HomePage() {
         </div>
       </section>
 
-      {user && (
+      {user && !only && (
         <section className="space-y-3" aria-labelledby="h-active">
           <h2 id="h-active" className="font-display text-2xl font-semibold">
             Mes commandes en cours

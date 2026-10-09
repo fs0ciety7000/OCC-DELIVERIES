@@ -73,6 +73,21 @@ docker compose up --build         # http://localhost:8090
 Les apprentissages importants (pièges PocketBase, décisions d'UX) sont ajoutés
 ci-dessous, du plus récent au plus ancien.
 
+* 2026-10-09 — **Historique & reprise de commande** : `GET /api/occ/me/history` / `me/stats`,
+  `GET|POST /parties/{id}/reorder`, `join` renvoie `alreadyMember`. Cause du « salon introuvable » :
+  `partiesApi.mineActive` filtrait `members ?= {:u}` — le piège relation multiple vaut aussi pour les
+  `?filter=` client (aucun résultat, même pour l'hôte) → `members.id ?=`. Bandeau « Commande en cours »
+  + toasts de statut globaux (abonnement `parties` `*` dans le shell, filtré par les rules), dernière party
+  en localStorage. Totaux d'historique = `summaryFromRecords` (même code que `/summary`), chargés par lots.
+* 2026-10-09 — **Remboursements à montant exact** (retours : « un QR Wero varie avec le montant », « les liens
+  Revolut ne s'affichent pas »). Cause du 2e : le profil refusait tout lien sans `https://` (jamais enregistré),
+  Revolut sans montant derrière une tuile générique non présélectionnée, `PaymentQR` en cache 5 min. Désormais
+  `revolut_tag` / `paypal_me` structurés (migration `1760000013`, reprise des anciens liens), `PaymentQR.links[]`
+  par paiement avec `amountPrefilled` (Revolut `?amount=<centimes>&currency=EUR&note=` lu par la page revolut.me,
+  PayPal.me `/<montant>EUR`, Wise Business `?amount=`), méthodes `revolut` / `paypal`, ordre QR EPC → liens →
+  Wero/Bancontact ; mobile : liens d'abord + « Afficher le QR pour un collègue ». QR perso Wero/Bancontact gardé
+  mais toujours averti « sans montant ». Wero / Bancontact Pay / Lydia / Wisetag : aucun format tiers (ADR 0003 maj 1).
+  Piège e2e : un autre agent peut lancer Playwright en parallèle → `--output` dédié, sinon artefacts ENOENT.
 * 2026-10-09 — **Coordonnées des restos** : téléphone E.164 / adresse « Rue X 12, 7000 Mons » normalisés
   partout (`domain/contact.go`, migration `1760000012`) ; enrichissement OpenStreetMap (`internal/enrich`,
   Nominatim : UA identifié, ≥ 1,1 s, cache 30 j y compris les absences, ≤ 60 requêtes/exécution, arrêt sur

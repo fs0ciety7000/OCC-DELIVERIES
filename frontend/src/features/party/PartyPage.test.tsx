@@ -37,7 +37,7 @@ vi.mock('@/lib/api', () => ({
     config: vi.fn(async () => ({ currency: 'EUR', defaultLocation: { lat: 50, lng: 3, label: 'Mons' }, providers: [{ id: 'ubereats', name: 'Uber Eats', color: '', enabled: true }] })),
     nearby: vi.fn(async () => [{ ...resto, distanceKm: 0.4 }, { ...resto2, distanceKm: 1.2 }]),
     summary: vi.fn(async () => summary),
-    paymentQR: vi.fn(async () => ({ amount: 1400, reference: 'OCC K7M2QX Bob', beneficiary: 'Alice', epc: 'BCD', link: null, wero: { id: '+32470123456', hasQr: false }, bancontact: null, methods: ['wero', 'qr', 'cash', 'later'] })),
+    paymentQR: vi.fn(async () => ({ amount: 1400, reference: 'OCC K7M2QX Bob', beneficiary: 'Alice', epc: 'BCD', iban: 'BE71096123456769', links: [], wero: { id: '+32470123456', hasQr: false }, bancontact: null, methods: ['qr', 'wero', 'cash', 'later'] })),
   },
   restaurantsApi: {
     categories: vi.fn(async () => [{ id: 'c1', restaurant: 'r1', name: 'Pizzas', position: 1 }]),
@@ -57,7 +57,7 @@ vi.mock('@/lib/api', () => ({
     ]),
   },
   usersApi: {},
-  payoutApi: {},
+  payoutApi: { mine: vi.fn(async () => null) },
 }))
 
 beforeAll(() => {
@@ -96,6 +96,16 @@ describe('PartyPage — chaque étape se rend', () => {
     status = s
     const { unmount } = await renderParty()
     expect(await screen.findByText(text, {}, { timeout: 3000 })).toBeInTheDocument()
+    unmount()
+  })
+})
+
+describe('PartyPage — vue du payeur', () => {
+  it('signale un profil de remboursement vide', async () => {
+    status = 'paying'
+    const { unmount } = await renderParty()
+    expect(await screen.findByText(/Aucun moyen renseigné/, {}, { timeout: 3000 })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Compléter mon profil' })).toHaveAttribute('href', '/profile?onglet=infos')
     unmount()
   })
 })

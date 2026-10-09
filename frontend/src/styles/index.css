@@ -140,3 +140,14 @@
     animation: none;
   }
 }
+
+/* Bandeau « Commande en cours » posé au-dessus de la tab bar (mobile) : les barres
+   collantes et le bas de page (qui lisent --tabbar-h) remontent d'autant. */
+.has-resume-dock {
+  --tabbar-h: 128px;
+}
+@media (min-width: 768px) {
+  .has-resume-dock {
+    --tabbar-h: 0px;
+  }
+}

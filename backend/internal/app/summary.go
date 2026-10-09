@@ -15,6 +15,12 @@ func partyMembers(app core.App, partyID string) ([]*core.Record, error) {
 	if err != nil {
 		return nil, err
 	}
+	sortMembers(recs)
+	return recs, nil
+}
+
+// sortMembers orders party members host first, then by arrival.
+func sortMembers(recs []*core.Record) {
 	sort.SliceStable(recs, func(i, j int) bool {
 		hi, hj := recs[i].GetString("role") == "host", recs[j].GetString("role") == "host"
 		if hi != hj {
@@ -26,7 +32,6 @@ func partyMembers(app core.App, partyID string) ([]*core.Record, error) {
 		}
 		return recs[i].Id < recs[j].Id
 	})
-	return recs, nil
 }
 
 func orderItems(app core.App, partyID string) ([]*core.Record, error) {
@@ -34,6 +39,12 @@ func orderItems(app core.App, partyID string) ([]*core.Record, error) {
 	if err != nil {
 		return nil, err
 	}
+	sortByCreated(recs)
+	return recs, nil
+}
+
+// sortByCreated orders records by creation date (then id, for stability).
+func sortByCreated(recs []*core.Record) {
 	sort.SliceStable(recs, func(i, j int) bool {
 		ci, cj := recs[i].GetDateTime("created"), recs[j].GetDateTime("created")
 		if !ci.Equal(cj) {
@@ -41,7 +52,6 @@ func orderItems(app core.App, partyID string) ([]*core.Record, error) {
 		}
 		return recs[i].Id < recs[j].Id
 	})
-	return recs, nil
 }
 
 func userInfo(u *core.Record) domain.UserInfo {
@@ -60,23 +70,11 @@ var estimatedFeeStatuses = map[string]bool{
 
 // buildSummary loads everything needed and computes the party summary.
 func buildSummary(app core.App, party *core.Record) (domain.Summary, *core.Record, error) {
-	status := party.GetString("status")
-
 	var rest *core.Record
-	var restInfo *domain.RestaurantInfo
 	if rid := party.GetString("restaurant"); rid != "" {
 		if r, err := app.FindRecordById(colRestaurants, rid); err == nil {
 			rest = r
-			restInfo = &domain.RestaurantInfo{
-				ID: r.Id, Name: r.GetString("name"),
-				MinOrder: r.GetInt("min_order"), DeliveryFee: r.GetInt("delivery_fee"),
-			}
 		}
-	}
-
-	deliveryFee := party.GetInt("delivery_fee")
-	if estimatedFeeStatuses[status] && rest != nil {
-		deliveryFee = rest.GetInt("delivery_fee")
 	}
 
 	pms, err := partyMembers(app, party.Id)
@@ -99,6 +97,26 @@ func buildSummary(app core.App, party *core.Record) (domain.Summary, *core.Recor
 	byID := make(map[string]*core.Record, len(users))
 	for _, u := range users {
 		byID[u.Id] = u
+	}
+
+	return summaryFromRecords(party, rest, pms, items, byID), rest, nil
+}
+
+// summaryFromRecords computes the summary from already loaded records (members
+// sorted host first, items by creation), so that several parties can be
+// summarised from a few batched queries (history).
+func summaryFromRecords(party, rest *core.Record, pms, items []*core.Record, byID map[string]*core.Record) domain.Summary {
+	status := party.GetString("status")
+	var restInfo *domain.RestaurantInfo
+	if rest != nil {
+		restInfo = &domain.RestaurantInfo{
+			ID: rest.Id, Name: rest.GetString("name"),
+			MinOrder: rest.GetInt("min_order"), DeliveryFee: rest.GetInt("delivery_fee"),
+		}
+	}
+	deliveryFee := party.GetInt("delivery_fee")
+	if estimatedFeeStatuses[status] && rest != nil {
+		deliveryFee = rest.GetInt("delivery_fee")
 	}
 
 	in := domain.SummaryInput{
@@ -134,7 +152,7 @@ func buildSummary(app core.App, party *core.Record) (domain.Summary, *core.Recor
 			Total:        it.GetInt("total"),
 		})
 	}
-	return domain.BuildSummary(in), rest, nil
+	return domain.BuildSummary(in)
 }
 
 func providerRestaurant(r *core.Record) providers.Restaurant {

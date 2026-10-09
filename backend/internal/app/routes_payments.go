@@ -226,14 +226,15 @@ type bancontactInfo struct {
 }
 
 type paymentQR struct {
-	Amount      int             `json:"amount"`
-	Reference   string          `json:"reference"`
-	Beneficiary string          `json:"beneficiary"`
-	EPC         *string         `json:"epc"`
-	Link        *string         `json:"link"`
-	Wero        *weroInfo       `json:"wero"`
-	Bancontact  *bancontactInfo `json:"bancontact"`
-	Methods     []string        `json:"methods"`
+	Amount      int                  `json:"amount"`
+	Reference   string               `json:"reference"`
+	Beneficiary string               `json:"beneficiary"`
+	EPC         *string              `json:"epc"`
+	IBAN        *string              `json:"iban"`
+	Links       []domain.PaymentLink `json:"links"`
+	Wero        *weroInfo            `json:"wero"`
+	Bancontact  *bancontactInfo      `json:"bancontact"`
+	Methods     []string             `json:"methods"`
 }
 
 func payoutProfile(app core.App, userID string) *core.Record {
@@ -253,6 +254,7 @@ func (h *handlers) paymentQR(e *core.RequestEvent) error {
 	out := paymentQR{
 		Amount:    pay.GetInt("amount"),
 		Reference: pay.GetString("reference"),
+		Links:     []domain.PaymentLink{},
 	}
 	if u, err := e.App.FindRecordById(colUsers, creditorID); err == nil {
 		out.Beneficiary = userInfo(u).Name
@@ -269,11 +271,15 @@ func (h *handlers) paymentQR(e *core.RequestEvent) error {
 			})
 			if err == nil {
 				out.EPC = &epc
+				iban = domain.NormalizeIBAN(iban)
+				out.IBAN = &iban
 			}
 		}
-		if link := domain.PaymentLinkWithAmount(prof.GetString("payment_link"), out.Amount); link != "" {
-			out.Link = &link
-		}
+		// Normalized again: profiles saved before the structured handles.
+		h := domain.PayoutHandles{Link: prof.GetString("payment_link")}
+		h.RevolutTag, _ = domain.NormalizeRevolutTag(prof.GetString("revolut_tag"))
+		h.PayPalMe, _ = domain.NormalizePayPalMe(prof.GetString("paypal_me"))
+		out.Links = domain.PaymentLinks(domain.SplitPayoutLink(h), out.Amount, out.Reference)
 		if id, qr := prof.GetString("wero_id"), prof.GetString("wero_qr"); id != "" || qr != "" {
 			out.Wero = &weroInfo{ID: id, HasQR: qr != ""}
 		}
@@ -281,9 +287,18 @@ func (h *handlers) paymentQR(e *core.RequestEvent) error {
 			out.Bancontact = &bancontactInfo{Phone: phone, HasQR: qr != ""}
 		}
 	}
-	out.Methods = domain.AvailableMethods(domain.PayoutAvailability{
-		IBAN: out.EPC != nil, Wero: out.Wero != nil, Bancontact: out.Bancontact != nil, Link: out.Link != nil,
-	})
+	avail := domain.PayoutAvailability{IBAN: out.EPC != nil, Wero: out.Wero != nil, Bancontact: out.Bancontact != nil}
+	for _, l := range out.Links {
+		switch l.Kind {
+		case domain.LinkRevolut:
+			avail.Revolut = true
+		case domain.LinkPayPal:
+			avail.PayPal = true
+		case domain.LinkGeneric:
+			avail.Link = true
+		}
+	}
+	out.Methods = domain.AvailableMethods(avail)
 	return ok(e, out)
 }
 

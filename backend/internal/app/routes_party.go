@@ -29,6 +29,7 @@ func (h *handlers) join(e *core.RequestEvent) error {
 	}
 
 	var party *core.Record
+	already := false
 	err := e.App.RunInTransaction(func(tx core.App) error {
 		p, err := tx.FindFirstRecordByData(colParties, "code", code)
 		if err != nil {
@@ -36,7 +37,8 @@ func (h *handlers) join(e *core.RequestEvent) error {
 		}
 		party = p
 		if isMember(p, e.Auth.Id) {
-			return nil // idempotent
+			already = true
+			return nil // idempotent : un membre retrouve sa commande, quel que soit son statut
 		}
 		if !slices.Contains(joinableStatuses, p.GetString("status")) {
 			return badRequest("Cette commande n'accepte plus de nouveaux participants.")
@@ -56,7 +58,7 @@ func (h *handlers) join(e *core.RequestEvent) error {
 	if err != nil {
 		return err
 	}
-	return ok(e, map[string]any{"party": party})
+	return ok(e, map[string]any{"party": party, "alreadyMember": already})
 }
 
 func (h *handlers) leave(e *core.RequestEvent) error {

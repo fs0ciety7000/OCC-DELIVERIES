@@ -19,6 +19,7 @@ import { qk } from '@/lib/queryKeys'
 import type { MenuItem, OrderItem } from '@/lib/types'
 import type { PartyCtx } from '../context'
 import { useOrderItems, useReady, useTransition, useUpdateParty } from '../hooks'
+import { ReorderCard } from '../ReorderCard'
 import { cartStatsByUser } from '../logic'
 
 export function OrderingStep({ ctx }: { ctx: PartyCtx }) {
@@ -129,6 +130,7 @@ export function OrderingStep({ ctx }: { ctx: PartyCtx }) {
         )}
         <p className="text-xs text-subtle">Prix indicatifs — les totaux sont recalculés par le serveur.</p>
         {restaurant && <PartialMenuBanner restaurant={restaurant} />}
+        {items.isSuccess && mine.length === 0 && <ReorderCard partyId={party.id} />}
         {menu.isPending ? (
           <MenuSkeleton />
         ) : menu.isError ? (

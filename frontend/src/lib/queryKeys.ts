@@ -12,6 +12,9 @@ export const qk = {
   summary: (id: string) => ['party', id, 'summary'] as const,
   paymentQR: (paymentId: string) => ['paymentQR', paymentId] as const,
   myParties: (userId: string) => ['myParties', userId] as const,
+  history: (userId: string) => ['history', userId] as const,
+  myStats: (userId: string) => ['history', userId, 'stats'] as const,
+  reorder: (partyId: string) => ['party', partyId, 'reorder'] as const,
   payout: (userId: string) => ['payout', userId] as const,
   authMethods: ['authMethods'] as const,
   admin: {

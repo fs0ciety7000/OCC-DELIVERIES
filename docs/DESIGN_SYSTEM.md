@@ -142,25 +142,40 @@ un parcours critique, toutes interruptibles.
 | `Countdown` | mm:ss | |
 | `Toast` | via `sonner`, thème sombre | |
 | `QRCodeCard` | QR généré (`value`) **ou** image de QR (`imageSrc`, QR « recevoir » Wero / Bancontact) + montant + bouton copier | `qrcode.react`, fond blanc obligatoire (lisibilité scanners), `fgColor="currentColor"` sur `--color-qr-fg` |
-| Tuiles de paiement (`MethodTiles`) | une tuile ≥ 80 px par moyen, dans l'ordre de `PaymentQR.methods` : Wero, Bancontact Pay, Virement QR, Lien, Espèces, Plus tard | `role="radiogroup"` ; Wero/Bancontact : wordmark en aplat, montant + communication + identifiant copiables, QR du payeur si dispo, mini-guide en 3 étapes. **Aucun faux deep link** (pas d'API P2P tierce) |
+| Tuiles de paiement (`MethodTiles`) | une tuile ≥ 80 px par moyen, dans l'ordre de `PaymentQR.methods` (utilité) : Virement QR, Revolut, PayPal, Lien, Wero, Bancontact Pay, Espèces, Plus tard. **Mobile** (< 1024 px) : les liens à montant pré-rempli passent devant le Virement QR (on ne scanne pas son propre écran) | `role="radiogroup"` ; sous-titre `muted` 12 px dans le nom accessible : « Montant inclus » (QR), « Montant pré-rempli » / « Montant à saisir » (liens), « Montant à saisir » (Wero/Bancontact). Revolut/PayPal : wordmark texte sur `fg/8` (pas de logo ni de couleur de marque). **Virement QR** : desktop = QR EPC 240 px « Ouvre ton app bancaire et scanne » ; mobile = encart `info` + bouton « Afficher le QR pour un collègue » (`aria-expanded`) ; IBAN, montant, communication toujours copiables. **Liens** : bouton `primary` `lg` pleine largeur « Payer 12,40 € avec Revolut » (lien externe) si `amountPrefilled`, sinon `secondary` « Ouvrir … » + encart `warning` « saisis 12,40 € ». **Wero/Bancontact** : identifiant + montant + communication copiables, guide en 3 étapes ; QR personnel du payeur **toujours** précédé de l'encart `warning` « QR sans montant : saisis 12,40 € dans l'app », replié (« Afficher son QR personnel (sans montant) ») si un identifiant existe. **Aucun faux deep link** (pas d'API P2P tierce) |
+| Carte « Tes moyens de remboursement » (payeur) | | pastilles des moyens visibles par les collègues (`MethodMark` + libellé), ou encart `warning` « Aucun moyen renseigné… » ; lien `secondary` `sm` vers *Mes infos* |
 | `Segmented`, `Chip`, `CopyButton` | | radiogroup en pills ; filtre `aria-pressed` ; copie + toast |
+| Bandeau « Commande en cours » (`ResumeBanner`, `features/party/ActiveParties.tsx`) | `header` (pastille desktop ≥ 768 px dans l'en-tête : point live braise + titre tronqué 176 px + statut ≥ 1024 px + « Reprendre → » en `text-brand`, fond `brand/10`, bord `brand/30`, h 36 px) ; `dock` (mobile : `aside` « Commande en cours » fixé au-dessus de la tab bar, carte `elevated/95` floutée bord `brand/30`, vignette resto 40 px, sur-titre braise en capitales 11 px + titre + « Étape 3/5 · Commande », bouton `secondary sm` « Reprendre ») | toute la carte est un lien vers la party (nom accessible « Reprendre la commande « X » — statut ») ; ≥ 2 commandes → bouton qui ouvre une `Sheet` « Mes commandes en cours » (lignes 56 px : vignette, titre, badge statut, resto). Masqué dans la party, sur `/j/…`, l'auth, et sur l'accueil quand `ResumeHero` s'y affiche. Quand le dock est là, `.has-resume-dock` porte `--tabbar-h` à 128 px en mobile : barres collantes et bas de page remontent d'autant. Point live : `animate-ping`, coupé par `motion-reduce` |
+| `ResumeHero` | | accueil, **exactement une** commande en cours (ex. retour après connexion) : carte `rounded-xl` bord `brand/40`, fond `brand/10`, `shadow-glow`, sur-titre « Ta commande t'attend », titre display 20 px, étape + resto ; remplace la section « Mes commandes en cours » |
+| Carte d'historique (`HistoryCard`, profil) | | vignette resto 56 px, nom du resto en titre (`h3`), date longue (« ven. 9 octobre 2026 ») + titre de la commande en `muted` 12 px, badge de **mon** remboursement (`success` Remboursé, `info` Déclaré · Wero, `warning` À rembourser, `brand` Tu as avancé l'argent, `danger` Annulée, statut en cours avec point live), **ma part** à droite (display 18 px, `tabular-nums`, « ma part » en `subtle`). Pied bordé : « Mes plats (n) » (`aria-expanded`, chevron qui pivote, `motion-reduce`) → panneau `elevated/40` (quantité ×, nom, options, note en italique, total de ligne ; puis Mes plats / Ma part des frais / Ma part / Total de la commande / payeur et moyen) ; lien « Voir » ou « Reprendre » (en cours) ; « Relancer ici » (`ghost`, `text-brand`, icône `RotateCcw`) seulement si le resto est actif et la commande finie → `CreatePartySheet` avec ce resto (commande directe, sans vote) |
+| Onglets du profil (`ProfileTabs`) | | motif ARIA *tabs* (flèches, Début / Fin, `tabIndex` itinérant) au look `Segmented` (pills pleine largeur, 44 px) : « Mes commandes » (défaut) / « Mes infos » (`?onglet=infos`) |
+| Carte « Comme la dernière fois ? » (`ReorderCard`, étape Commande) | | affichée quand **mon** panier est vide et que j'ai déjà commandé dans ce resto : pastille icône `History` braise 40 px, date de la commande source, 4 plats max (+ n autres), plats retirés en `warning`, « Environ X € » (prix actuels serveur), bouton `secondary` « Reprendre ma dernière commande » (le `primary` reste « Je suis prêt·e ») ; toasts : succès « n plats remis dans ton panier », avertissement listant les plats sautés et la raison |
 
 ## 4. Écrans clés
 
 1. **Accueil** — héros « Qu'est-ce qu'on mange ? », CTA *Lancer une commande*,
    champ *Rejoindre avec un code*, mes commandes en cours, restaurants à proximité.
+   Partout ailleurs : bandeau « Commande en cours » (voir composants) et toasts de statut
+   (« Le vote est ouvert — « Midi du vendredi » », action « Voir ») quand une de mes commandes
+   avance pendant que je suis sur une autre page.
 2. **Restaurants** — recherche, filtres cuisine en chips, cartes (cover/emoji,
    note, ETA, frais, distance, badges fournisseurs).
 3. **Restaurant** — héros, catégories en onglets collants, items avec options.
 4. **Party** — en-tête (titre, code, avatars, stepper) + contenu par étape :
+   * En-tête : code + copier le lien + **partager** (`navigator.share` avec le lien `/j/:code`, si dispo) ;
+     un membre qui rouvre `/j/:code` revient directement dans la salle (« Te revoilà dans … »).
    * *Salon* : lien + QR d'invitation, membres live, sélection des candidats.
    * *Vote* : cartes restaurants, cœur pour voter, barres de score live.
    * *Commande* : menu du restaurant, panier perso en sheet, statut « prêt » des autres.
    * *Récap* : totaux par personne, récap consolidé, choix d'envoi (Uber Eats,
      Takeaway, export, téléphone), choix du payeur.
-   * *Paiement* : ma part + QR EPC / lien / espèces / plus tard ; vue payeur avec
-     la liste des parts et confirmation.
-5. **Profil** — nom, couleur, IBAN, lien de paiement, thème.
+   * *Paiement* : ma part + QR EPC (montant + communication) / liens Revolut, PayPal
+     avec montant / Wero, Bancontact Pay / espèces / plus tard ; vue payeur avec ses
+     moyens visibles, la liste des parts (moyen déclaré en badge) et confirmation.
+5. **Profil** — en-tête (avatar, nom, e-mail) puis onglets : *Mes commandes* (4 tuiles
+   chiffrées — Commandes, Dépensé, Resto chouchou, Plat préféré —, puis cartes d'historique
+   10 par 10 avec « Voir plus de commandes », état vide illustré par l'assiette + « Lancer une
+   commande ») ; *Mes infos* (nom, couleur, coordonnées de remboursement, thème, déconnexion).
 6. **Administration** (`/admin`, rôle `admin`) — mêmes tokens et composants, densité
    plus « outil » (listes compactes, actions icônes 44 px avec `aria-label`).
    * *Mise en page* : barre latérale 220 px (≥ 768 px, entrées `rounded-md`, icône braise

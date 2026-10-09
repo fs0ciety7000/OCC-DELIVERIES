@@ -24,6 +24,9 @@
   servie par le même binaire → même origine, pas de CORS, cookies/token simples.
 * **Realtime** : le client s'abonne aux collections filtrées par `party` ; les
   règles d'accès PocketBase s'appliquent aussi aux événements SSE.
+  Le shell (`AppShell`) s'abonne en plus à `parties` `*` : les rules ne livrent que
+  les parties dont on est membre → bandeau « Commande en cours » et toasts de statut
+  partout dans l'app (`useMyPartiesRealtime`).
 * **Argent** : toujours en **centimes entiers** (`int`), devise EUR.
 
 Pourquoi PocketBase plutôt que Postgres : voir `docs/adr/0001-stack.md`.
@@ -38,6 +41,7 @@ backend/
     party.go                 state machine, élection du restaurant
     code.go                  génération code de party
     epc.go / iban.go         payload QR EPC (SEPA), validation IBAN
+    payout.go                revtag Revolut / PayPal.me / lien libre : normalisation, liens avec montant
     geo.go                   haversine
     contact.go               téléphones (E.164, affichage) et adresses (« Rue X 12, 7000 Mons ») des restaurants
   internal/providers/        adaptateurs Uber Eats / Takeaway / Deliveroo / weloveat / manuel + tests
@@ -85,7 +89,9 @@ ou `OCC_ADMINS` passent `admin` ; un compte créé plus tard avec un de ces e-ma
 | holder_name | text | bénéficiaire du virement |
 | iban | text | validé mod-97, stocké sans espaces, majuscules |
 | bic | text | optionnel |
-| payment_link | url | ex. `https://paypal.me/jdoe`, Revolut… |
+| revolut_tag | text (≤ 32) | revtag Revolut, minuscules sans `@` (saisie `@jdoe`, `revolut.me/jdoe`… acceptée) |
+| paypal_me | text (≤ 40) | nom PayPal.me (saisie `jdoe`, `paypal.me/jdoe`, `paypal.com/paypalme/jdoe` acceptée) |
+| payment_link | url | autre lien de paiement (Lydia/Sumeria, Wise Business…), `https://` ajouté si absent |
 | wero_id | text | n° de mobile (E.164, ex. `+32470123456`) **ou** e-mail enregistré sur Wero |
 | bancontact_phone | text | n° de mobile (E.164) lié à Bancontact Pay |
 | wero_qr | file | image (png/jpg/webp, ≤ 1 Mo, `protected`) — QR « recevoir » généré dans l'app bancaire |
@@ -95,7 +101,10 @@ Rules : toutes `user = @request.auth.id` (create : `@request.auth.id != "" && us
 Jamais exposé aux autres membres : QR EPC, identifiants Wero/Bancontact et images
 QR ne sortent que via `/api/occ/payments/{id}/qr` et `/wallet-qr/{kind}`, pour les
 membres de la party concernée. Hook : `wero_id` / `bancontact_phone` normalisés
-(mobile → E.164 avec `+32` par défaut si commence par `0` ; e-mail en minuscules) et validés.
+(mobile → E.164 avec `+32` par défaut si commence par `0` ; e-mail en minuscules) et validés ;
+`revolut_tag` / `paypal_me` / `payment_link` normalisés (`domain/payout.go`) et un lien
+`revolut.me/…` ou `paypal.me/…` collé dans `payment_link` est déplacé dans le champ structuré
+(migration `1760000013` : même traitement pour les profils existants).
 
 ### `restaurants` (lecture publique)
 | champ | type | notes |
@@ -339,7 +348,8 @@ jetons… retirés avant le cache).
 
 Rules :
 * list/view : `members.id ?= @request.auth.id || @request.auth.role = "admin"`
-  (⚠ PocketBase (v0.36 à v0.40) : sur une relation multiple, `members ?= x` compare la
+  (⚠ PocketBase (v0.36 à v0.40) : sur une relation multiple — dans les rules **comme dans les
+  filtres `?filter=` du client** — `members ?= x` compare la
   valeur JSON brute et ne matche jamais → toujours écrire `members.id ?= …`)
 * create : `@request.auth.id != ""` → le hook force `host`, `members=[host]`, `code`, `status=lobby`.
 * update : `host = @request.auth.id` → le hook **refuse** toute modification de
@@ -389,7 +399,7 @@ Hooks : valide options (min/max, ids), recalcule prix ; toute écriture remet
 | debtor | R(users) | qui doit |
 | creditor | R(users) | le payeur |
 | amount | number int | cents |
-| method | select | `qr` (virement EPC), `wero`, `bancontact`, `link`, `cash`, `later`, `self` |
+| method | select | `qr` (virement EPC), `revolut`, `paypal`, `link`, `wero`, `bancontact`, `cash`, `later`, `self` |
 | status | select | `pending`, `declared`, `confirmed` |
 | reference | text | communication, ex. `OCC K7M2QX Alice` |
 | declared_at, confirmed_at | date | |
@@ -432,7 +442,7 @@ PocketBase `{ "status": 400, "message": "…", "data": {} }`, messages en franç
 | `GET /api/occ/health` | — | | `{ "status": "ok", "version": "x.y.z" }` |
 | `GET /api/occ/config` | — | | `{ "currency":"EUR", "defaultLocation":{lat,lng,label}, "providers":[{id,name,color,enabled}], "minMenuItems": 10 }` (`minMenuItems` = seuil des cartes incomplètes, 0 = aucun) |
 | `GET /api/occ/restaurants/nearby` | — | `lat,lng,radiusKm(=5),q,cuisine` | `{ "items": [Restaurant & { "distanceKm": number }] }` triés par distance ; les positions approximatives (`geo_approx`) après les autres ; restaurants actifs uniquement, **sans les cartes incomplètes** (`items_count < minMenuItems` quand le seuil > 0) |
-| `POST /api/occ/parties/join` | ✔ | `{ "code": "K7M2QX" }` | `{ "party": Party }` (idempotent ; statuts lobby/voting/ordering/review) |
+| `POST /api/occ/parties/join` | ✔ | `{ "code": "K7M2QX" }` | `{ "party": Party, "alreadyMember": bool }` — idempotent : un **membre** retrouve sa party quel que soit son statut (`alreadyMember: true`, lien `/j/:code` réouvert) ; un nouveau venu seulement en lobby/voting/ordering/review |
 | `POST /api/occ/parties/{id}/leave` | membre (≠ hôte) | | `{ "ok": true }` — seulement en lobby/voting/ordering ; supprime ses votes/items |
 | `POST /api/occ/parties/{id}/transition` | hôte | `{ "to": Status, "restaurant"?: id }` | `{ "party": Party }` |
 | `POST /api/occ/parties/{id}/ready` | membre | `{ "ready": bool }` | `{ "member": PartyMember }` (status `ordering` uniquement) |
@@ -440,7 +450,11 @@ PocketBase `{ "status": 400, "message": "…", "data": {} }`, messages en franç
 | `POST /api/occ/parties/{id}/dispatch` | hôte | `{ "method": "ubereats"\|"takeaway"\|"deliveroo"\|"weloveat"\|"export"\|"phone" }` (plateforme désactivée par `OCC_PROVIDERS` → 400) | `{ "party": Party, "dispatch": Dispatch }` (status review/paying) |
 | `POST /api/occ/parties/{id}/payer` | hôte | `{ "payer": userId }` | `{ "party": Party, "payments": Payment[] }` (review → paying ; en paying : recalcule si aucun paiement tiers confirmé) |
 | `GET /api/occ/parties/{id}/export` | membre | `format=csv\|txt\|json` | fichier (`Content-Disposition: attachment`) |
-| `POST /api/occ/payments/{id}/action` | voir | `{ "action": "declare"\|"confirm"\|"reset", "method"?: "qr"\|"wero"\|"bancontact"\|"link"\|"cash"\|"later" }` | `{ "payment": Payment }` |
+| `GET /api/occ/parties/{id}/reorder` | membre | | `ReorderPreview` (ci-dessous) : ma dernière commande dans le restaurant de la party (`source: null` si aucune) |
+| `POST /api/occ/parties/{id}/reorder` | membre | | `{ "added": [{ name, quantity }], "skipped": [{ name, reason }] }` — status `ordering` (sinon 400) ; ajoute à **mon** panier les lignes encore valides de ma dernière commande ici (prix recalculés serveur, `ready` remis à false) ; **404** sans commande précédente |
+| `GET /api/occ/me/history` | ✔ | `page` (≥ 1), `perPage` (1–50, défaut 10) | `{ page, perPage, totalItems, totalPages, items: HistoryEntry[] }` — mes parties (membre, tous statuts), plus récentes d'abord |
+| `GET /api/occ/me/stats` | ✔ | | `MyStats` (ci-dessous) |
+| `POST /api/occ/payments/{id}/action` | voir | `{ "action": "declare"\|"confirm"\|"reset", "method"?: "qr"\|"revolut"\|"paypal"\|"link"\|"wero"\|"bancontact"\|"cash"\|"later" }` | `{ "payment": Payment }` |
 | `GET /api/occ/payments/{id}/qr` | membre | | `PaymentQR` |
 | `GET /api/occ/payments/{id}/wallet-qr/{kind}` | membre | `kind=wero\|bancontact` | image QR du payeur (stream, `Cache-Control: private`) ou 404 |
 | `GET /api/occ/admin/stats` | admin | | `AdminStats` (ci-dessous) |
@@ -462,7 +476,7 @@ PocketBase `{ "status": 400, "message": "…", "data": {} }`, messages en franç
 « admin » = utilisateur `role = "admin"` **ou** superuser (401 sans auth, 403 sinon).
 
 Règles `payments/{id}/action` :
-* `declare` — débiteur seulement. `method=qr|wero|bancontact|link|cash` → `status=declared` ; `method=later` → `status=pending`.
+* `declare` — débiteur seulement. `method=qr|revolut|paypal|link|wero|bancontact|cash` → `status=declared` ; `method=later` → `status=pending`.
 * `confirm` — créancier (payeur) ou hôte → `status=confirmed`. Si tous confirmés → party `closed`.
 * `reset` — créancier ou hôte → `status=pending`.
 
@@ -493,6 +507,48 @@ partagés (`deliveryFee + serviceFee + tip`). `equal` : parts égales ;
 `proportional` : au prorata du sous-total. Arrondi au centime par la méthode du
 plus grand reste (ordre stable par id) → `Σ total = grandTotal` **exactement**.
 
+### `HistoryEntry` (`/me/history`)
+```json
+{ "id": "…", "code": "K7M2QX", "title": "Midi du vendredi", "status": "closed",
+  "created": "2026-10-09 10:02:11.000Z", "closedAt": "2026-10-09 13:40:00.000Z",
+  "restaurant": { "id": "…", "name": "Pizza Nonna", "emoji": "🍕", "cover": "", "cover_url": "", "active": true },
+  "provider": "ubereats", "host": { "id": "…", "name": "Bob", "avatar": "", "color": "#…" }, "isHost": false,
+  "memberCount": 3,
+  "items": [{ "menuItem": "…", "name": "Margherita", "optionsLabel": "Large", "note": "", "quantity": 2, "unitPrice": 1450, "total": 2900 }],
+  "subtotal": 2900, "sharedFees": 133, "total": 3033, "grandTotal": 6099,
+  "payer": { "id": "…", "name": "Bob", "avatar": "", "color": "#…" },
+  "payment": { "id": "…", "method": "wero", "status": "confirmed", "amount": 3033 } }
+```
+`items` = **mes** lignes seulement ; `subtotal` / `sharedFees` / `total` / `grandTotal` = exactement ceux du
+`Summary` de la party (même code, `summaryFromRecords`) ; `restaurant` `null` tant qu'aucun n'est retenu ;
+`payer` / `payment` (mon remboursement, débiteur) `null` avant `paying` ; `payment.method = "self"` si j'ai
+avancé l'argent. Chargement par lots (party_members → parties, membres, articles, utilisateurs, restaurants,
+mes paiements : 8 requêtes par page, comptage compris, quelle que soit sa taille — aucun N+1).
+
+### `MyStats` (`/me/stats`)
+```json
+{ "orders": 12, "totalSpent": 18450,
+  "favoriteRestaurant": { "id": "…", "name": "Pizza Nonna", "emoji": "🍕", "orders": 5 },
+  "favoriteDish": { "name": "Margherita", "quantity": 7, "orders": 5 } }
+```
+Commande comptée (`domain.ComputeHistoryStats`, pur et testé) = party `review` / `paying` / `closed` où j'ai
+au moins un article ; `totalSpent` = Σ de mes parts (`total`). Favoris : plus de commandes (resto) / plus
+grande quantité cumulée (plat, nom insensible à la casse), puis le plus récent, puis le nom ; `null` si aucun.
+
+### `ReorderPreview` (`/parties/{id}/reorder`)
+```json
+{ "source": { "partyId": "…", "title": "Midi du lundi", "created": "2026-10-05 10:00:00.000Z" },
+  "items": [{ "menuItem": "…", "name": "Margherita", "optionsLabel": "Large", "note": "bien cuite", "quantity": 2,
+              "unitPrice": 1400, "available": true },
+            { "menuItem": "…", "name": "Tiramisu", "optionsLabel": "", "note": "", "quantity": 1,
+              "unitPrice": 0, "available": false, "reason": "n'est plus disponible" }] }
+```
+Source = ma party la plus récente (≠ celle-ci, non annulée) au **même restaurant** où j'ai des articles.
+Chaque ligne est revalidée contre la carte actuelle : plat absent / d'un autre restaurant (« n'est plus à la
+carte »), indisponible (« n'est plus disponible »), options refusées par `domain.PriceOptions` (« ses options
+ont changé ») ; `unitPrice` = prix **actuel** recalculé (le client n'envoie jamais de prix). `POST` crée les
+lignes valides en une transaction (snapshots `name` / `options_label` / `unit_price` / `total` serveur).
+
 ### `Dispatch`
 ```json
 { "method": "ubereats", "url": "https://www.ubereats.com/…", "cartText": "…",
@@ -502,25 +558,41 @@ plus grand reste (ordre stable par id) → `Σ total = grandTotal` **exactement*
 
 ### `PaymentQR`
 ```json
-{ "amount": 1400, "reference": "OCC K7M2QX Alice", "beneficiary": "Bob Martin",
-  "epc": "BCD\n002\n1\nSCT\n\nBob Martin\nBE71096123456769\nEUR14.00\n\n\nOCC K7M2QX Alice",
-  "link": "https://paypal.me/bob/14.00EUR",
+{ "amount": 1240, "reference": "OCC K7M2QX Alice", "beneficiary": "Bob Martin",
+  "epc": "BCD\n002\n1\nSCT\n\nBob Martin\nBE71096123456769\nEUR12.40\n\n\nOCC K7M2QX Alice",
+  "iban": "BE71096123456769",
+  "links": [
+    { "kind": "revolut", "label": "Revolut", "amountPrefilled": true,
+      "url": "https://revolut.me/bobm?amount=1240&currency=EUR&note=OCC+K7M2QX+Alice" },
+    { "kind": "paypal", "label": "PayPal", "amountPrefilled": true,
+      "url": "https://paypal.me/bobm/12.40EUR" },
+    { "kind": "link", "label": "lydia-app.com", "amountPrefilled": false,
+      "url": "https://lydia-app.com/collect/…" } ],
   "wero": { "id": "+32470123456", "hasQr": true },
   "bancontact": { "phone": "+32470123456", "hasQr": false },
-  "methods": ["qr", "wero", "bancontact", "link", "cash", "later"] }
+  "methods": ["qr", "revolut", "paypal", "link", "wero", "bancontact", "cash", "later"] }
 ```
 `epc` = payload **EPC069-12** (QR virement SEPA, lu par les apps bancaires
-belges/européennes), `null` si le payeur n'a pas d'IBAN. `link` = lien de paiement
-du payeur (montant ajouté pour paypal.me), `null` sinon. `wero` / `bancontact` :
+belges/européennes : montant **et** communication pré-remplis — le seul QR « à
+montant » universel), `null` si le payeur n'a pas d'IBAN ; `iban` l'accompagne
+(copie manuelle). `links` = liens du payeur construits **pour ce paiement**
+(`[]` si aucun), ordre Revolut, PayPal, lien libre ; `amountPrefilled` vaut
+`true` seulement si le format du fournisseur est confirmé (ADR 0003) :
+Revolut `?amount=<centimes>&currency=EUR&note=<communication>`, PayPal.me
+`/<montant>EUR`, lien libre Wise Business `?amount=&currency=&description=` ;
+tout autre lien est renvoyé tel quel (`false`). `wero` / `bancontact` :
 `null` si le payeur n'a rien renseigné ; `hasQr` indique qu'une image est
 disponible via `/wallet-qr/{kind}`. `methods` = moyens réellement proposés
-(selon le profil du payeur), dans l'ordre d'affichage recommandé.
+(selon le profil du payeur), par ordre d'utilité : `qr`, `revolut`, `paypal`,
+`link`, `wero`, `bancontact`, `cash`, `later` (le front avance les liens
+pré-remplis devant `qr` sur mobile).
 
 **Wero / Bancontact Pay** n'exposent aucun lien ni QR de demande de paiement
-P2P utilisable par un tiers (leurs API sont réservées aux commerçants). L'UI
-affiche donc : montant + communication à copier, identifiant du payeur à
-copier, QR personnel du payeur s'il l'a téléversé, et un mini-guide
-(« Ouvre ton app bancaire → Wero → Envoyer… »). Voir ADR 0003.
+P2P utilisable par un tiers (demandes créées dans l'app du bénéficiaire ;
+API réservées aux commerçants). L'UI affiche donc : identifiant du payeur,
+montant et communication à copier, mini-guide, et le QR personnel du payeur
+s'il l'a téléversé, **toujours** avec l'avertissement « QR sans montant :
+saisis 12,40 € dans l'app ». Voir ADR 0003.
 
 ### `RestaurantImport`
 ```json

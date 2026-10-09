@@ -18,8 +18,8 @@ function defaultTitle(): string {
 export interface CreatePartySheetProps {
   open: boolean
   onClose: () => void
-  /** Restaurant imposé : la party passe directement en commande. */
-  restaurant?: Restaurant
+  /** Restaurant imposé : la party passe directement en commande (fiche resto, « Relancer » de l'historique). */
+  restaurant?: Pick<Restaurant, 'id' | 'name' | 'emoji' | 'cover' | 'cover_url'>
 }
 
 export function CreatePartySheet({ open, onClose, restaurant }: CreatePartySheetProps) {

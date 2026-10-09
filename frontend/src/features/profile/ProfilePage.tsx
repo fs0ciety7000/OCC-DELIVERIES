@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, ImagePlus, LogOut, Trash2 } from 'lucide-react'
 import { useEffect, useState, type ChangeEvent } from 'react'
-import { useNavigate } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { Avatar, Badge, Button, Card, CardBody, Field, Input, Segmented, Skeleton } from '@/components/ui'
 import { MethodMark } from '@/features/party/steps/PaymentMethods'
@@ -14,12 +14,18 @@ import { formatIban, isValidBic, isValidIban, normalizeIban } from '@/lib/iban'
 import { qk } from '@/lib/queryKeys'
 import { useTheme, type ThemePref } from '@/lib/theme'
 import type { PayoutProfile, User } from '@/lib/types'
-import { checkQrFile, isValidMobile, isValidWeroId, normalizeMobile, normalizeWeroId } from '@/lib/wallet'
+import { checkQrFile, isValidMobile, isValidWeroId, normalizeMobile, normalizePaymentLink, normalizePayPalMe, normalizeRevolutTag, normalizeWeroId } from '@/lib/wallet'
+import { OrderHistory } from './OrderHistory'
+import { panelId, tabId, type ProfileTab } from './tabs'
+import { ProfileTabs } from './ProfileTabs'
 
 export function ProfilePage() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const { pref, setPref } = useTheme()
+  // Onglets : « Mes commandes » par défaut, « Mes infos » via ?onglet=infos (lien partageable).
+  const [params, setParams] = useSearchParams()
+  const tab: ProfileTab = params.get('onglet') === 'infos' ? 'infos' : 'commandes'
   if (!user) return null
   return (
     <div className="mx-auto max-w-[680px] space-y-6">
@@ -30,6 +36,13 @@ export function ProfilePage() {
           <p className="truncate text-sm text-muted">{user.email}</p>
         </div>
       </header>
+      <ProfileTabs value={tab} onChange={(t) => setParams(t === 'infos' ? { onglet: 'infos' } : {}, { replace: true })} />
+      {tab === 'commandes' ? (
+        <div role="tabpanel" id={panelId('commandes')} aria-labelledby={tabId('commandes')}>
+          <OrderHistory userId={user.id} />
+        </div>
+      ) : (
+      <div role="tabpanel" id={panelId('infos')} aria-labelledby={tabId('infos')} className="space-y-6">
       <IdentityCard key={user.id} user={user} />
       <PayoutCard userId={user.id} />
       <Card>
@@ -60,6 +73,8 @@ export function ProfilePage() {
       >
         Se déconnecter
       </Button>
+      </div>
+      )}
     </div>
   )
 }
@@ -134,6 +149,8 @@ function PayoutForm({ userId, profile }: { userId: string; profile: PayoutProfil
     holder_name: profile?.holder_name ?? '',
     iban: profile?.iban ? formatIban(profile.iban) : '',
     bic: profile?.bic ?? '',
+    revolut_tag: profile?.revolut_tag ?? '',
+    paypal_me: profile?.paypal_me ?? '',
     payment_link: profile?.payment_link ?? '',
     wero_id: profile?.wero_id ?? '',
     bancontact_phone: profile?.bancontact_phone ?? '',
@@ -144,7 +161,9 @@ function PayoutForm({ userId, profile }: { userId: string; profile: PayoutProfil
   const errors = {
     iban: v.iban && !isValidIban(v.iban) ? 'IBAN invalide (vérifie les chiffres).' : undefined,
     bic: !isValidBic(v.bic) ? 'BIC invalide (8 ou 11 caractères).' : undefined,
-    payment_link: v.payment_link && !/^https:\/\/\S+$/.test(v.payment_link) ? 'Le lien doit commencer par https://' : undefined,
+    revolut_tag: normalizeRevolutTag(v.revolut_tag) === null ? 'Revtag invalide (ex. @jdoe ou revolut.me/jdoe).' : undefined,
+    paypal_me: normalizePayPalMe(v.paypal_me) === null ? 'Nom PayPal.me invalide (ex. jdoe ou paypal.me/jdoe).' : undefined,
+    payment_link: normalizePaymentLink(v.payment_link) === null ? 'Lien invalide (ex. https://…).' : undefined,
     wero_id: !isValidWeroId(v.wero_id) ? 'Numéro de mobile (ex. 0470 12 34 56) ou e-mail.' : undefined,
     bancontact_phone: !isValidMobile(v.bancontact_phone) ? 'Numéro de mobile invalide (ex. 0470 12 34 56).' : undefined,
   }
@@ -159,7 +178,9 @@ function PayoutForm({ userId, profile }: { userId: string; profile: PayoutProfil
           holder_name: v.holder_name.trim(),
           iban: normalizeIban(v.iban),
           bic: v.bic.replace(/\s/g, '').toUpperCase(),
-          payment_link: v.payment_link.trim(),
+          revolut_tag: normalizeRevolutTag(v.revolut_tag) ?? '',
+          paypal_me: normalizePayPalMe(v.paypal_me) ?? '',
+          payment_link: normalizePaymentLink(v.payment_link) ?? '',
           wero_id: normalizeWeroId(v.wero_id),
           bancontact_phone: v.bancontact_phone.trim() ? normalizeMobile(v.bancontact_phone) : '',
         },
@@ -187,44 +208,11 @@ function PayoutForm({ userId, profile }: { userId: string; profile: PayoutProfil
             <p className="text-sm text-muted">Quand tu avances la commande, tes collègues te remboursent avec ces infos. Elles restent privées : seul le QR de paiement est partagé, et uniquement avec les membres de la commande.</p>
           </div>
 
-          <section className="space-y-3" aria-labelledby="h-wero">
-            <h3 id="h-wero" className="flex items-center gap-2 font-semibold">
-              <MethodMark method="wero" /> Wero
-            </h3>
-            <Field label="Mobile ou e-mail Wero" optional error={errors.wero_id} hint="Celui enregistré dans ton app bancaire (KBC, BNP Paribas Fortis, ING, Belfius…).">
-              {(p) => <Input {...p} value={v.wero_id} onChange={set('wero_id')} placeholder="0470 12 34 56 ou toi@mail.be" autoComplete="tel" />}
-            </Field>
-            <QrUpload
-              label="QR « recevoir » Wero"
-              help="Dans ton app bancaire : Wero → Recevoir → Mon QR code, puis fais une capture d'écran."
-              profile={profile}
-              field="wero_qr"
-              value={files.wero_qr}
-              onChange={(f) => setFiles((s) => ({ ...s, wero_qr: f }))}
-            />
-          </section>
-
-          <section className="space-y-3 border-t border-border pt-5" aria-labelledby="h-bcp">
-            <h3 id="h-bcp" className="flex items-center gap-2 font-semibold">
-              <MethodMark method="bancontact" /> Bancontact Pay
-            </h3>
-            <Field label="Mobile lié à Bancontact Pay" optional error={errors.bancontact_phone}>
-              {(p) => <Input {...p} type="tel" value={v.bancontact_phone} onChange={set('bancontact_phone')} placeholder="0470 12 34 56" autoComplete="tel" />}
-            </Field>
-            <QrUpload
-              label="QR « recevoir » Bancontact Pay"
-              help="Dans l'app Bancontact Pay : Recevoir de l'argent → Afficher mon QR code, puis capture d'écran."
-              profile={profile}
-              field="bancontact_qr"
-              value={files.bancontact_qr}
-              onChange={(f) => setFiles((s) => ({ ...s, bancontact_qr: f }))}
-            />
-          </section>
-
-          <section className="space-y-3 border-t border-border pt-5" aria-labelledby="h-sepa">
+          <section className="space-y-3" aria-labelledby="h-sepa">
             <h3 id="h-sepa" className="flex items-center gap-2 font-semibold">
               <MethodMark method="qr" /> Virement (QR SEPA)
             </h3>
+            <p className="text-sm text-muted">Recommandé : tes collègues scannent un QR qui remplit le montant et la communication dans leur app bancaire.</p>
             <Field label="Titulaire du compte" optional>
               {(p) => <Input {...p} value={v.holder_name} onChange={set('holder_name')} autoComplete="name" />}
             </Field>
@@ -248,13 +236,56 @@ function PayoutForm({ userId, profile }: { userId: string; profile: PayoutProfil
             </div>
           </section>
 
-          <section className="space-y-3 border-t border-border pt-5" aria-labelledby="h-link">
-            <h3 id="h-link" className="flex items-center gap-2 font-semibold">
-              <MethodMark method="link" /> Lien de paiement
+          <section className="space-y-3 border-t border-border pt-5" aria-labelledby="h-links">
+            <h3 id="h-links" className="flex items-center gap-2 font-semibold">
+              <MethodMark method="revolut" /> <MethodMark method="paypal" /> Liens de paiement
             </h3>
-            <Field label="PayPal.me, Revolut…" optional error={errors.payment_link}>
-              {(p) => <Input {...p} type="url" value={v.payment_link} onChange={set('payment_link')} placeholder="https://paypal.me/toi" />}
+            <p className="text-sm text-muted">Chaque collègue reçoit un lien avec <strong className="text-fg">son montant</strong> déjà rempli.</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Revtag Revolut" optional error={errors.revolut_tag} hint="Ton @revtag ou ton lien revolut.me.">
+                {(p) => <Input {...p} value={v.revolut_tag} onChange={set('revolut_tag')} placeholder="@toi" autoComplete="off" autoCapitalize="none" spellCheck={false} />}
+              </Field>
+              <Field label="PayPal.me" optional error={errors.paypal_me} hint="Ton nom PayPal.me ou ton lien.">
+                {(p) => <Input {...p} value={v.paypal_me} onChange={set('paypal_me')} placeholder="toi" autoComplete="off" autoCapitalize="none" spellCheck={false} />}
+              </Field>
+            </div>
+            <Field label="Autre lien de paiement" optional error={errors.payment_link} hint="Lydia/Sumeria, Wise Business… (montant pré-rempli seulement si le service le permet).">
+              {(p) => <Input {...p} type="url" inputMode="url" value={v.payment_link} onChange={set('payment_link')} placeholder="https://…" autoCapitalize="none" spellCheck={false} />}
             </Field>
+          </section>
+
+          <section className="space-y-3 border-t border-border pt-5" aria-labelledby="h-wero">
+            <h3 id="h-wero" className="flex items-center gap-2 font-semibold">
+              <MethodMark method="wero" /> Wero
+            </h3>
+            <Field label="Mobile ou e-mail Wero" optional error={errors.wero_id} hint="Celui enregistré dans ton app bancaire (KBC, BNP Paribas Fortis, ING, Belfius…).">
+              {(p) => <Input {...p} value={v.wero_id} onChange={set('wero_id')} placeholder="0470 12 34 56 ou toi@mail.be" autoComplete="tel" />}
+            </Field>
+            <QrUpload
+              label="QR « recevoir » Wero"
+              help="Dans ton app bancaire : Wero → Recevoir → Mon QR code, puis fais une capture d'écran. Ce QR ne contient pas de montant : tes collègues devront le saisir (préfère ton numéro ou ton IBAN)."
+              profile={profile}
+              field="wero_qr"
+              value={files.wero_qr}
+              onChange={(f) => setFiles((s) => ({ ...s, wero_qr: f }))}
+            />
+          </section>
+
+          <section className="space-y-3 border-t border-border pt-5" aria-labelledby="h-bcp">
+            <h3 id="h-bcp" className="flex items-center gap-2 font-semibold">
+              <MethodMark method="bancontact" /> Bancontact Pay
+            </h3>
+            <Field label="Mobile lié à Bancontact Pay" optional error={errors.bancontact_phone}>
+              {(p) => <Input {...p} type="tel" value={v.bancontact_phone} onChange={set('bancontact_phone')} placeholder="0470 12 34 56" autoComplete="tel" />}
+            </Field>
+            <QrUpload
+              label="QR « recevoir » Bancontact Pay"
+              help="Dans l'app Bancontact Pay : Recevoir de l'argent → Afficher mon QR code, sans montant, puis capture d'écran. Tes collègues devront saisir leur montant."
+              profile={profile}
+              field="bancontact_qr"
+              value={files.bancontact_qr}
+              onChange={(f) => setFiles((s) => ({ ...s, bancontact_qr: f }))}
+            />
           </section>
 
           <Button type="submit" block size="lg" disabled={hasErrors} loading={save.isPending}>

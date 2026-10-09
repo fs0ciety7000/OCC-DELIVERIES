@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"net/url"
 	"strings"
 	"unicode/utf8"
 )
@@ -53,30 +52,6 @@ func BuildEPC(p EPCParams) (string, error) {
 		rem,
 	}
 	return strings.Join(lines, "\n"), nil
-}
-
-// PaymentLinkWithAmount returns the payer's payment link; for paypal.me links
-// with only a username, the amount is appended (".../bob/14.00EUR").
-func PaymentLinkWithAmount(link string, amount int) string {
-	link = strings.TrimSpace(link)
-	if link == "" {
-		return ""
-	}
-	u, err := url.Parse(link)
-	if err != nil || u.Host == "" {
-		return link
-	}
-	host := strings.ToLower(strings.TrimPrefix(u.Host, "www."))
-	if host != "paypal.me" || amount <= 0 {
-		return link
-	}
-	segs := strings.Split(strings.Trim(u.Path, "/"), "/")
-	if len(segs) != 1 || segs[0] == "" {
-		return link
-	}
-	u.Path = "/" + segs[0] + "/" + FormatAmount(amount) + "EUR"
-	u.RawQuery = ""
-	return u.String()
 }
 
 func cleanLine(s string) string {

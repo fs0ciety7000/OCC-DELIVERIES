@@ -13,6 +13,10 @@ import type {
   DispatchMethod,
   ExportFormat,
   HealthResponse,
+  HistoryPage,
+  MyStats,
+  ReorderPreview,
+  ReorderResult,
   MenuCategory,
   MenuItem,
   NearbyQuery,
@@ -60,7 +64,8 @@ export const occ = {
     return res.items ?? []
   },
 
-  join: (code: string) => pb.send<{ party: Party }>('/api/occ/parties/join', json({ code: code.toUpperCase() })),
+  /** Idempotent : `alreadyMember` si on faisait déjà partie de la commande (quel que soit son statut). */
+  join: (code: string) => pb.send<{ party: Party; alreadyMember?: boolean }>('/api/occ/parties/join', json({ code: code.toUpperCase() })),
 
   leave: (partyId: string) => pb.send<{ ok: true }>(`/api/occ/parties/${partyId}/leave`, json({})),
 
@@ -121,6 +126,17 @@ export const occ = {
   },
 
   paymentQR: (paymentId: string) => pb.send<PaymentQR>(`/api/occ/payments/${paymentId}/qr`, { method: 'GET' }),
+
+  /** Mes commandes (membre), plus récentes d'abord, 10 par page. */
+  history: (page = 1, perPage = 10) => pb.send<HistoryPage>('/api/occ/me/history', { method: 'GET', query: { page, perPage } }),
+
+  myStats: () => pb.send<MyStats>('/api/occ/me/stats', { method: 'GET' }),
+
+  /** Ma dernière commande dans le restaurant de la party (revalidée par le serveur). */
+  reorderPreview: (partyId: string) => pb.send<ReorderPreview>(`/api/occ/parties/${partyId}/reorder`, { method: 'GET' }),
+
+  /** Ajoute ma dernière commande à mon panier : le serveur recalcule les prix et saute l'indisponible. */
+  reorder: (partyId: string) => pb.send<ReorderResult>(`/api/occ/parties/${partyId}/reorder`, json({})),
 
 }
 
@@ -269,7 +285,8 @@ export const partiesApi = {
 
   mineActive: (userId: string) =>
     pb.collection('parties').getFullList<Party>({
-      filter: pb.filter('members ?= {:u} && status != "closed" && status != "cancelled"', { u: userId }),
+      // ⚠ relation multiple : `members.id ?=` (et non `members ?=`, qui ne matche jamais — CLAUDE.md).
+      filter: pb.filter('members.id ?= {:u} && status != "closed" && status != "cancelled"', { u: userId }),
       sort: '-updated',
       expand: 'restaurant,members',
     }),
@@ -325,7 +342,7 @@ export const usersApi = {
   refresh: () => pb.collection('users').authRefresh<User>(),
 }
 
-export type PayoutProfileInput = Pick<PayoutProfile, 'holder_name' | 'iban' | 'bic' | 'payment_link' | 'wero_id' | 'bancontact_phone'>
+export type PayoutProfileInput = Pick<PayoutProfile, 'holder_name' | 'iban' | 'bic' | 'revolut_tag' | 'paypal_me' | 'payment_link' | 'wero_id' | 'bancontact_phone'>
 
 export const payoutApi = {
   /** `null` si l'utilisateur n'a pas encore de profil. */

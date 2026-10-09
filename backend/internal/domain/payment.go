@@ -7,6 +7,8 @@ const (
 	MethodQR         = "qr"
 	MethodWero       = "wero"
 	MethodBancontact = "bancontact"
+	MethodRevolut    = "revolut"
+	MethodPayPal     = "paypal"
 	MethodLink       = "link"
 	MethodCash       = "cash"
 	MethodLater      = "later"
@@ -14,7 +16,7 @@ const (
 )
 
 // PaymentMethods lists every payment method value.
-var PaymentMethods = []string{MethodQR, MethodWero, MethodBancontact, MethodLink, MethodCash, MethodLater, MethodSelf}
+var PaymentMethods = []string{MethodQR, MethodRevolut, MethodPayPal, MethodLink, MethodWero, MethodBancontact, MethodCash, MethodLater, MethodSelf}
 
 // Payment statuses.
 const (
@@ -34,7 +36,7 @@ const (
 // it with the given method.
 func DeclareStatus(method string) (string, error) {
 	switch method {
-	case MethodQR, MethodWero, MethodBancontact, MethodLink, MethodCash:
+	case MethodQR, MethodRevolut, MethodPayPal, MethodLink, MethodWero, MethodBancontact, MethodCash:
 		return PaymentDeclared, nil
 	case MethodLater:
 		return PaymentPending, nil
@@ -45,26 +47,30 @@ func DeclareStatus(method string) (string, error) {
 // PayoutAvailability describes what the payer filled in their payout profile.
 type PayoutAvailability struct {
 	IBAN       bool
+	Revolut    bool
+	PayPal     bool
+	Link       bool
 	Wero       bool
 	Bancontact bool
-	Link       bool
 }
 
 // AvailableMethods returns the reimbursement methods offered to debtors, in
-// recommended display order: wero, bancontact, qr, link, then cash and later.
+// order of usefulness: the EPC transfer QR (amount + communication
+// prefilled in any bank app), the wallet links (amount prefilled), the
+// free link, Wero / Bancontact Pay (amount typed by hand), then cash and
+// later.
 func AvailableMethods(a PayoutAvailability) []string {
 	out := []string{}
-	if a.Wero {
-		out = append(out, MethodWero)
-	}
-	if a.Bancontact {
-		out = append(out, MethodBancontact)
-	}
-	if a.IBAN {
-		out = append(out, MethodQR)
-	}
-	if a.Link {
-		out = append(out, MethodLink)
+	for _, m := range []struct {
+		on     bool
+		method string
+	}{
+		{a.IBAN, MethodQR}, {a.Revolut, MethodRevolut}, {a.PayPal, MethodPayPal}, {a.Link, MethodLink},
+		{a.Wero, MethodWero}, {a.Bancontact, MethodBancontact},
+	} {
+		if m.on {
+			out = append(out, m.method)
+		}
 	}
 	return append(out, MethodCash, MethodLater)
 }

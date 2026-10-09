@@ -14,8 +14,10 @@ export function JoinPage() {
   const clean = normalizeCode(code)
   const join = useMutation({
     mutationFn: () => occ.join(clean),
-    onSuccess: ({ party }) => {
-      toast.success(`Bienvenue dans « ${party.title || 'la commande'} » !`)
+    onSuccess: ({ party, alreadyMember }) => {
+      // Déjà membre (lien réouvert, page quittée…) : on retourne simplement dans le salon.
+      if (alreadyMember) toast(`Te revoilà dans « ${party.title || 'la commande'} »`)
+      else toast.success(`Bienvenue dans « ${party.title || 'la commande'} » !`)
       navigate(`/party/${party.id}`, { replace: true })
     },
   })

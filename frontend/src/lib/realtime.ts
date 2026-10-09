@@ -116,3 +116,64 @@ export function usePartyRealtime(partyId: string | undefined, { meId, onPartyCha
     }
   }, [partyId, meId, qc])
 }
+
+/**
+ * Abonnement global (AppShell) aux parties dont je suis membre : les rules PocketBase
+ * filtrent les évènements SSE (`members.id ?= @request.auth.id`). Invalide « mes commandes
+ * en cours » / l'historique et signale chaque changement de statut via `onStatusChange`.
+ */
+export function useMyPartiesRealtime(userId: string | undefined, onStatusChange?: (party: Party, previous: Party['status']) => void) {
+  const qc = useQueryClient()
+  const cbRef = useRef(onStatusChange)
+  useEffect(() => {
+    cbRef.current = onStatusChange
+  }, [onStatusChange])
+
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    const unsubs: UnsubscribeFunc[] = []
+    // Statut connu par party : évènements reçus, sinon dernière liste « en cours » en cache.
+    const known = new Map<string, Party['status']>()
+    const cachedStatus = (id: string) => qc.getQueryData<Party[]>(qk.myParties(userId))?.find((p) => p.id === id)?.status
+    const refresh = () => {
+      void qc.invalidateQueries({ queryKey: qk.myParties(userId) })
+      void qc.invalidateQueries({ queryKey: qk.history(userId) })
+    }
+    const add = async (p: Promise<UnsubscribeFunc>) => {
+      try {
+        const u = await p
+        if (cancelled) void u().catch(() => undefined)
+        else unsubs.push(u)
+      } catch {
+        /* realtime indisponible : refetch au focus */
+      }
+    }
+    void add(
+      pb.collection('parties').subscribe<Party>('*', (e) => {
+        const before = known.get(e.record.id) ?? cachedStatus(e.record.id)
+        refresh()
+        if (e.action === 'delete') {
+          known.delete(e.record.id)
+          return
+        }
+        known.set(e.record.id, e.record.status)
+        if (e.action === 'update' && before && before !== e.record.status) cbRef.current?.(e.record, before)
+      }),
+    )
+    let first = true
+    void add(
+      pb.realtime.subscribe('PB_CONNECT', () => {
+        if (first) {
+          first = false
+          return
+        }
+        refresh()
+      }),
+    )
+    return () => {
+      cancelled = true
+      unsubs.forEach((u) => void u().catch(() => undefined))
+    }
+  }, [userId, qc])
+}

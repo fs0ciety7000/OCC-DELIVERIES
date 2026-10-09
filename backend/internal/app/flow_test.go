@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"net/http"
 	"slices"
 	"strings"
@@ -213,12 +214,16 @@ func TestHappyPath(t *testing.T) {
 	// --- payout profile of bob (the payer) ---------------------------------
 	e.expect(400, "POST", "/api/collections/payout_profiles/records", bob.token, map[string]any{"user": bob.id(), "iban": "BE72 0961 2345 6769"})
 	e.expect(400, "POST", "/api/collections/payout_profiles/records", bob.token, map[string]any{"user": bob.id(), "bancontact_phone": "123"})
+	e.expect(400, "POST", "/api/collections/payout_profiles/records", bob.token, map[string]any{"user": bob.id(), "revolut_tag": "bob smith"})
+	e.expect(400, "POST", "/api/collections/payout_profiles/records", bob.token, map[string]any{"user": bob.id(), "payment_link": "javascript:alert(1)"})
 	r = e.expect(200, "POST", "/api/collections/payout_profiles/records", bob.token, map[string]any{
 		"user": bob.id(), "holder_name": "Bob Martin", "iban": "be71 0961 2345 6769",
-		"wero_id": "0470 12 34 56", "bancontact_phone": "0032.470.12.34.56", "payment_link": "https://paypal.me/bob",
+		"wero_id": "0470 12 34 56", "bancontact_phone": "0032.470.12.34.56",
+		"revolut_tag": "https://revolut.me/BobM", "payment_link": "paypal.me/bob",
 	})
 	prof := r.m(t)
-	if prof["iban"] != "BE71096123456769" || prof["wero_id"] != "+32470123456" || prof["bancontact_phone"] != "+32470123456" {
+	if prof["iban"] != "BE71096123456769" || prof["wero_id"] != "+32470123456" || prof["bancontact_phone"] != "+32470123456" ||
+		prof["revolut_tag"] != "bobm" || prof["paypal_me"] != "bob" || prof["payment_link"] != "" {
 		t.Fatalf("profile normalization: %v", prof)
 	}
 	e.expect(400, "POST", "/api/collections/payout_profiles/records", carol.token, map[string]any{"user": bob.id()})
@@ -276,11 +281,12 @@ func TestHappyPath(t *testing.T) {
 	e.attachFile(profRec, "wero_qr", "wero.png", pngBytes(t))
 
 	var qr struct {
-		Amount      int     `json:"amount"`
-		Reference   string  `json:"reference"`
-		Beneficiary string  `json:"beneficiary"`
-		EPC         *string `json:"epc"`
-		Link        *string `json:"link"`
+		Amount      int                  `json:"amount"`
+		Reference   string               `json:"reference"`
+		Beneficiary string               `json:"beneficiary"`
+		EPC         *string              `json:"epc"`
+		IBAN        *string              `json:"iban"`
+		Links       []domain.PaymentLink `json:"links"`
 		Wero        *struct {
 			ID    string `json:"id"`
 			HasQR bool   `json:"hasQr"`
@@ -296,16 +302,38 @@ func TestHappyPath(t *testing.T) {
 	if qr.EPC == nil || *qr.EPC != wantEPC || qr.Beneficiary != "Bob Martin" || qr.Amount != aliceShare.Total {
 		t.Fatalf("qr: %+v", qr)
 	}
-	if qr.Link == nil || *qr.Link != "https://paypal.me/bob/"+domain.FormatAmount(aliceShare.Total)+"EUR" {
-		t.Fatalf("link: %v", qr.Link)
+	if qr.IBAN == nil || *qr.IBAN != "BE71096123456769" {
+		t.Fatalf("iban: %v", qr.IBAN)
+	}
+	wantLinks := []domain.PaymentLink{
+		{Kind: "revolut", Label: "Revolut", AmountPrefilled: true,
+			URL: fmt.Sprintf("https://revolut.me/bobm?amount=%d&currency=EUR&note=OCC+%s+Alice", aliceShare.Total, code)},
+		{Kind: "paypal", Label: "PayPal", AmountPrefilled: true,
+			URL: "https://paypal.me/bob/" + domain.FormatAmount(aliceShare.Total) + "EUR"},
+	}
+	if len(qr.Links) != len(wantLinks) || qr.Links[0] != wantLinks[0] || qr.Links[1] != wantLinks[1] {
+		t.Fatalf("links: %+v", qr.Links)
 	}
 	if qr.Wero == nil || qr.Wero.ID != "+32470123456" || !qr.Wero.HasQR || qr.Bancontact == nil || qr.Bancontact.HasQR {
 		t.Fatalf("wallets: %+v %+v", qr.Wero, qr.Bancontact)
 	}
-	if strings.Join(qr.Methods, ",") != "wero,bancontact,qr,link,cash,later" {
+	if strings.Join(qr.Methods, ",") != "qr,revolut,paypal,wero,bancontact,cash,later" {
 		t.Fatalf("methods: %v", qr.Methods)
 	}
 	e.expect(403, "GET", path("/api/occ/payments/%s/qr", alicePay), carol.token, nil)
+
+	// legacy profile (free revolut.me link stored before the structured handles)
+	if _, err := e.app.DB().Update(colPayoutProfiles, dbx.Params{"revolut_tag": "", "paypal_me": "", "payment_link": "https://revolut.me/legacy"}, dbx.HashExp{"user": bob.id()}).Execute(); err != nil {
+		t.Fatal(err)
+	}
+	e.expect(200, "GET", path("/api/occ/payments/%s/qr", alicePay), alice.token, nil).json(t, &qr)
+	if len(qr.Links) != 1 || qr.Links[0].Kind != "revolut" || !qr.Links[0].AmountPrefilled ||
+		!strings.HasPrefix(qr.Links[0].URL, fmt.Sprintf("https://revolut.me/legacy?amount=%d&", aliceShare.Total)) {
+		t.Fatalf("legacy links: %+v", qr.Links)
+	}
+	if strings.Join(qr.Methods, ",") != "qr,revolut,wero,bancontact,cash,later" {
+		t.Fatalf("legacy methods: %v", qr.Methods)
+	}
 
 	// wallet QR image
 	wr := e.expect(200, "GET", path("/api/occ/payments/%s/wallet-qr/wero", alicePay), alice.token, nil)
@@ -340,6 +368,13 @@ func TestHappyPath(t *testing.T) {
 	e.expect(200, "POST", path("/api/occ/payments/%s/action", alicePay), bob.token, map[string]any{"action": "reset"}).json(t, &ar)
 	if ar.Payment["status"] != "pending" {
 		t.Fatalf("reset: %v", ar.Payment)
+	}
+	// new wallet methods are stored as such (payments.method select values)
+	for _, m := range []string{"paypal", "revolut"} {
+		e.expect(200, "POST", path("/api/occ/payments/%s/action", alicePay), alice.token, map[string]any{"action": "declare", "method": m}).json(t, &ar)
+		if ar.Payment["status"] != "declared" || ar.Payment["method"] != m {
+			t.Fatalf("declare %s: %v", m, ar.Payment)
+		}
 	}
 	e.expect(200, "POST", path("/api/occ/payments/%s/action", alicePay), alice.token, map[string]any{"action": "declare", "method": "qr"})
 	e.expect(200, "POST", path("/api/occ/payments/%s/action", alicePay), bob.token, map[string]any{"action": "confirm"}).json(t, &ar)

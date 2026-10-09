@@ -41,6 +41,11 @@ export interface PayoutProfile extends BaseRecord {
   holder_name: string
   iban: string
   bic: string
+  /** Revtag Revolut (sans @, minuscules) — lien revolut.me avec montant. */
+  revolut_tag: string
+  /** Nom PayPal.me — lien paypal.me avec montant. */
+  paypal_me: string
+  /** Autre lien de paiement (https, normalisé par le serveur). */
   payment_link: string
   /** Mobile (E.164) ou e-mail enregistré sur Wero. */
   wero_id: string
@@ -363,7 +368,7 @@ export interface OrderItemInput {
   note: string
 }
 
-export type PaymentMethod = 'qr' | 'wero' | 'bancontact' | 'link' | 'cash' | 'later' | 'self'
+export type PaymentMethod = 'qr' | 'revolut' | 'paypal' | 'link' | 'wero' | 'bancontact' | 'cash' | 'later' | 'self'
 export type PaymentStatus = 'pending' | 'declared' | 'confirmed'
 
 export interface Payment extends BaseRecord {
@@ -476,7 +481,10 @@ export interface PaymentQR {
   reference: string
   beneficiary: string
   epc: string | null
-  link: string | null
+  /** IBAN du payeur (sans espaces), présent avec `epc`. */
+  iban: string | null
+  /** Liens de paiement du payeur pour CE paiement (montant pré-rempli quand le format le permet). */
+  links: PaymentLink[]
   wero: { id: string; hasQr: boolean } | null
   bancontact: { phone: string; hasQr: boolean } | null
   /** Moyens réellement proposés, dans l'ordre d'affichage recommandé. */
@@ -485,9 +493,20 @@ export interface PaymentQR {
 
 export type WalletKind = 'wero' | 'bancontact'
 
+export type PaymentLinkKind = 'revolut' | 'paypal' | 'link'
+
+export interface PaymentLink {
+  kind: PaymentLinkKind
+  /** « Revolut », « PayPal » ou le domaine du lien libre. */
+  label: string
+  url: string
+  /** `true` si le montant (et la communication quand c'est possible) est pré-rempli. */
+  amountPrefilled: boolean
+}
+
 export type ExportFormat = 'csv' | 'txt' | 'json'
 export type PaymentAction = 'declare' | 'confirm' | 'reset'
-export type DeclareMethod = 'qr' | 'wero' | 'bancontact' | 'link' | 'cash' | 'later'
+export type DeclareMethod = 'qr' | 'revolut' | 'paypal' | 'link' | 'wero' | 'bancontact' | 'cash' | 'later'
 
 export interface TransitionBody {
   to: PartyStatus
@@ -600,4 +619,97 @@ export interface AdminUserList {
   perPage: number
   totalItems: number
   items: AdminUser[]
+}
+
+/* ------------------------------------------- historique (/api/occ/me/*) */
+
+/** Restaurant d'une entrée d'historique (mêmes noms de champs que la collection). */
+export interface HistoryRestaurant {
+  id: string
+  name: string
+  emoji: string
+  cover: string
+  cover_url: string
+  active: boolean
+}
+
+export interface HistoryItem {
+  menuItem: string
+  name: string
+  optionsLabel: string
+  note: string
+  quantity: number
+  unitPrice: Cents
+  total: Cents
+}
+
+export interface HistoryPayment {
+  id: string
+  method: PaymentMethod | ''
+  status: PaymentStatus
+  amount: Cents
+}
+
+/** Une party vue par l'utilisateur connecté (`GET /api/occ/me/history`). */
+export interface HistoryEntry {
+  id: string
+  code: string
+  title: string
+  status: PartyStatus
+  created: ISODate
+  closedAt: ISODate
+  restaurant: HistoryRestaurant | null
+  provider: PartyProvider | ''
+  host: UserLite
+  isHost: boolean
+  memberCount: number
+  /** Mes articles uniquement. */
+  items: HistoryItem[]
+  subtotal: Cents
+  sharedFees: Cents
+  /** Ma part (articles + frais partagés), calculée par le serveur. */
+  total: Cents
+  grandTotal: Cents
+  payer: UserLite | null
+  /** Mon remboursement (débiteur), `null` avant le choix du payeur. */
+  payment: HistoryPayment | null
+}
+
+export interface HistoryPage {
+  page: number
+  perPage: number
+  totalItems: number
+  totalPages: number
+  items: HistoryEntry[]
+}
+
+/** `GET /api/occ/me/stats` : commandes passées (récap, remboursements, terminées). */
+export interface MyStats {
+  orders: number
+  totalSpent: Cents
+  favoriteRestaurant: { id: string; name: string; emoji: string; orders: number } | null
+  favoriteDish: { name: string; quantity: number; orders: number } | null
+}
+
+export interface ReorderLine {
+  menuItem: string
+  name: string
+  optionsLabel: string
+  note: string
+  quantity: number
+  /** Prix unitaire actuel (serveur), 0 si indisponible. */
+  unitPrice: Cents
+  available: boolean
+  reason?: string
+}
+
+/** `GET /api/occ/parties/{id}/reorder` : ma dernière commande dans ce restaurant. */
+export interface ReorderPreview {
+  source: { partyId: string; title: string; created: ISODate } | null
+  items: ReorderLine[]
+}
+
+export interface ReorderResult {
+  added: { name: string; quantity: number }[]
+  skipped: { name: string; reason: string }[]
 }

@@ -46,6 +46,8 @@ interface Actor {
  */
 const GLOBAL_ALLOW: RegExp[] = [
   /^\[requestfailed\] GET \S+\/api\/realtime net::ERR_ABORTED$/,
+  // « Mes commandes en cours » (bandeau du shell, sur chaque page) annulée par une navigation immédiate.
+  /^\[requestfailed\] GET \S+\/api\/collections\/parties\/records\?\S* net::ERR_ABORTED$/,
   /^\[requestfailed\] GET https:\/\/(?!127\.0\.0\.1|localhost)[^/\s]+\/\S*\.(?:jpe?g|png|webp|gif)(?:\?\S*)? net::ERR_ABORTED$/,
 ]
 
@@ -253,8 +255,23 @@ test('commande groupée complète : vote → paniers → récap → dispatch →
       for (const g of [bob, chloe]) {
         for (const r of CANDIDATES) await expect(g.page.getByRole('list', { name: 'Restos candidats' })).toContainText(r)
       }
+      // Bob quitte la salle (page Restos) : le bandeau « Commande en cours » lui permet de revenir.
+      const bp = bob.page
+      await bp.getByRole('link', { name: "Retour à l'accueil" }).click()
+      await expect(bp.getByRole('link', { name: `Reprendre la commande « Midi E2E ${RUN} » — Salon` })).toBeVisible()
+      await bp.goto('/restaurants')
+      const resume = bp.getByRole('complementary', { name: 'Commande en cours' }).getByRole('link', { name: new RegExp(`^Reprendre la commande « Midi E2E ${RUN} »`) })
+      await expect(resume).toBeVisible()
+      await expect(resume).toContainText('Étape 1/5 · Salon')
+
       await ap.getByRole('button', { name: 'Lancer le vote (3)' }).click()
+      // Notification globale (realtime) alors que Bob est ailleurs dans l'app, bandeau mis à jour en direct.
+      await expect(bp.getByText(`Le vote est ouvert — « Midi E2E ${RUN} »`)).toBeVisible()
+      await expect(resume).toContainText('Étape 2/5 · Vote')
+      await resume.click()
+      await bp.waitForURL(`**${partyPath}`)
       for (const a of members) await expect(a.page.getByRole('heading', { name: 'Vote pour tes restos préférés' })).toBeVisible()
+      await expect(bp.getByRole('complementary', { name: 'Commande en cours' })).toHaveCount(0) // masqué dans la salle
 
       const meter = (p: Page, n: number, r: string) => p.getByRole('meter', { name: `${n} vote(s) pour ${r}`, exact: true })
 
@@ -386,15 +403,19 @@ test('commande groupée complète : vote → paniers → récap → dispatch →
     })
 
     await shot(members, '4-review')
-    await test.step('5. Bob renseigne son profil, devient payeur ; Wero + espèces → clôture', async () => {
+    await test.step('5. Bob renseigne son profil (IBAN, Revolut, PayPal, Wero), devient payeur ; Wero + espèces → clôture', async () => {
       const bp = bob.page
-      await bp.goto('/profile')
+      await bp.goto('/profile?onglet=infos') // onglet « Mes infos » (« Mes commandes » par défaut)
       await bp.getByLabel('Mobile ou e-mail Wero').fill('+32470123456')
       await bp.getByLabel('Titulaire du compte').fill('Bob Martin')
       await bp.getByLabel('IBAN').fill('BE71096123456769')
       await expect(bp.getByText('IBAN valide ✓')).toBeVisible()
+      await bp.getByLabel('Revtag Revolut').fill('@BobM')
+      await bp.getByLabel('PayPal.me').fill('paypal.me/bobmartin')
       await bp.getByRole('button', { name: 'Enregistrer', exact: true }).last().click()
       await expect(bp.getByText('Coordonnées de remboursement enregistrées').first()).toBeVisible()
+      await expect(bp.getByLabel('Revtag Revolut')).toHaveValue('bobm') // normalisé par le serveur
+      await expect(bp.getByLabel('PayPal.me')).toHaveValue('bobmartin')
       await bp.goto(partyPath)
       await expect(bp.getByRole('heading', { name: 'Qui a pris quoi' })).toBeVisible()
 
@@ -409,14 +430,33 @@ test('commande groupée complète : vote → paniers → récap → dispatch →
         const p = debtor.page
         await expect(p.getByRole('heading', { name: 'Ma part' })).toBeVisible()
         await expect(p.locator('div', { has: p.getByRole('heading', { name: 'Ma part' }) }).last().locator('..')).toContainText(euro(shares[debtor.name]!))
-        await expect(p.getByText('Bob Martin').first()).toBeVisible()
         const tiles = p.getByRole('radiogroup', { name: 'Moyen de remboursement' })
+        const cents = shares[debtor.name]!
+        if (debtor === alice) {
+          // Desktop : le QR virement (montant + communication) d'abord, en grand.
+          await expect(tiles.getByRole('radio').first()).toHaveAccessibleName(/Virement QR/)
+          await expect(p.getByRole('img', { name: /QR virement SEPA de .* vers Bob Martin/ })).toBeVisible()
+        } else {
+          // Mobile : le téléphone ne peut pas scanner son propre écran → liens d'abord, QR à la demande.
+          await expect(tiles.getByRole('radio').first()).toHaveAccessibleName(/Revolut/)
+          await tiles.getByRole('radio', { name: /Virement QR/ }).click()
+          await expect(p.getByRole('img', { name: /QR virement SEPA/ })).toBeHidden()
+          await p.getByRole('button', { name: 'Afficher le QR pour un collègue' }).click()
+          await expect(p.getByRole('img', { name: /QR virement SEPA de .* vers Bob Martin/ })).toBeVisible()
+        }
+        await expect(p.getByText('BE71 0961 2345 6769')).toBeVisible()
+        await expect(p.getByText('IBAN de Bob Martin')).toBeVisible()
+        // Liens Revolut / PayPal avec le montant exact de CE débiteur.
+        await tiles.getByRole('radio', { name: /Revolut/ }).click()
+        await expect(p.getByRole('link', { name: /^Payer .* avec Revolut/ })).toHaveAttribute('href', new RegExp(`^https://revolut\\.me/bobm\\?amount=${cents}&currency=EUR&note=OCC\\+`))
+        await tiles.getByRole('radio', { name: /PayPal/ }).click()
+        await expect(p.getByRole('link', { name: /^Payer .* avec PayPal/ })).toHaveAttribute('href', `https://paypal.me/bobmartin/${(cents / 100).toFixed(2)}EUR`)
         const wero = tiles.getByRole('radio', { name: /Wero/ })
         await expect(wero).toBeVisible()
         await wero.click()
         await expect(p.getByText('+32470123456')).toBeVisible()
         await tiles.getByRole('radio', { name: /Virement QR/ }).click()
-        await expect(p.getByRole('img', { name: /QR virement SEPA de .* vers Bob Martin/ })).toBeVisible()
+        await expect(p.getByText('BE71 0961 2345 6769')).toBeVisible()
       }
 
       await alice.page.getByRole('radiogroup', { name: 'Moyen de remboursement' }).getByRole('radio', { name: /Wero/ }).click()
@@ -431,6 +471,8 @@ test('commande groupée complète : vote → paniers → récap → dispatch →
       // Bob voit les déclarations en direct puis confirme.
       const parts = bp.locator('li').filter({ has: bp.getByRole('button', { name: 'Confirmer' }) })
       await expect(bp.getByText(/avancé l.argent/)).toBeVisible()
+      await expect(bp.getByRole('list', { name: 'Moyens proposés' })).toContainText('Revolut')
+      await expect(bp.getByRole('list', { name: 'Moyens proposés' })).toContainText('PayPal')
       await expect(parts.filter({ hasText: 'Alice' })).toContainText('Wero')
       await expect(parts.filter({ hasText: 'Alice' })).toContainText('Déclaré')
       await expect(parts.filter({ hasText: 'Chloé' })).toContainText('Espèces')
@@ -448,6 +490,24 @@ test('commande groupée complète : vote → paniers → récap → dispatch →
     })
 
     await shot(members, '5-closed')
+    await test.step('5b. Alice retrouve la commande clôturée dans Profil → Mes commandes, avec sa part exacte', async () => {
+      const ap = alice.page
+      await ap.goto('/profile')
+      await expect(ap.getByRole('tab', { name: 'Mes commandes' })).toHaveAttribute('aria-selected', 'true')
+      const card = ap.getByRole('listitem').filter({ has: ap.getByRole('heading', { name: WINNER, exact: true }) }).first()
+      await expect(card).toBeVisible()
+      await expect(card).toContainText(euro(shares.Alice!))
+      await expect(card).toContainText('Remboursé')
+      await card.getByRole('button', { name: /^Mes plats/ }).click()
+      await expect(card.getByRole('list', { name: 'Mes plats' })).toContainText(sc.alice.name)
+      await expect(card).toContainText(euro(grand))
+      const stats = ap.getByLabel('Mes statistiques')
+      await expect(stats).toContainText(euro(shares.Alice!))
+      await expect(stats).toContainText(WINNER)
+      // La commande terminée n'apparaît plus dans le bandeau « Commande en cours ».
+      await expect(ap.getByRole('link', { name: /^Reprendre la commande/ })).toHaveCount(0)
+    })
+
     await test.step("6. Un non-membre qui ouvre la party reçoit une erreur propre", async () => {
       await register(dave)
       // La vue d'une party dont on n'est pas membre répond 404 (rules PocketBase) : attendu.

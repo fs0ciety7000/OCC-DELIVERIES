@@ -30,6 +30,7 @@ export function PartyHeader({ ctx }: { ctx: PartyCtx }) {
   const readyCount = members.filter((m) => m.ready).length
   const active = party.status !== 'closed' && party.status !== 'cancelled'
   const canLeave = !isHost && ['lobby', 'voting', 'ordering'].includes(party.status)
+  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
 
   return (
     <header className="space-y-4">
@@ -75,6 +76,11 @@ export function PartyHeader({ ctx }: { ctx: PartyCtx }) {
               {party.code}
             </span>
             <CopyButton value={inviteUrl(party.code)} label="" ariaLabel="Copier le lien d'invitation" size="icon" variant="ghost" toastMessage="Lien d'invitation copié" />
+            {canShare && (
+              <Button variant="ghost" size="icon" aria-label="Partager l'invitation" onClick={() => void shareInvite(party)}>
+                <Share2 className="size-4" />
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -84,7 +90,7 @@ export function PartyHeader({ ctx }: { ctx: PartyCtx }) {
       <Sheet open={menuOpen} onClose={() => setMenuOpen(false)} title="Actions">
         <div className="space-y-2">
           <CopyButton value={inviteUrl(party.code)} label="Copier le lien d'invitation" className="w-full justify-start" size="md" toastMessage="Lien copié" />
-          {'share' in navigator && (
+          {canShare && (
             <Button variant="secondary" block className="justify-start" leftIcon={<Share2 className="size-4" />} onClick={() => void shareInvite(party)}>
               Partager l'invitation
             </Button>

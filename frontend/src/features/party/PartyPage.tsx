@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { Button, EmptyState, Skeleton } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
 import { errorMessage, isNotFound } from '@/lib/errors'
+import { forgetParty, readLastParty, rememberParty } from '@/lib/lastParty'
 import { fadeUp } from '@/lib/motion'
 import { usePartyRealtime } from '@/lib/realtime'
 import type { Party, PartyStatus, User } from '@/lib/types'
@@ -51,6 +52,16 @@ export function PartyPage() {
   }, [status])
 
   usePartyRealtime(id, { meId: user?.id, onPartyChange })
+
+  // Souvenir local de la dernière commande ouverte (repli du bandeau « Commande en cours »).
+  const p = party.data
+  useEffect(() => {
+    if (p && user) rememberParty(user.id, { id: p.id, title: p.title, status: p.status, code: p.code })
+  }, [p, user])
+  const notFound = party.isError && isNotFound(party.error)
+  useEffect(() => {
+    if (notFound && user && readLastParty(user.id)?.id === id) forgetParty(user.id)
+  }, [notFound, user, id])
 
   const ctx = useMemo<PartyCtx | null>(() => {
     if (!party.data || !user) return null

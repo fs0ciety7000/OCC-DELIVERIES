@@ -358,5 +358,24 @@ func onPayoutProfileUpsert(e *core.RecordRequestEvent) error {
 	r.Set("bancontact_phone", phone)
 	r.Set("holder_name", strings.TrimSpace(r.GetString("holder_name")))
 
+	revtag, err := domain.NormalizeRevolutTag(r.GetString("revolut_tag"))
+	if err != nil {
+		return toAPIError(err)
+	}
+	paypal, err := domain.NormalizePayPalMe(r.GetString("paypal_me"))
+	if err != nil {
+		return toAPIError(err)
+	}
+	link, err := domain.NormalizePaymentLink(r.GetString("payment_link"))
+	if err != nil {
+		return toAPIError(err)
+	}
+	// A revolut.me / PayPal.me link pasted in the free field becomes a handle
+	// (so the per-payment link gets the amount).
+	h := domain.SplitPayoutLink(domain.PayoutHandles{RevolutTag: revtag, PayPalMe: paypal, Link: link})
+	r.Set("revolut_tag", h.RevolutTag)
+	r.Set("paypal_me", h.PayPalMe)
+	r.Set("payment_link", h.Link)
+
 	return e.Next()
 }

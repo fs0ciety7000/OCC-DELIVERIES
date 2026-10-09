@@ -1,11 +1,26 @@
 import { Home, Plus, ShieldCheck, User, UtensilsCrossed } from 'lucide-react'
-import { Suspense, useState, type CSSProperties } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
+import { toast } from 'sonner'
 import { FoodLoader } from '@/components/food'
 import { Avatar, buttonClass, Logo, ThemeToggle } from '@/components/ui'
+import { ResumeBanner } from '@/features/party/ActiveParties'
+import { useActiveParties } from '@/features/party/resume'
 import { CreatePartySheet } from '@/features/party/CreatePartySheet'
 import { useAuth } from '@/lib/auth'
 import { cn } from '@/lib/cn'
+import { useMyPartiesRealtime } from '@/lib/realtime'
+import type { Party, PartyStatus } from '@/lib/types'
+
+/** Notifications globales : un collègue fait avancer une commande pendant que je suis ailleurs. */
+const STATUS_NOTIFS: Partial<Record<PartyStatus, string>> = {
+  voting: 'Le vote est ouvert',
+  ordering: 'À vos paniers : le resto est choisi',
+  review: 'Les paniers sont verrouillés (récap)',
+  paying: 'Place aux remboursements',
+  closed: 'Commande terminée',
+  cancelled: 'Commande annulée',
+}
 
 const NAV = [
   { to: '/', label: 'Accueil', icon: Home, end: true },
@@ -25,8 +40,32 @@ export function AppShell() {
   const launch = () => (user ? setCreateOpen(true) : navigate(`/login?next=${encodeURIComponent(location.pathname)}`))
   const shellStyle = inParty ? ({ '--tabbar-h': '0px' } as CSSProperties) : undefined
 
+  // « Commande en cours » : bandeau persistant + toasts de statut où que l'on soit.
+  const { parties: active } = useActiveParties(user?.id)
+  const pathRef = useRef(location.pathname)
+  useEffect(() => {
+    pathRef.current = location.pathname
+  }, [location.pathname])
+  const onStatusChange = useCallback(
+    (p: Party) => {
+      // La page de la party affiche déjà ses propres toasts.
+      if (pathRef.current === `/party/${p.id}`) return
+      const msg = STATUS_NOTIFS[p.status]
+      if (!msg) return
+      toast(`${msg} — « ${p.title || 'Commande groupée'} »`, {
+        id: `party-status-${p.id}`,
+        action: { label: 'Voir', onClick: () => navigate(`/party/${p.id}`) },
+      })
+    },
+    [navigate],
+  )
+  useMyPartiesRealtime(user?.id, onStatusChange)
+  const hideResume = inParty || location.pathname.startsWith('/j/') || ['/login', '/register'].includes(location.pathname) || (location.pathname === '/' && active.length === 1)
+  const resume = user && !hideResume ? active : []
+  const showDock = resume.length > 0
+
   return (
-    <div className="relative min-h-dvh" style={shellStyle}>
+    <div className={cn('relative min-h-dvh', showDock && 'has-resume-dock')} style={shellStyle}>
       <div className="app-aurora" aria-hidden />
       <a href="#main" className="sr-only z-[80] rounded-md bg-elevated px-4 py-2 focus:not-sr-only focus:fixed focus:top-3 focus:left-3">
         Aller au contenu
@@ -59,6 +98,7 @@ export function AppShell() {
             )}
           </nav>
           <div className="ml-auto flex items-center gap-1">
+            <ResumeBanner parties={resume} variant="header" />
             {isAdmin && (
               <Link to="/admin" className={cn(buttonClass('ghost', 'icon'), 'md:hidden')} aria-label="Administration">
                 <ShieldCheck className="size-5" aria-hidden />
@@ -102,6 +142,8 @@ export function AppShell() {
           </a>
         </footer>
       </main>
+
+      {showDock && <ResumeBanner parties={resume} variant="dock" />}
 
       {/* Barre d'onglets mobile */}
       {!inParty && (

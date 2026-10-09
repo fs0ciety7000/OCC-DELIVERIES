@@ -2,9 +2,11 @@ import { useQuery } from '@tanstack/react-query'
 import { CheckCircle2, Lock, RotateCcw, UserRoundCog } from 'lucide-react'
 import { motion } from 'motion/react'
 import { Suspense, useState } from 'react'
+import { Link } from 'react-router'
 import { PaymentCoin } from '@/components/food'
-import { Avatar, Badge, Button, Card, CardBody, EmptyState, Money, Sheet, Skeleton } from '@/components/ui'
-import { occ } from '@/lib/api'
+import { Avatar, Badge, Button, buttonClass, Card, CardBody, EmptyState, Money, Sheet, Skeleton } from '@/components/ui'
+import { occ, payoutApi } from '@/lib/api'
+import { useMediaQuery } from '@/lib/hooks'
 import { cn } from '@/lib/cn'
 import { errorMessage } from '@/lib/errors'
 import { formatRelativeTime } from '@/lib/format'
@@ -13,8 +15,8 @@ import { qk } from '@/lib/queryKeys'
 import type { DeclareMethod, Payment } from '@/lib/types'
 import type { PartyCtx } from '../context'
 import { usePaymentAction, usePayments, useSetPayer, useTransition } from '../hooks'
-import { availableMethods, declareLabel, METHOD_BADGE, METHOD_LABELS } from '../labels'
-import { MethodDetails, MethodTiles, StatusBadge } from './PaymentMethods'
+import { availableMethods, declareLabel, METHOD_BADGE, METHOD_LABELS, methodHint, orderForDevice, payoutMethods } from '../labels'
+import { MethodDetails, MethodMark, MethodTiles, StatusBadge } from './PaymentMethods'
 
 export function PayingStep({ ctx }: { ctx: PartyCtx }) {
   const { party, me, isHost } = ctx
@@ -79,6 +81,7 @@ export function PayingStep({ ctx }: { ctx: PartyCtx }) {
       </div>
 
       <aside className="space-y-4">
+        {iAmPayer && <PayerMethods userId={me.id} />}
         <PaymentsList ctx={ctx} payments={owed} canManage={iAmPayer || isHost} />
         {isHost && (
           <div className="flex flex-col gap-2">
@@ -113,8 +116,19 @@ export function PayingStep({ ctx }: { ctx: PartyCtx }) {
 function MyShare({ ctx, payment }: { ctx: PartyCtx; payment: Payment }) {
   const { party } = ctx
   const action = usePaymentAction(party.id)
-  const qr = useQuery({ queryKey: qk.paymentQR(payment.id), queryFn: () => occ.paymentQR(payment.id), enabled: payment.status !== 'confirmed', staleTime: 5 * 60_000 })
-  const methods = availableMethods(qr.data)
+  // Le profil du payeur est privé (pas de realtime) : on relit régulièrement
+  // pour voir apparaître un moyen qu'il vient d'ajouter.
+  const qr = useQuery({
+    queryKey: qk.paymentQR(payment.id),
+    queryFn: () => occ.paymentQR(payment.id),
+    enabled: payment.status !== 'confirmed',
+    staleTime: 15_000,
+    refetchOnWindowFocus: true,
+    refetchInterval: payment.status === 'pending' ? 60_000 : false,
+  })
+  const desktop = useMediaQuery('(min-width: 1024px)')
+  const methods = orderForDevice(availableMethods(qr.data), qr.data, !desktop)
+  const hints = Object.fromEntries(methods.map((m) => [m, methodHint(m, qr.data)])) as Partial<Record<DeclareMethod, string>>
   const [chosen, setChosen] = useState<DeclareMethod | null>(null)
   const [changing, setChanging] = useState(false)
   const method = chosen ?? methods[0] ?? null
@@ -164,10 +178,10 @@ function MyShare({ ctx, payment }: { ctx: PartyCtx; payment: Payment }) {
               <p className="text-sm text-danger">{errorMessage(qr.error)}</p>
             ) : (
               <>
-                <MethodTiles methods={methods} value={method} onChange={setChosen} />
+                <MethodTiles methods={methods} value={method} onChange={setChosen} hints={hints} />
                 {method && qr.data && (
                   <motion.div key={method} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-                    <MethodDetails method={method} qr={qr.data} paymentId={payment.id} />
+                    <MethodDetails method={method} qr={qr.data} paymentId={payment.id} mobile={!desktop} />
                   </motion.div>
                 )}
                 {method && (
@@ -190,6 +204,38 @@ function MyShare({ ctx, payment }: { ctx: PartyCtx; payment: Payment }) {
             )}
           </>
         )}
+      </CardBody>
+    </Card>
+  )
+}
+
+function PayerMethods({ userId }: { userId: string }) {
+  const profile = useQuery({ queryKey: qk.payout(userId), queryFn: () => payoutApi.mine(userId) })
+  if (!profile.isSuccess) return null
+  const methods = payoutMethods(profile.data)
+  return (
+    <Card>
+      <CardBody className="space-y-3">
+        <h2 className="font-display text-lg font-semibold">Tes moyens de remboursement</h2>
+        {methods.length ? (
+          <>
+            <p className="text-sm text-muted">Tes collègues voient, avec leur montant exact :</p>
+            <ul className="flex flex-wrap gap-2" aria-label="Moyens proposés">
+              {methods.map((m) => (
+                <li key={m} className="flex items-center gap-2 rounded-md border border-border bg-surface py-1 pr-3 pl-1 text-sm font-medium">
+                  <MethodMark method={m} /> {METHOD_LABELS[m]}
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <p className="rounded-md border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
+            Aucun moyen renseigné : tes collègues ne peuvent te rembourser qu'en espèces. Ajoute ton IBAN, Revolut, PayPal ou Wero.
+          </p>
+        )}
+        <Link to="/profile?onglet=infos" className={buttonClass('secondary', 'sm')}>
+          {methods.length ? 'Modifier dans mon profil' : 'Compléter mon profil'}
+        </Link>
       </CardBody>
     </Card>
   )

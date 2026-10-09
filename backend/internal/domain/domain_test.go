@@ -347,26 +347,6 @@ func TestBuildEPC(t *testing.T) {
 	}
 }
 
-func TestPaymentLinkWithAmount(t *testing.T) {
-	cases := []struct {
-		link   string
-		amount int
-		want   string
-	}{
-		{"https://paypal.me/bob", 1400, "https://paypal.me/bob/14.00EUR"},
-		{"https://www.paypal.me/bob/", 1250, "https://www.paypal.me/bob/12.50EUR"},
-		{"https://paypal.me/bob/5EUR", 1250, "https://paypal.me/bob/5EUR"},
-		{"https://revolut.me/bob", 1250, "https://revolut.me/bob"},
-		{"", 1250, ""},
-		{"https://paypal.me/bob", 0, "https://paypal.me/bob"},
-	}
-	for _, c := range cases {
-		if got := PaymentLinkWithAmount(c.link, c.amount); got != c.want {
-			t.Errorf("%q → %q want %q", c.link, got, c.want)
-		}
-	}
-}
-
 func TestHaversine(t *testing.T) {
 	if d := HaversineKm(50.4542, 3.9567, 50.4542, 3.9567); d != 0 {
 		t.Fatalf("same point %f", d)
@@ -428,7 +408,7 @@ func TestNormalizeWeroID(t *testing.T) {
 }
 
 func TestPaymentHelpers(t *testing.T) {
-	for _, m := range []string{MethodQR, MethodWero, MethodBancontact, MethodLink, MethodCash} {
+	for _, m := range []string{MethodQR, MethodRevolut, MethodPayPal, MethodWero, MethodBancontact, MethodLink, MethodCash} {
 		if s, err := DeclareStatus(m); err != nil || s != PaymentDeclared {
 			t.Errorf("%s → %s %v", m, s, err)
 		}
@@ -442,8 +422,8 @@ func TestPaymentHelpers(t *testing.T) {
 		}
 	}
 
-	all := AvailableMethods(PayoutAvailability{IBAN: true, Wero: true, Bancontact: true, Link: true})
-	if strings.Join(all, ",") != "wero,bancontact,qr,link,cash,later" {
+	all := AvailableMethods(PayoutAvailability{IBAN: true, Revolut: true, PayPal: true, Wero: true, Bancontact: true, Link: true})
+	if strings.Join(all, ",") != "qr,revolut,paypal,link,wero,bancontact,cash,later" {
 		t.Errorf("order: %v", all)
 	}
 	none := AvailableMethods(PayoutAvailability{})

@@ -146,3 +146,11 @@ export function mapHref(r: { address?: string; lat?: number; lng?: number; geo_a
   const query = r.address?.trim() || r.name?.trim() || ''
   return `https://www.openstreetmap.org/search?query=${encodeURIComponent(query)}`
 }
+
+const dateFormatter = new Intl.DateTimeFormat('fr-BE', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })
+
+/** « ven. 9 octobre 2026 » */
+export function formatDate(value: string | Date | null | undefined): string {
+  const date = typeof value === 'string' ? parseDate(value) : value
+  return date ? dateFormatter.format(date) : ''
+}
