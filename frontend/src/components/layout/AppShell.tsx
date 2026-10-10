@@ -2,7 +2,6 @@ import { Home, Plus, ShieldCheck, User, UtensilsCrossed } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
-import { BrandEmblem } from '@/components/brand/BrandEmblem'
 import { FoodLoader } from '@/components/food'
 import { Avatar, buttonClass, Logo, ThemeToggle } from '@/components/ui'
 import { ResumeBanner } from '@/features/party/ActiveParties'
@@ -33,9 +32,6 @@ const NAV = [
   { to: '/', label: 'Accueil', icon: Home, end: true },
   { to: '/restaurants', label: 'Restos', icon: UtensilsCrossed, end: false },
 ] as const
-
-/** Adresse de contact publique (aussi dans les e-mails : `ContactEmail` côté Go). */
-const CONTACT_EMAIL = 'contact@eat.fs0ciety.org'
 
 export function AppShell() {
   const { user } = useAuth()
@@ -150,46 +146,6 @@ export function AppShell() {
             <Outlet />
           </Suspense>
         </div>
-        {/* mt-auto : sur une page courte, le pied reste en bas (au-dessus du dock grâce au padding). */}
-        <footer className="mt-auto border-t border-border pt-6 text-xs text-subtle">
-          <div className="mx-auto flex w-fit flex-wrap items-center justify-center gap-x-1.5 gap-y-1 py-1 text-center">
-            <a
-              href="https://interactive.cardormedia.com/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group flex items-center gap-2.5 rounded-md underline-offset-4 focus-visible:text-fg"
-            >
-              {/* Emblème « Le Dragon » de la charte CARDOR : glitch au survol, « boot » au premier affichage. */}
-              <BrandEmblem name="interactive" className="h-6 w-auto" />
-              <span>
-                Développé par{' '}
-                <span className="font-semibold text-muted group-hover:text-fg group-hover:underline">
-                  <span className="font-mono tracking-[0.15em]">CM</span> Interactive
-                </span>
-              </span>
-            </a>
-            <span>
-              <span className="hidden sm:inline">· </span>une division de{' '}
-              <a
-                href="https://cardormedia.com/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-md align-middle font-semibold text-muted underline-offset-4 hover:text-fg hover:underline focus-visible:text-fg"
-              >
-                {/* Roue du Car d'Or (monogramme) : un tour au survol. */}
-                <BrandEmblem name="cardor-monogram" className="size-4" />
-                CARDOR Media
-              </a>{' '}
-              · © {new Date().getFullYear()}
-            </span>
-          </div>
-          <p className="mt-1 text-center">
-            Contact :{' '}
-            <a href={`mailto:${CONTACT_EMAIL}`} className="rounded-sm font-semibold text-muted underline-offset-4 hover:text-fg hover:underline focus-visible:text-fg">
-              {CONTACT_EMAIL}
-            </a>
-          </p>
-        </footer>
       </main>
 
       {showDock && <ResumeBanner parties={resume} variant="dock" />}
