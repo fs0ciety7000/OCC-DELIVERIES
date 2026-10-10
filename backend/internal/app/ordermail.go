@@ -422,7 +422,7 @@ const orderMailHTMLSource = `<div style="display:none;max-height:0;overflow:hidd
 <table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 8px"><tr><td style="border-radius:14px;background:[brand];background-image:linear-gradient(135deg,[brand],[brand2])">
 <a href="{{.PartyURL}}" target="_blank" rel="noopener" style="display:inline-block;padding:14px 26px;font-size:16px;font-weight:700;color:[brandfg];text-decoration:none;border-radius:14px">{{if .IsPayer}}Suivre les remboursements{{else}}Rembourser {{if .PayerName}}{{.PayerName}}{{else}}ma part{{end}}{{end}}</a>
 </td></tr></table>
-<p style="margin:0 0 24px;font-size:13px;line-height:18px;color:[muted]">{{if .IsPayer}}Confirme chaque remboursement reçu dans l'app.{{else}}QR code virement, Wero, Revolut… : tout est dans l'app, montant prérempli.{{end}}<br/><a href="{{.PartyURL}}" style="color:[ink];word-break:break-all">{{.PartyURL}}</a></p>
+<p style="margin:0 0 24px;font-size:13px;line-height:18px;color:[muted]">{{if .IsPayer}}Confirme chaque remboursement reçu dans l'app.{{else}}QR code virement (dans ton app bancaire), Revolut, PayPal… : tout est dans l'app, montant prérempli.{{end}}<br/><a href="{{.PartyURL}}" style="color:[ink];word-break:break-all">{{.PartyURL}}</a></p>
 
 <h2 style="margin:0 0 10px;font-size:18px;line-height:24px;font-weight:750;color:[fg]">Commande complète</h2>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid [border];border-radius:14px">
@@ -512,7 +512,7 @@ func renderOrderMailText(d orderMailData) string {
 			to = " à " + d.PayerName
 		}
 		line("MONTANT À REMBOURSER%s : %s", strings.ToUpper(to), eur(d.Owed))
-		line("Rembourser (QR code virement, Wero, Revolut… montant prérempli) : %s", d.PartyURL)
+		line("Rembourser (QR code virement, Revolut, PayPal… montant prérempli) : %s", d.PartyURL)
 	}
 	line("")
 	line("== COMMANDE COMPLÈTE ==")

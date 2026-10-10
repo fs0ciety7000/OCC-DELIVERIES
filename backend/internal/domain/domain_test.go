@@ -334,53 +334,8 @@ func TestHaversine(t *testing.T) {
 	}
 }
 
-func TestNormalizePhone(t *testing.T) {
-	tests := []struct {
-		in, want string
-		ok       bool
-	}{
-		{"0470 12 34 56", "+32470123456", true},
-		{"0470.12.34.56", "+32470123456", true},
-		{"0470-12-34-56", "+32470123456", true},
-		{"0032 470 12 34 56", "+32470123456", true},
-		{"+33 6 12 34 56 78", "+33612345678", true},
-		{"+32 (0)470", "", false},
-		{"", "", true},
-		{"12345", "", false},
-		{"+0470123456", "", false},
-		{"abc", "", false},
-		{"+3247012345678901", "", false},
-	}
-	for _, tt := range tests {
-		got, err := NormalizePhone(tt.in)
-		if (err == nil) != tt.ok || got != tt.want {
-			t.Errorf("%q → %q, %v (want %q ok=%v)", tt.in, got, err, tt.want, tt.ok)
-		}
-	}
-}
-
-func TestNormalizeWeroID(t *testing.T) {
-	tests := []struct {
-		in, want string
-		ok       bool
-	}{
-		{"0470 12 34 56", "+32470123456", true},
-		{" Bob.Martin@Example.BE ", "bob.martin@example.be", true},
-		{"", "", true},
-		{"bob@", "", false},
-		{"bob@example", "", false},
-		{"pas un numero", "", false},
-	}
-	for _, tt := range tests {
-		got, err := NormalizeWeroID(tt.in)
-		if (err == nil) != tt.ok || got != tt.want {
-			t.Errorf("%q → %q, %v (want %q ok=%v)", tt.in, got, err, tt.want, tt.ok)
-		}
-	}
-}
-
 func TestPaymentHelpers(t *testing.T) {
-	for _, m := range []string{MethodQR, MethodRevolut, MethodPayPal, MethodWero, MethodBancontact, MethodLink, MethodCash} {
+	for _, m := range []string{MethodQR, MethodRevolut, MethodPayPal, MethodLink, MethodCash} {
 		if s, err := DeclareStatus(m); err != nil || s != PaymentDeclared {
 			t.Errorf("%s → %s %v", m, s, err)
 		}
@@ -388,14 +343,14 @@ func TestPaymentHelpers(t *testing.T) {
 	if s, err := DeclareStatus(MethodLater); err != nil || s != PaymentPending {
 		t.Errorf("later → %s %v", s, err)
 	}
-	for _, m := range []string{MethodSelf, "", "bitcoin"} {
+	for _, m := range []string{MethodSelf, MethodWero, MethodBancontact, "", "bitcoin"} {
 		if _, err := DeclareStatus(m); err == nil {
 			t.Errorf("%q should be rejected", m)
 		}
 	}
 
-	all := AvailableMethods(PayoutAvailability{IBAN: true, Revolut: true, PayPal: true, Wero: true, Bancontact: true, Link: true})
-	if strings.Join(all, ",") != "qr,revolut,paypal,link,wero,bancontact,cash,later" {
+	all := AvailableMethods(PayoutAvailability{IBAN: true, Revolut: true, PayPal: true, Link: true})
+	if strings.Join(all, ",") != "qr,revolut,paypal,link,cash,later" {
 		t.Errorf("order: %v", all)
 	}
 	none := AvailableMethods(PayoutAvailability{})

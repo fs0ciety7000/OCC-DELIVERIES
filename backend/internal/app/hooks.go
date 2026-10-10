@@ -370,17 +370,6 @@ func onPayoutProfileUpsert(e *core.RecordRequestEvent) error {
 	}
 	r.Set("bic", bic)
 
-	wero, err := domain.NormalizeWeroID(r.GetString("wero_id"))
-	if err != nil {
-		return toAPIError(err)
-	}
-	r.Set("wero_id", wero)
-
-	phone, err := domain.NormalizePhone(r.GetString("bancontact_phone"))
-	if err != nil {
-		return toAPIError(domain.Errf("Numéro Bancontact Pay invalide (format attendu : +32470123456)."))
-	}
-	r.Set("bancontact_phone", phone)
 	r.Set("holder_name", strings.TrimSpace(r.GetString("holder_name")))
 
 	revtag, err := domain.NormalizeRevolutTag(r.GetString("revolut_tag"))

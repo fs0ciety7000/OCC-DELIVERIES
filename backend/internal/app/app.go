@@ -190,7 +190,6 @@ func (h *handlers) routes(r *router.Router[*core.RequestEvent]) {
 	g.POST("/payments/{id}/action", h.paymentAction).Bind(user)
 	g.GET("/payments/{id}/qr", h.paymentQR).Bind(user)
 	g.GET("/parties/{id}/payments/qr", h.paymentsCollectQR).Bind(user)
-	g.GET("/payments/{id}/wallet-qr/{kind}", h.walletQR).Bind(user)
 	h.teamRoutes(g, user)
 	h.guestRoutes(g, user)
 	h.passkeyRoutes(g, user)

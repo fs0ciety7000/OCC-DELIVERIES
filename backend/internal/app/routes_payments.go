@@ -219,16 +219,6 @@ func (h *handlers) paymentAction(e *core.RequestEvent) error {
 	return ok(e, map[string]any{"payment": pay})
 }
 
-type weroInfo struct {
-	ID    string `json:"id"`
-	HasQR bool   `json:"hasQr"`
-}
-
-type bancontactInfo struct {
-	Phone string `json:"phone"`
-	HasQR bool   `json:"hasQr"`
-}
-
 type paymentQR struct {
 	Amount      int                  `json:"amount"`
 	Reference   string               `json:"reference"`
@@ -236,8 +226,6 @@ type paymentQR struct {
 	EPC         *string              `json:"epc"`
 	IBAN        *string              `json:"iban"`
 	Links       []domain.PaymentLink `json:"links"`
-	Wero        *weroInfo            `json:"wero"`
-	Bancontact  *bancontactInfo      `json:"bancontact"`
 	Methods     []string             `json:"methods"`
 }
 
@@ -255,8 +243,6 @@ type payoutData struct {
 	beneficiary string
 	iban, bic   string
 	handles     domain.PayoutHandles
-	wero        *weroInfo
-	bancontact  *bancontactInfo
 }
 
 func loadPayout(app core.App, creditorID string) payoutData {
@@ -276,12 +262,6 @@ func loadPayout(app core.App, creditorID string) payoutData {
 	d.handles = domain.PayoutHandles{Link: prof.GetString("payment_link")}
 	d.handles.RevolutTag, _ = domain.NormalizeRevolutTag(prof.GetString("revolut_tag"))
 	d.handles.PayPalMe, _ = domain.NormalizePayPalMe(prof.GetString("paypal_me"))
-	if id, qr := prof.GetString("wero_id"), prof.GetString("wero_qr"); id != "" || qr != "" {
-		d.wero = &weroInfo{ID: id, HasQR: qr != ""}
-	}
-	if phone, qr := prof.GetString("bancontact_phone"), prof.GetString("bancontact_qr"); phone != "" || qr != "" {
-		d.bancontact = &bancontactInfo{Phone: phone, HasQR: qr != ""}
-	}
 	return d
 }
 
@@ -292,8 +272,6 @@ func (d payoutData) qrFor(amount int, reference string) paymentQR {
 		Reference:   reference,
 		Beneficiary: d.beneficiary,
 		Links:       []domain.PaymentLink{},
-		Wero:        d.wero,
-		Bancontact:  d.bancontact,
 	}
 	if d.iban != "" {
 		epc, err := domain.BuildEPC(domain.EPCParams{
@@ -307,7 +285,7 @@ func (d payoutData) qrFor(amount int, reference string) paymentQR {
 		}
 	}
 	out.Links = domain.PaymentLinks(domain.SplitPayoutLink(d.handles), amount, reference)
-	avail := domain.PayoutAvailability{IBAN: out.EPC != nil, Wero: out.Wero != nil, Bancontact: out.Bancontact != nil}
+	avail := domain.PayoutAvailability{IBAN: out.EPC != nil}
 	for _, l := range out.Links {
 		switch l.Kind {
 		case domain.LinkRevolut:
@@ -407,36 +385,4 @@ func (h *handlers) paymentsCollectQR(e *core.RequestEvent) error {
 		return strings.ToLower(out.Items[i].Debtor.Name) < strings.ToLower(out.Items[j].Debtor.Name)
 	})
 	return ok(e, out)
-}
-
-var walletQRFields = map[string]string{"wero": "wero_qr", "bancontact": "bancontact_qr"}
-
-func (h *handlers) walletQR(e *core.RequestEvent) error {
-	field, known := walletQRFields[e.Request.PathValue("kind")]
-	if !known {
-		return notFound("Type de QR inconnu.")
-	}
-	pay, _, err := paymentForMember(e)
-	if err != nil {
-		return err
-	}
-	prof := payoutProfile(e.App, pay.GetString("creditor"))
-	if prof == nil || prof.GetString(field) == "" {
-		return notFound("Le payeur n'a pas fourni de QR.")
-	}
-	name := prof.GetString(field)
-
-	fsys, err := e.App.NewFilesystem()
-	if err != nil {
-		return err
-	}
-	defer fsys.Close()
-
-	key := prof.BaseFilesPath() + "/" + name
-	e.Response.Header().Set("Cache-Control", "private, max-age=300")
-	if err := fsys.Serve(e.Response, e.Request, key, name); err != nil {
-		e.Response.Header().Del("Cache-Control")
-		return notFound("QR introuvable.")
-	}
-	return nil
 }
