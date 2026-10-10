@@ -154,7 +154,7 @@ test('notifications push : clé publique, abonnement, préférences, test', asyn
   expect(sub.ok(), await sub.text()).toBeTruthy()
   expect((await request.post('/api/occ/push/test', { headers: H(u) })).ok()).toBeTruthy()
   const prefs = await (await request.patch('/api/occ/push/prefs', { headers: H(u), data: { reminders: false } })).json()
-  expect(prefs.prefs).toEqual({ party: true, payments: true, reminders: false })
+  expect(prefs.prefs).toEqual({ party: true, payments: true, reminders: false, emails: true })
   expect((await request.delete('/api/occ/push/subscribe', { headers: H(u), data: { endpoint: `https://push.invalid/${RUN}` } })).ok()).toBeTruthy()
 })
 

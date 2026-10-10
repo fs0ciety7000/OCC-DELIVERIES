@@ -24,7 +24,7 @@ async function signIn(page: Page, email: string) {
   await page.goto('/login')
   await page.getByLabel('E-mail').fill(email)
   await page.getByLabel('Mot de passe').fill(PASSWORD)
-  await page.getByRole('button', { name: 'Se connecter' }).click()
+  await page.getByRole('button', { name: 'Se connecter', exact: true }).click()
 }
 
 test('un·e admin suspend puis réactive un compte', async ({ browser, baseURL }) => {

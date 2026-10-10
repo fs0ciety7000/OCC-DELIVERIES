@@ -198,7 +198,10 @@ sautent à la valeur finale, cœur / coche à l'état final.
    * En-tête : code + copier le lien + **partager** (`navigator.share` avec le lien `/j/:code`, si dispo) ;
      un membre qui rouvre `/j/:code` revient directement dans la salle (« Te revoilà dans … »).
    * *Salon* : lien + QR d'invitation, membres live, sélection des candidats.
-   * *Vote* : cartes restaurants, cœur pour voter, barres de score live.
+   * *Vote* (par classement, ADR 0005) : cartes restaurants, cœur → pastille de rang « 1er / 2e… » ; carte « Mon classement »
+     (pastille 36 px, 1er choix en `bg-ember`, « +n pts », Monter / Descendre / Retirer en boutons icônes 44 px, focus conservé
+     sur le bouton déplacé, annonce `aria-live` « X est maintenant ton 2e choix ») ; carte « Classement en direct » (points
+     serveur, jauges `meter`, réordonnancement `layout`) ; « Ton 1er choix vaut le plus de points ».
    * *Commande* : menu du restaurant, panier perso en sheet, statut « prêt » des autres.
    * *Récap* : totaux par personne, récap consolidé, choix d'envoi (Uber Eats,
      Takeaway, export, téléphone), choix du payeur.

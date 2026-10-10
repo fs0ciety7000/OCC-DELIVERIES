@@ -17,6 +17,7 @@ import (
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/tests"
 
+	"github.com/fs0ciety7000/occ-deliveries/backend/internal/domain"
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/notify"
 )
 
@@ -324,21 +325,27 @@ func TestPushPartyEvents(t *testing.T) {
 	pe.flush()
 	pe.expect(200, "POST", path("/api/occ/parties/%s/payer", pid), alice.token, map[string]any{"payer": bob.id()})
 	got := pe.flush()
-	if strings.Join(got, "|") != "bob: C'est toi qui paies 💳|carol: Paiement : tu dois 7,00 €" {
+	// Carol's share: 7,00 € ± the delivery-fee cent, which goes to whichever member sorts first
+	// (ids created in the same second) — read it from the server instead of hard-coding it.
+	payRec, err := pe.app.FindFirstRecordByFilter(colPayments, "party = {:p} && debtor = {:d}", dbx.Params{"p": pid, "d": carol.id()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	carolOwes := domain.FormatEUR(payRec.GetInt("amount"))
+	if a := payRec.GetInt("amount"); a != 699 && a != 700 {
+		t.Fatalf("carol amount = %d", a)
+	}
+	if strings.Join(got, "|") != "bob: C'est toi qui paies 💳|carol: Paiement : tu dois "+carolOwes {
 		t.Fatalf("paying: %v", got)
 	}
 
 	var pay struct {
 		ID string `json:"id"`
 	}
-	payRec, err := pe.app.FindFirstRecordByFilter(colPayments, "party = {:p} && debtor = {:d}", dbx.Params{"p": pid, "d": carol.id()})
-	if err != nil {
-		t.Fatal(err)
-	}
 	pay.ID = payRec.Id
 	pe.expect(200, "POST", path("/api/occ/payments/%s/action", pay.ID), carol.token, map[string]any{"action": "declare", "method": "wero"})
 	pe.h.push.wait()
-	if l := pe.rec.last(); !strings.HasSuffix(l.endpoint, "/bob") || l.payload.Body != "Carol a déclaré t'avoir remboursé 7,00 € (Wero). Pense à confirmer." || l.payload.URL != "/party/"+pid {
+	if l := pe.rec.last(); !strings.HasSuffix(l.endpoint, "/bob") || l.payload.Body != "Carol a déclaré t'avoir remboursé "+carolOwes+" (Wero). Pense à confirmer." || l.payload.URL != "/party/"+pid {
 		t.Fatalf("declared: %+v", l)
 	}
 	pe.rec.take()

@@ -73,6 +73,35 @@ docker compose up --build         # http://localhost:8090
 Les apprentissages importants (pièges PocketBase, décisions d'UX) sont ajoutés
 ci-dessous, du plus récent au plus ancien.
 
+* 2026-10-10 — **Passkeys / WebAuthn** (migration `1760000018`, `app/passkeys.go`, `domain/passkey.go`, `lib/webauthn.ts`,
+  `lib/passkeys.ts`). PocketBase v0.40.5 n'a pas de passkeys natives → `go-webauthn/webauthn` v0.18.2 derrière
+  `/api/occ/passkeys*`, collection `passkeys` sans aucune rule, connexion via `apis.RecordAuthResponse(e, u, "passkey", nil)`
+  (hooks ban/MFA conservés). Défis en mémoire, usage unique, 10 min ; RP ID = hôte d'`OCC_PUBLIC_URL` (prod
+  `eat.fs0ciety.org` ; le changer casse toutes les passkeys). Pièges : `RecordAuthResponse` relit le corps → lire avec
+  `e.BindBody` (un decoder brut le consomme → 400 générique) ; options encodées en `encoding/json` v1 ; garder BE/BS/UV en
+  base ; `CloneWarning` n'échoue pas seul → refuser un compteur qui recule (0/0 = passkeys synchronisées) ; demander
+  `credProps`. Front : options *begin* préchargées pour appeler `navigator.credentials.*` dans le clic (Safari),
+  autoremplissage `autocomplete="username webauthn"` + `mediation: 'conditional'` interrompu avant la modale. E2E : le bouton
+  « Se connecter avec une passkey » rend `name: 'Se connecter'` ambigu → `exact: true`.
+* 2026-10-10 — **Vote par classement** (ADR 0005, migration `1760000019`, `domain/vote.go`, `app/routes_vote.go`). Borda
+  tronqué : rang r → `max(1, K − r + 1)` points (K = candidats actifs) ; égalité → 1ers choix, votants, note, nom ;
+  `domain.ComputeTally` unique pour l'hôte, le planificateur et `GET /tally`. Bulletin écrit **uniquement** par
+  `PUT /parties/{id}/ballot` (rules d'écriture `votes` à `nil`), réécrit entier en transaction (l'index unique
+  `(party, user, rank)` interdit d'échanger deux rangs ligne à ligne). Anciens votes rangés par ordre de création
+  (vérifié par simulation de mise à jour depuis la prod). File hors ligne : action `ballot` (dernier état par party).
+  Piège : relecture temps réel entre deux gestes rapides → bulletin local en attente prioritaire tant que
+  `isMutating(['ballot', id]) > 1`.
+* 2026-10-10 — **E-mail « bon de commande »** (`app/ordermail.go`, migration `1760000020`). À `review → paying` (ou `closed`
+  si seul le payeur a commandé), chaque membre ayant commandé reçoit le bon complet, son bloc surligné et le montant dû au
+  payeur. Hook après commit + goroutine ; idempotence par `parties.order_mail_sent_at` (caché) réclamé par
+  `UPDATE … WHERE order_mail_sent_at = ''` avant l'envoi ; rien sans SMTP. Opt-out `notify_prefs.emails`. Pièges :
+  `html/template` échappe `+` en `&#43;` ; jetons de palette remplacés avant `Parse`, jamais interpolés dans `style`.
+* 2026-10-10 — **« Encaisser » côté payeur** (`GET /api/occ/parties/{id}/payments/qr`, payeur seul, `CollectPanel.tsx`,
+  ADR 0003 mise à jour 2) : QR EPC / liens à montant par collègue, mode « Présenter » plein écran (Wake Lock, `#root`
+  inerte, focus piégé). Recherche 2026 : aucun format P2P à montant générable par un tiers pour Wero, Bancontact Pay,
+  Lydia ; Tikkie exige un compte néerlandais ; SRTP en adoption précoce. `TestPushPartyEvents` stabilisé (centime de
+  livraison attribué selon l'ordre des ids → montant lu côté serveur).
+
 * 2026-10-09 — **Revue design complète** (product-designer, 108 captures 390/1280 × clair/sombre, 28 points corrigés ;
   patterns dans `DESIGN_SYSTEM.md` « Patterns — passe 2 »). Pièges : une grille mobile sans `grid-cols-1` explicite
   laisse la piste implicite s'élargir au contenu (accueil à 480 px) ; un `<table className="sr-only">` ne rétrécit pas
