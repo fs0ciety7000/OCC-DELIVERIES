@@ -164,7 +164,7 @@ export function AppShell() {
               <span>
                 Développé par{' '}
                 <span className="font-semibold text-muted group-hover:text-fg group-hover:underline">
-                  <span className="font-mono tracking-[0.15em]">OCC</span> Interactive
+                  <span className="font-mono tracking-[0.15em]">CM</span> Interactive
                 </span>
               </span>
             </a>

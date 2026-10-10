@@ -231,7 +231,7 @@ sautent à la valeur finale, cœur / coche à l'état final.
    **E-mails** (`backend/internal/app/mailtemplates.go`) : palette « Ember » claire en styles en ligne (les
    clients mail ignorent les variables CSS) — fond `#FAF8F4`, carte blanche `radius 20px`, titre 24 px 750,
    bouton dégradé braise → ambre, texte `#1A0B05` (= `brand-fg`, AA), lien brut de secours en `brand-ink`,
-   pied « Développé par OCC Interactive, une division de CARDOR Media ». Ton tutoyé, durée de validité rappelée, « Ignore cet e-mail »
+   pied « Développé par CM Interactive, une division de CARDOR Media ». Ton tutoyé, durée de validité rappelée, « Ignore cet e-mail »
    si ce n'est pas toi.
 6. **Profil** — en-tête (avatar, nom, e-mail) puis onglets : *Mes commandes* (4 tuiles
    chiffrées — Commandes, Dépensé, Resto chouchou, Plat préféré —, puis cartes d'historique
@@ -501,8 +501,8 @@ Captures de référence : `docs/screenshots/<écran>-<mobile|desktop>-<dark|ligh
 
 ## Signature studio (pied de page)
 
-« Développé par **OCC Interactive** · une division de **CARDOR Media** · © année ». Emblèmes de la charte CARDOR
-(`cardormedia.com/marque`) via `components/brand/BrandEmblem` : Dragon (OCC Interactive, ratio 1,23, h-6) et roue du
+« Développé par **CM Interactive** · une division de **CARDOR Media** · © année ». Emblèmes de la charte CARDOR
+(`cardormedia.com/marque`) via `components/brand/BrandEmblem` : Dragon (CM Interactive, ratio 1,23, h-6) et roue du
 Car d'Or (CARDOR Media, size-4). Mouvement repris du site CARDOR : « boot » glitch au premier affichage, glitch du
 Dragon et tour de roue au survol / focus du lien ; jamais en boucle (principe « Silence »). Couleurs de marque en thème
 sombre, version mono (`currentColor`) en clair. Animations réduites : statique. Ne pas déformer, ni ajouter d'effet.
