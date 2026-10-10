@@ -457,7 +457,7 @@ const orderMailHTMLSource = `<div style="display:none;max-height:0;overflow:hidd
 {{end}}
 {{end}}
 </td></tr>
-<tr><td style="padding:16px 4px 0;font-size:12px;line-height:16px;color:[muted]">Tu reçois cet e-mail car tu as commandé dans cette party. Tu peux le désactiver dans ton profil (Notifications).<br/>Commandes groupées entre collègues · <a href="{{.D.AppURL}}" style="color:[muted]">{{.D.AppURL}}</a><br/>Développé par OCC MONS Studios</td></tr>
+<tr><td style="padding:16px 4px 0;font-size:12px;line-height:16px;color:[muted]">Tu reçois cet e-mail car tu as commandé dans cette party. Tu peux le désactiver dans ton profil (Notifications).<br/>Commandes groupées entre collègues · <a href="{{.D.AppURL}}" style="color:[muted]">{{.D.AppURL}}</a><br/>Développé par OCC Interactive, une division de CARDOR Media</td></tr>
 </table></td></tr></table>`
 
 type orderMailView struct {

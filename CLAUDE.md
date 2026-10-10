@@ -73,6 +73,11 @@ docker compose up --build         # http://localhost:8090
 Les apprentissages importants (pièges PocketBase, décisions d'UX) sont ajoutés
 ci-dessous, du plus récent au plus ancien.
 
+* 2026-10-10 — **Signature « OCC Interactive — une division de CARDOR Media »** (remplace OCC MONS Studios : pied de
+  page, e-mails). Emblème « Le Dragon » repris de la charte `cardormedia.com/marque` (`public/brand/occ-interactive.svg`,
+  couleurs via `--logo-t1/t2`) + variante claire `occ-interactive-light.svg` (planche D « mono » : encre Olive, t2 = 45 %
+  noir) car l'Acid est illisible sur fond clair ; les deux `<img>` alternent par `dark:`. « OCC » en mono espacé comme
+  dans les lockups. Précache du service worker mis à jour.
 * 2026-10-10 — **Garde du payeur et mode « espèces »** (ADR 0003 maj 4, migration `1760000022`, `domain/payerguard.go`,
   `app/payerguard.go`, `steps/PayerSheet.tsx`). Demande : « blocage uniquement si on demande autre chose qu'espèces ».
   `POST /payer {payer, collectMode}` : `transfer` (défaut) exige un moyen utilisable (IBAN mod-97, revtag, PayPal.me, lien)

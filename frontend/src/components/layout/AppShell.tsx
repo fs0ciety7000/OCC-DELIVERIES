@@ -148,18 +148,32 @@ export function AppShell() {
         </div>
         {/* mt-auto : sur une page courte, le pied reste en bas (au-dessus du dock grâce au padding). */}
         <footer className="mt-auto border-t border-border pt-6 text-xs text-subtle">
-          <a
-            href="https://studios.fs0ciety.org/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group mx-auto flex w-fit items-center gap-2.5 rounded-md py-1 underline-offset-4 focus-visible:text-fg"
-          >
-            <img src="/brand/occ-mons-studios.webp" alt="" width={20} height={33} className="h-10 w-auto transition-transform group-hover:scale-105 motion-reduce:transition-none" />
+          <div className="mx-auto flex w-fit flex-wrap items-center justify-center gap-x-1.5 gap-y-1 py-1 text-center">
+            <a
+              href="https://interactive.cardormedia.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex items-center gap-2.5 rounded-md underline-offset-4 focus-visible:text-fg"
+            >
+              {/* Emblème « Le Dragon » (charte CARDOR Media, ratio 1,23) : couleurs de marque portées par les SVG. */}
+              <img src="/brand/occ-interactive.svg" alt="" width={30} height={24} className="hidden h-6 w-auto transition-transform group-hover:scale-105 motion-reduce:transition-none dark:block" />
+              {/* Version claire (charte, planche D) : l'Acid de l'emblème est illisible sur Paper. */}
+              <img src="/brand/occ-interactive-light.svg" alt="" width={30} height={24} className="h-6 w-auto transition-transform group-hover:scale-105 motion-reduce:transition-none dark:hidden" />
+              <span>
+                Développé par{' '}
+                <span className="font-semibold text-muted group-hover:text-fg group-hover:underline">
+                  <span className="font-mono tracking-[0.15em]">OCC</span> Interactive
+                </span>
+              </span>
+            </a>
             <span>
-              Développé par <span className="font-semibold text-muted group-hover:text-fg group-hover:underline">OCC MONS Studios</span> · ©{' '}
-              {new Date().getFullYear()}
+              <span className="hidden sm:inline">· </span>une division de{' '}
+              <a href="https://cardormedia.com/" target="_blank" rel="noopener noreferrer" className="rounded-md font-semibold text-muted underline-offset-4 hover:text-fg hover:underline focus-visible:text-fg">
+                CARDOR Media
+              </a>{' '}
+              · © {new Date().getFullYear()}
             </span>
-          </a>
+          </div>
         </footer>
       </main>
 

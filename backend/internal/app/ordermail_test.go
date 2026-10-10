@@ -322,7 +322,7 @@ func TestRenderOrderMail(t *testing.T) {
 		"Alice <span style=\"font-weight:400;color:#5F5B66\">(toi)</span>",
 		"Bob <span style=\"font-size:12px;font-weight:700;color:#B93A17\">· a payé</span>",
 		"Tél. &#43;32 65 00 00 00", "Rue X 12, 7000 Mons", "« bien cuite »",
-		`href="https://eat.example"`, "Développé par OCC MONS Studios",
+		`href="https://eat.example"`, "Développé par OCC Interactive, une division de CARDOR Media",
 	} {
 		if !strings.Contains(h, want) {
 			t.Errorf("html: %q missing", want)

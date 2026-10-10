@@ -231,7 +231,7 @@ sautent à la valeur finale, cœur / coche à l'état final.
    **E-mails** (`backend/internal/app/mailtemplates.go`) : palette « Ember » claire en styles en ligne (les
    clients mail ignorent les variables CSS) — fond `#FAF8F4`, carte blanche `radius 20px`, titre 24 px 750,
    bouton dégradé braise → ambre, texte `#1A0B05` (= `brand-fg`, AA), lien brut de secours en `brand-ink`,
-   pied « Développé par OCC MONS Studios ». Ton tutoyé, durée de validité rappelée, « Ignore cet e-mail »
+   pied « Développé par OCC Interactive, une division de CARDOR Media ». Ton tutoyé, durée de validité rappelée, « Ignore cet e-mail »
    si ce n'est pas toi.
 6. **Profil** — en-tête (avatar, nom, e-mail) puis onglets : *Mes commandes* (4 tuiles
    chiffrées — Commandes, Dépensé, Resto chouchou, Plat préféré —, puis cartes d'historique
