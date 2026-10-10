@@ -112,8 +112,9 @@ func TestPrefsAndRecipients(t *testing.T) {
 		{"", DefaultPrefs()},
 		{"null", DefaultPrefs()},
 		{"{oops", DefaultPrefs()},
-		{`{"party":false}`, Prefs{Party: false, Payments: true, Reminders: true}},
-		{`{"party":true,"payments":false,"reminders":false}`, Prefs{Party: true}},
+		{`{"party":false}`, Prefs{Party: false, Payments: true, Reminders: true, Emails: true}},
+		{`{"party":true,"payments":false,"reminders":false}`, Prefs{Party: true, Emails: true}},
+		{`{"emails":false}`, Prefs{Party: true, Payments: true, Reminders: true}},
 		{`{"payments":"no"}`, DefaultPrefs()},
 	}
 	for _, c := range cases {

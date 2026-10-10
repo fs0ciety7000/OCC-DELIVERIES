@@ -11,10 +11,13 @@ type Prefs struct {
 	Party     bool `json:"party"`
 	Payments  bool `json:"payments"`
 	Reminders bool `json:"reminders"`
+	// Emails: the « bon de commande » e-mail sent when the order is validated
+	// (not a push category: it applies even without a subscribed device).
+	Emails bool `json:"emails"`
 }
 
 // DefaultPrefs has every category on.
-func DefaultPrefs() Prefs { return Prefs{Party: true, Payments: true, Reminders: true} }
+func DefaultPrefs() Prefs { return Prefs{Party: true, Payments: true, Reminders: true, Emails: true} }
 
 // ParsePrefs reads the stored JSON; null, invalid JSON or missing keys fall
 // back to « on ».
@@ -36,6 +39,7 @@ func ParsePrefs(raw []byte) Prefs {
 	read("party", &p.Party)
 	read("payments", &p.Payments)
 	read("reminders", &p.Reminders)
+	read("emails", &p.Emails)
 	return p
 }
 

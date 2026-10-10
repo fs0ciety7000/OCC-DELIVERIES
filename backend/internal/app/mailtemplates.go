@@ -145,7 +145,7 @@ func testMailBody(appURL string) string {
 	body := renderMail(mailContent{
 		Preheader:  "L'envoi d'e-mails fonctionne.",
 		Title:      "Ça marche ! ✅",
-		Paragraphs: []string{"Cet e-mail de test confirme que {APP_NAME} peut envoyer des e-mails : vérification d'adresse, mot de passe oublié et changement d'adresse sont opérationnels."},
+		Paragraphs: []string{"Cet e-mail de test confirme que {APP_NAME} peut envoyer des e-mails : vérification d'adresse, mot de passe oublié, changement d'adresse et bons de commande sont opérationnels."},
 		Footnote:   "Envoyé depuis l'administration (Utilisateurs → E-mails).",
 	})
 	r := strings.NewReplacer("{APP_URL}", html.EscapeString(appURL), "{APP_NAME}", "OCC Deliveries")
