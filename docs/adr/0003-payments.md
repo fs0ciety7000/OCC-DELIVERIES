@@ -86,3 +86,57 @@ bancaire automatique (possible plus tard via la communication structurée).
   retour sur l'onglet) ; le payeur voit une carte « Tes moyens de
   remboursement » (ou l'alerte « Aucun moyen renseigné ») avec un lien vers
   son profil.
+
+## Mise à jour 2 — 2026-10-10 : « Encaisser » côté payeur, recherche d'un autre système
+
+### Demande
+« Créer les codes QR avec montant (sur la vue de celui qui a payé) destinés à
+chaque membre. Paiement par PayPal ? Trouver un autre système ? »
+
+### Décision — QR à montant présentés par le payeur
+* `GET /api/occ/parties/{id}/payments/qr` (**payeur seulement** : ni l'hôte non
+  payeur, ni un débiteur, ni un non-membre) renvoie, pour chaque part à
+  encaisser, le payload **EPC069-12** et les liens à montant, construits par
+  les **mêmes** fonctions que `/payments/{id}/qr` (`loadPayout().qrFor()`).
+  Aucune donnée nouvelle ne sort : le payeur ne lit que ses propres
+  coordonnées et des montants que tous les membres voient déjà.
+* PayingStep (payeur) : carte « Encaisser » (une carte par collègue, statut
+  temps réel, QR, « Confirmer la réception ») + mode « Présenter » plein écran
+  (QR géant, montant, balayage / flèches, Wake Lock détecté, conseil
+  « luminosité au maximum » — le Web ne peut pas régler la luminosité).
+* Deux natures de QR, au choix :
+  * **Virement** (EPC) : à scanner **dans l'app bancaire** (KBC, BNP Paribas
+    Fortis, ING, Belfius, Argenta…), montant et communication `OCC <code>
+    <nom>` pré-remplis. Reste le moyen recommandé : universel en Belgique,
+    gratuit, instantané si la banque le propose ;
+  * **lien Revolut / PayPal.me à montant** encodé tel quel dans un QR : scanné
+    avec l'appareil photo, il ouvre la page/l'app avec le montant. Ce n'est pas
+    un nouveau format : c'est le lien documenté en mise à jour 1. Les liens
+    sans montant (lien libre, Wisetag, Lydia) ne sont **pas** proposés en QR.
+
+### Recherche « autre système » (Belgique, octobre 2026)
+Question : quels moyens P2P permettent à une **application tierce** de
+fabriquer une demande **à montant pré-rempli** que le débiteur ouvre ou scanne ?
+
+| Moyen | Verdict | Pourquoi | Sources |
+|---|---|---|---|
+| **QR EPC069-12** (virement SEPA) | ✅ en place | Format public de l'EPC ; lu par les apps bancaires belges. Seul QR à montant universel et gratuit. | EPC069-12 (European Payments Council) ; mise à jour 1 |
+| **PayPal.me** | ✅ en place (lien + QR du lien) | `paypal.me/<nom>/<montant>EUR` documenté. Le « QR PayPal » de l'app est un QR personnel où le payeur **saisit** le montant : pas de format tiers avec montant ; on encode donc le lien PayPal.me. Compte PayPal requis des deux côtés, frais possibles hors « amis et famille ». | https://www.paypal.com/us/cshelp/article/what-is-paypalme-help432 ; https://qwac.paypal.com/us/brc/article/how-customers-pay-via-qr-codes (« the customer scans the code, enters the amount ») |
+| **Revolut** (revolut.me) | ✅ en place (lien + QR du lien) | `?amount=<centimes>&currency=EUR&note=` (mise à jour 1). L'aide Revolut décrit en plus des liens à montant fixe **créés dans l'app** (non générables par un tiers). | https://help.revolut.com/help/adding-money/with-money-from-friends-or-relatives/requesting-money/ |
+| **Wise** | ⚠️ inchangé | Compte perso : « Request → Anyone » crée un lien (QR Wisetag) **dans l'app**, valable 30 jours, sans format public ; seul le lien Business ouvert a `?amount=` (déjà géré). | https://wise.com/help/articles/2WvlZST6DiDMUBhyl1N4zM/how-do-i-request-money ; https://wise.com/help/articles/4qr3kkvIQlHNiD8BegEB4u/getting-paid-to-your-wise-business-by-payment-link |
+| **Wero** (EPI) | ❌ pour du P2P | Demandes et QR « Recevoir » créés dans l'app du bénéficiaire (KBC : « Receive payment »). Les QR/liens **à montant générables hors app** n'existent que côté **commerçant** : p. ex. Buckaroo « Wero Invoice QR » (`wero-qr.buckaroo.io/invoice?storeId=…&amount=…`, contrat marchand) et l'API « Wero Merchant Payment » d'ABN AMRO (accès anticipé, Pays-Bas). Revient à l'option écartée (PSP, frais, argent via un compte marchand). | https://www.kbcbrussels.be/retail/en/products/payments/self-banking/wero.html ; https://wero-wallet.eu/be-fr ; https://docs.buckaroo.io/v2/docs/invoice-qr ; https://developer.abnamro.com/api-products/wero-merchant-payment/overview ; https://banking.vision/wero-entschluesselt |
+| **Bancontact Pay** (ex-Payconiq) | ❌ | Toujours : QR et demandes de paiement P2P générés **dans l'app** du bénéficiaire, chiffrés, valables 60 jours ; nouvelle « Cagnotte » (lien partagé, montant fixe ou libre) également créée dans l'app. Les API documentées (Checkout.com, Adyen, Worldline…) sont marchandes. | https://www.bancontact.com/fr/consommateur/payments/entre-amis ; https://www.checkout.com/docs/payments/add-payment-methods/bancontact/payment-setup-api |
+| **Tikkie** (ABN AMRO) | ❌ en Belgique | Exige un compte de paiement **néerlandais** (numéro belge accepté, pas l'IBAN belge) ; paiement via iDEAL. | https://www.tikkie.me/nl/hulp/veelgestelde-vragen ; https://webwoordenboek.nl/kenniscentrum/is-tikkie-europees |
+| **Lydia / Sumeria** | ❌ | Orientés France ; aucun format public de demande à montant trouvé. Lien libre conservé tel quel (montant à saisir). | https://sumeria.eu/documents/tcs/fr/12032026/2-sumeria/2-3-sumeria-annexe-tarifs-et-limites-fr-240426.pdf |
+| **Liens « demander de l'argent » des banques** (KBC, BNP Paribas Fortis, ING, Belfius) | ❌ | Ce sont les demandes **Wero** intégrées aux apps (BNP : demande à un contact via son numéro de mobile). Aucune URL publique. | https://www.bnpparibasfortis.be/en/public/individuals/daily-banking/payments/mobile-payments/wero ; page KBC ci-dessus |
+| **Mollie / Stripe payment links** | ❌ (option écartée maintenue) | Liens à montant parfaits techniquement, mais compte marchand, KYC, frais par transaction et l'argent transite par la plateforme. | ADR 0003 « Option écartée » |
+| **SEPA Request-to-Pay (SRTP)** | ⏳ pas utilisable | Schéma EPC (rulebook v4.0 depuis le 5/10/2025, API inter-prestataires v1.0, vagues d'homologation 2026) en **adoption précoce** ; aucune banque belge n'expose de demande SRTP à des particuliers ni à une app tierce non agréée. À surveiller (ce serait le « Wero à montant » standard). | https://ecovis.lt/?p=8805 (rulebook v4.0) ; présentation EPC « SRTP Scheme » d'octobre 2025 (EPC145-25, « early adoption ») ; https://www.ecb.europa.eu/paym/groups/erpb/shared/pdf/25th-ERPB%20meeting%20on%2018%20June%202026/Statement.pdf ; https://www.vixio.com/insights/pc-epc-finalises-api-specifications-sepa-request-pay-interoperability |
+
+### Conclusion
+Aucun format **nouveau** et légitime n'a été trouvé pour du P2P belge : on
+n'invente rien. Recommandation affichée : QR **virement** (EPC) d'abord — il
+remplace dans les faits la « demande Wero à montant » puisque les apps qui
+portent Wero le lisent —, puis Revolut / PayPal.me à montant pour ceux qui les
+utilisent ; Wero / Bancontact Pay restent « identifiant + montant à saisir ».
+À réévaluer si SRTP arrive dans les apps belges ou si EPI publie un format de
+demande P2P ouvert aux tiers.

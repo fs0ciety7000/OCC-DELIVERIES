@@ -17,6 +17,7 @@ import type { DeclareMethod, Payment } from '@/lib/types'
 import type { PartyCtx } from '../context'
 import { usePaymentAction, usePayments, useSetPayer, useTransition } from '../hooks'
 import { availableMethods, declareLabel, isLinkMethod, linkFor, METHOD_BADGE, METHOD_LABELS, methodHint, orderForDevice, payoutMethods } from '../labels'
+import { CollectPanel } from './CollectPanel'
 import { DispatchedBanner } from './DispatchedBanner'
 import { MethodDetails, MethodMark, MethodTiles, StatusBadge } from './PaymentMethods'
 
@@ -80,12 +81,15 @@ export function PayingStep({ ctx }: { ctx: PartyCtx }) {
           <Card>
             <CardBody className="text-sm text-muted">Tu n'as rien commandé : rien à rembourser 😉</CardBody>
           </Card>
-        ) : null}
+        ) : (
+          <CollectPanel ctx={ctx} payments={owed} />
+        )}
       </div>
 
       <aside className="space-y-4">
         {iAmPayer && <PayerMethods userId={me.id} />}
-        <PaymentsList ctx={ctx} payments={owed} canManage={iAmPayer || isHost} />
+        {/* Le payeur confirme depuis « Encaisser » : pas de seconde liste avec les mêmes boutons. */}
+        {!iAmPayer && <PaymentsList ctx={ctx} payments={owed} canManage={isHost} />}
         {isHost && (
           <div className="flex flex-col gap-2">
             <Button variant="secondary" leftIcon={<UserRoundCog className="size-4" />} onClick={() => setPayerOpen(true)}>

@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"sort"
+	"strings"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
@@ -247,48 +249,64 @@ func payoutProfile(app core.App, userID string) *core.Record {
 	return p
 }
 
-func (h *handlers) paymentQR(e *core.RequestEvent) error {
-	pay, _, err := paymentForMember(e)
-	if err != nil {
-		return err
-	}
-	creditorID := pay.GetString("creditor")
-	out := paymentQR{
-		Amount:    pay.GetInt("amount"),
-		Reference: pay.GetString("reference"),
-		Links:     []domain.PaymentLink{},
-	}
-	if u, err := e.App.FindRecordById(colUsers, creditorID); err == nil {
-		out.Beneficiary = userInfo(u).Name
-	}
+// payoutData is the creditor's payout profile, loaded once and turned into
+// per-payment QR payloads (EPC + links with the exact amount).
+type payoutData struct {
+	beneficiary string
+	iban, bic   string
+	handles     domain.PayoutHandles
+	wero        *weroInfo
+	bancontact  *bancontactInfo
+}
 
-	if prof := payoutProfile(e.App, creditorID); prof != nil {
-		if holder := prof.GetString("holder_name"); holder != "" {
-			out.Beneficiary = holder
-		}
-		if iban := prof.GetString("iban"); iban != "" {
-			epc, err := domain.BuildEPC(domain.EPCParams{
-				BIC: prof.GetString("bic"), Name: out.Beneficiary, IBAN: iban,
-				Amount: out.Amount, Remittance: out.Reference,
-			})
-			if err == nil {
-				out.EPC = &epc
-				iban = domain.NormalizeIBAN(iban)
-				out.IBAN = &iban
-			}
-		}
-		// Normalized again: profiles saved before the structured handles.
-		h := domain.PayoutHandles{Link: prof.GetString("payment_link")}
-		h.RevolutTag, _ = domain.NormalizeRevolutTag(prof.GetString("revolut_tag"))
-		h.PayPalMe, _ = domain.NormalizePayPalMe(prof.GetString("paypal_me"))
-		out.Links = domain.PaymentLinks(domain.SplitPayoutLink(h), out.Amount, out.Reference)
-		if id, qr := prof.GetString("wero_id"), prof.GetString("wero_qr"); id != "" || qr != "" {
-			out.Wero = &weroInfo{ID: id, HasQR: qr != ""}
-		}
-		if phone, qr := prof.GetString("bancontact_phone"), prof.GetString("bancontact_qr"); phone != "" || qr != "" {
-			out.Bancontact = &bancontactInfo{Phone: phone, HasQR: qr != ""}
+func loadPayout(app core.App, creditorID string) payoutData {
+	var d payoutData
+	if u, err := app.FindRecordById(colUsers, creditorID); err == nil {
+		d.beneficiary = userInfo(u).Name
+	}
+	prof := payoutProfile(app, creditorID)
+	if prof == nil {
+		return d
+	}
+	if holder := prof.GetString("holder_name"); holder != "" {
+		d.beneficiary = holder
+	}
+	d.iban, d.bic = prof.GetString("iban"), prof.GetString("bic")
+	// Normalized again: profiles saved before the structured handles.
+	d.handles = domain.PayoutHandles{Link: prof.GetString("payment_link")}
+	d.handles.RevolutTag, _ = domain.NormalizeRevolutTag(prof.GetString("revolut_tag"))
+	d.handles.PayPalMe, _ = domain.NormalizePayPalMe(prof.GetString("paypal_me"))
+	if id, qr := prof.GetString("wero_id"), prof.GetString("wero_qr"); id != "" || qr != "" {
+		d.wero = &weroInfo{ID: id, HasQR: qr != ""}
+	}
+	if phone, qr := prof.GetString("bancontact_phone"), prof.GetString("bancontact_qr"); phone != "" || qr != "" {
+		d.bancontact = &bancontactInfo{Phone: phone, HasQR: qr != ""}
+	}
+	return d
+}
+
+// qrFor builds the PaymentQR of one payment (amount in cents, reference).
+func (d payoutData) qrFor(amount int, reference string) paymentQR {
+	out := paymentQR{
+		Amount:      amount,
+		Reference:   reference,
+		Beneficiary: d.beneficiary,
+		Links:       []domain.PaymentLink{},
+		Wero:        d.wero,
+		Bancontact:  d.bancontact,
+	}
+	if d.iban != "" {
+		epc, err := domain.BuildEPC(domain.EPCParams{
+			BIC: d.bic, Name: d.beneficiary, IBAN: d.iban,
+			Amount: amount, Remittance: reference,
+		})
+		if err == nil {
+			out.EPC = &epc
+			iban := domain.NormalizeIBAN(d.iban)
+			out.IBAN = &iban
 		}
 	}
+	out.Links = domain.PaymentLinks(domain.SplitPayoutLink(d.handles), amount, reference)
 	avail := domain.PayoutAvailability{IBAN: out.EPC != nil, Wero: out.Wero != nil, Bancontact: out.Bancontact != nil}
 	for _, l := range out.Links {
 		switch l.Kind {
@@ -301,6 +319,93 @@ func (h *handlers) paymentQR(e *core.RequestEvent) error {
 		}
 	}
 	out.Methods = domain.AvailableMethods(avail)
+	return out
+}
+
+func (h *handlers) paymentQR(e *core.RequestEvent) error {
+	pay, _, err := paymentForMember(e)
+	if err != nil {
+		return err
+	}
+	out := loadPayout(e.App, pay.GetString("creditor")).qrFor(pay.GetInt("amount"), pay.GetString("reference"))
+	return ok(e, out)
+}
+
+// collectItem is one debtor's share as seen by the payer (« Encaisser »).
+type collectItem struct {
+	Payment   string               `json:"payment"`
+	Debtor    domain.UserInfo      `json:"debtor"`
+	Amount    int                  `json:"amount"`
+	Status    string               `json:"status"`
+	Method    string               `json:"method"`
+	Reference string               `json:"reference"`
+	EPC       *string              `json:"epc"`
+	Links     []domain.PaymentLink `json:"links"`
+}
+
+type collectQR struct {
+	Beneficiary string        `json:"beneficiary"`
+	IBAN        *string       `json:"iban"`
+	Items       []collectItem `json:"items"`
+}
+
+// paymentsCollectQR returns, to the payer only, the QR payloads of every
+// debtor's share (EPC069-12 + prefilled links with each exact amount): the
+// payer presents them from his own phone. Same builders as /payments/{id}/qr;
+// only the payer's own payout data is involved.
+func (h *handlers) paymentsCollectQR(e *core.RequestEvent) error {
+	party, err := partyForMember(e)
+	if err != nil {
+		return err
+	}
+	switch party.GetString("status") {
+	case domain.StatusPaying, domain.StatusClosed:
+	default:
+		return badRequest("Les remboursements ne sont pas encore ouverts pour cette commande.")
+	}
+	payerID := party.GetString("payer")
+	if payerID == "" || payerID != e.Auth.Id {
+		return forbidden("Seul le payeur peut afficher les QR d'encaissement.")
+	}
+	pays, err := e.App.FindAllRecords(colPayments, dbx.HashExp{"party": party.Id, "creditor": payerID})
+	if err != nil {
+		return err
+	}
+	ids := make([]string, 0, len(pays))
+	for _, p := range pays {
+		ids = append(ids, p.GetString("debtor"))
+	}
+	users := map[string]domain.UserInfo{}
+	if recs, err := e.App.FindRecordsByIds(colUsers, ids); err == nil {
+		for _, u := range recs {
+			users[u.Id] = userInfo(u)
+		}
+	}
+
+	data := loadPayout(e.App, payerID)
+	out := collectQR{Beneficiary: data.beneficiary, Items: []collectItem{}}
+	for _, p := range pays {
+		debtor := p.GetString("debtor")
+		if debtor == payerID || p.GetString("method") == domain.MethodSelf {
+			continue
+		}
+		q := data.qrFor(p.GetInt("amount"), p.GetString("reference"))
+		if out.IBAN == nil {
+			out.IBAN = q.IBAN
+		}
+		u, found := users[debtor]
+		if !found {
+			u = domain.UserInfo{ID: debtor, Name: "Membre"}
+		}
+		out.Items = append(out.Items, collectItem{
+			Payment: p.Id, Debtor: u, Amount: p.GetInt("amount"),
+			Status: p.GetString("status"), Method: p.GetString("method"),
+			Reference: p.GetString("reference"), EPC: q.EPC, Links: q.Links,
+		})
+	}
+	sort.SliceStable(out.Items, func(i, j int) bool {
+		return strings.ToLower(out.Items[i].Debtor.Name) < strings.ToLower(out.Items[j].Debtor.Name)
+	})
 	return ok(e, out)
 }
 
