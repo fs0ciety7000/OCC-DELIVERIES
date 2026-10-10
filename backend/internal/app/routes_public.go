@@ -45,6 +45,8 @@ func (h *handlers) config(e *core.RequestEvent) error {
 		"minMenuItems": minMenuItems(e.App),
 		// e-mails (verification, password reset…) can be sent
 		"mailEnabled": mailEnabled(e.App),
+		// sign-in with a passkey is configured (WebAuthn relying party valid)
+		"passkeys": h.passkeys.enabled(),
 	})
 }
 

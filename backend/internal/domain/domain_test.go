@@ -212,34 +212,6 @@ func TestValidateTransition(t *testing.T) {
 	}
 }
 
-func TestElectWinner(t *testing.T) {
-	cands := []Candidate{
-		{ID: "r1", Name: "Pizza", Rating: 4.2},
-		{ID: "r2", Name: "Burger", Rating: 4.6},
-		{ID: "r3", Name: "Avocado", Rating: 4.6},
-	}
-	tests := []struct {
-		name  string
-		votes map[string]int
-		want  string
-	}{
-		{"most votes", map[string]int{"r1": 3, "r2": 1}, "r1"},
-		{"tie → rating", map[string]int{"r1": 2, "r2": 2}, "r2"},
-		{"tie rating → name", map[string]int{"r2": 1, "r3": 1}, "r3"},
-		{"no votes → best rating then name", nil, "r3"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := ElectWinner(cands, tt.votes); got != tt.want {
-				t.Fatalf("got %s want %s", got, tt.want)
-			}
-		})
-	}
-	if ElectWinner(nil, nil) != "" {
-		t.Fatal("empty candidates should give empty winner")
-	}
-}
-
 func TestGenerateCode(t *testing.T) {
 	seen := map[string]bool{}
 	for i := 0; i < 500; i++ {

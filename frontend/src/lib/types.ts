@@ -342,12 +342,38 @@ export interface PartyMember extends BaseRecord {
   expand?: { user?: User }
 }
 
+/** Une ligne du bulletin d'un membre (vote par classement, ADR 0005) ; écrit par `PUT /ballot` uniquement. */
 export interface Vote extends BaseRecord {
   party: string
   user: string
   restaurant: string
-  /** Clé d'idempotence (file hors ligne) : rejouer le même vote renvoie le vote existant. */
+  /** 1 = 1er choix ; rangs contigus par membre. */
+  rank: number
+  /** `<clientKey>_<rank>` (file hors ligne). */
   client_key?: string
+}
+
+export interface TallyStanding {
+  restaurant: string
+  points: number
+  firstChoices: number
+  voters: number
+}
+
+/** Classement en direct calculé par le serveur (`GET /parties/{id}/tally`). */
+export interface Tally {
+  /** K : points d'un 1er choix (rang r → max(1, K − r + 1)). */
+  candidates: number
+  voters: number
+  /** Triés par la règle du gagnant. */
+  standings: TallyStanding[]
+  /** Resto élu si le vote se fermait maintenant (`''` sans candidat). */
+  winner: string
+}
+
+export interface BallotResponse {
+  ballot: string[]
+  tally: Tally
 }
 
 /** Entrée de `parties.auto_events` (planificateur des heures limites). */
@@ -376,6 +402,8 @@ export interface NotifyPrefs {
   party: boolean
   payments: boolean
   reminders: boolean
+  /** E-mail « bon de commande » à la validation de la commande (indépendant des appareils abonnés). */
+  emails: boolean
 }
 
 /** `GET /api/occ/push/prefs`. */
@@ -384,6 +412,8 @@ export interface PushPrefsResponse {
   /** Appareils abonnés à ce compte. */
   devices: number
   enabled: boolean
+  /** Envoi d'e-mails configuré sur le serveur (SMTP). */
+  mail: boolean
 }
 
 /** `GET /api/occ/push/public-key`. */
@@ -476,6 +506,8 @@ export interface AppConfig {
   minMenuItems: number
   /** Le serveur peut envoyer des e-mails (vérification, mot de passe oublié…). */
   mailEnabled: boolean
+  /** Connexion par passkey configurée côté serveur (relying party WebAuthn valide). */
+  passkeys?: boolean
 }
 
 /** `GET / PATCH /api/occ/admin/settings`. */
@@ -574,6 +606,26 @@ export interface PaymentLink {
   url: string
   /** `true` si le montant (et la communication quand c'est possible) est pré-rempli. */
   amountPrefilled: boolean
+}
+
+/** Part d'un·e collègue vue par le payeur (« Encaisser », `GET /parties/{id}/payments/qr`). */
+export interface CollectItem {
+  payment: string
+  debtor: { id: string; name: string; avatar: string; color: string }
+  amount: Cents
+  status: PaymentStatus
+  method: PaymentMethod | ''
+  reference: string
+  /** Payload EPC069-12 avec le montant exact de cette part (`null` sans IBAN). */
+  epc: string | null
+  /** Liens du payeur construits pour cette part (Revolut / PayPal.me avec montant…). */
+  links: PaymentLink[]
+}
+
+export interface CollectQR {
+  beneficiary: string
+  iban: string | null
+  items: CollectItem[]
 }
 
 export type ExportFormat = 'csv' | 'txt' | 'json'
@@ -725,6 +777,18 @@ export interface AccountInfo {
   passwordSet: boolean
   providers: { id: string; provider: string; created: ISODate }[]
   mailEnabled: boolean
+}
+
+/** `GET /api/occ/passkeys` — une passkey de mon compte (Profil → Sécurité). */
+export interface PasskeyView {
+  id: string
+  name: string
+  created: ISODate
+  /** `""` si jamais utilisée pour se connecter. */
+  lastUsedAt: ISODate | ''
+  transports: string[]
+  /** Sauvegardée / synchronisée entre appareils (trousseau iCloud, Google…). */
+  synced: boolean
 }
 
 export interface AdminUserList {

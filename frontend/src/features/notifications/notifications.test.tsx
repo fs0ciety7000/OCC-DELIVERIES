@@ -9,9 +9,10 @@ import { OfflineBanner } from '@/pwa/PwaRuntime'
 import { NotificationsCard } from './NotificationsCard'
 
 const prefs = (over: Partial<PushPrefsResponse> = {}): PushPrefsResponse => ({
-  prefs: { party: true, payments: true, reminders: true },
+  prefs: { party: true, payments: true, reminders: true, emails: true },
   devices: 0,
   enabled: true,
+  mail: false,
   ...over,
 })
 
@@ -52,7 +53,7 @@ describe('NotificationsCard', () => {
     vi.spyOn(push, 'pushSupport').mockReturnValue('supported')
     vi.spyOn(push, 'currentSubscription').mockResolvedValue(null)
     vi.spyOn(pushApi, 'prefs').mockResolvedValue(prefs({ devices: 2 }))
-    const save = vi.spyOn(pushApi, 'setPrefs').mockResolvedValue({ prefs: { party: true, payments: true, reminders: false } })
+    const save = vi.spyOn(pushApi, 'setPrefs').mockResolvedValue({ prefs: { party: true, payments: true, reminders: false, emails: true } })
     renderCard()
     const reminders = await screen.findByRole('switch', { name: "Rappels d'heure limite" })
     expect(reminders).toHaveAttribute('aria-checked', 'true')
@@ -60,6 +61,28 @@ describe('NotificationsCard', () => {
     expect(save).toHaveBeenCalledWith({ reminders: false })
     expect(reminders).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByText(/2 appareils abonnés/)).toBeInTheDocument()
+  })
+
+  it('e-mail « bon de commande » : interrupteur sans appareil abonné, seulement si le serveur envoie des e-mails', async () => {
+    vi.spyOn(push, 'pushSupport').mockReturnValue('supported')
+    vi.spyOn(push, 'currentSubscription').mockResolvedValue(null)
+    vi.spyOn(pushApi, 'prefs').mockResolvedValue(prefs({ mail: true, enabled: false }))
+    const save = vi.spyOn(pushApi, 'setPrefs').mockResolvedValue({ prefs: { party: true, payments: true, reminders: true, emails: false } })
+    renderCard()
+    const toggle = await screen.findByRole('switch', { name: 'Bon de commande par e-mail' })
+    expect(toggle).toBeEnabled()
+    await userEvent.click(toggle)
+    expect(save).toHaveBeenCalledWith({ emails: false })
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('e-mail « bon de commande » : masqué sans SMTP', async () => {
+    vi.spyOn(push, 'pushSupport').mockReturnValue('supported')
+    vi.spyOn(push, 'currentSubscription').mockResolvedValue(null)
+    vi.spyOn(pushApi, 'prefs').mockResolvedValue(prefs())
+    renderCard()
+    await screen.findByRole('switch', { name: "Rappels d'heure limite" })
+    expect(screen.queryByRole('switch', { name: 'Bon de commande par e-mail' })).not.toBeInTheDocument()
   })
 
   it('iPhone dans Safari : installer d’abord sur l’écran d’accueil', async () => {

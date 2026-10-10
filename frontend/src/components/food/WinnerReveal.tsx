@@ -10,7 +10,8 @@ const INGREDIENTS = ['🍅', '🌿', '🧀', '🌶️', '🍋', '🥬']
  * Calque `pointer-events: none` (≈ 2 s, n'empêche rien), décoratif : le toast de statut
  * annonce déjà le choix. Mouvement réduit → rien (onDone immédiat).
  */
-export function WinnerReveal({ emoji, name, onDone }: { emoji: string; name: string; onDone?: () => void }) {
+/** `detail` : score du vote par classement (« 9 pts · 2 premiers choix »), facultatif. */
+export function WinnerReveal({ emoji, name, detail, onDone }: { emoji: string; name: string; detail?: string; onDone?: () => void }) {
   const scope = useRef<HTMLDivElement>(null)
   const [bits] = useState(() => Array.from({ length: 14 }, (_, i) => INGREDIENTS[i % INGREDIENTS.length]!))
   useGSAP(
@@ -58,6 +59,7 @@ export function WinnerReveal({ emoji, name, onDone }: { emoji: string; name: str
             {emoji}
           </div>
           <p className="font-display text-2xl leading-8 font-bold text-pretty">{name}</p>
+          {detail && <p className="mt-1 text-sm text-muted tabular">{detail}</p>}
         </div>
       </div>
     </div>,

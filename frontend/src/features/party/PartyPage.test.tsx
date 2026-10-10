@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { pb } from '@/lib/pb'
@@ -31,6 +31,12 @@ const summary: Summary = {
   itemsSubtotal: 1250, deliveryFee: 299, serviceFee: 0, tip: 0, sharedFees: 299, grandTotal: 1549, minOrderReached: false, allReady: false, splitMode: 'equal',
 }
 
+let myBallot: string[] = []
+const tally = {
+  candidates: 2, voters: 1, winner: 'r2',
+  standings: [{ restaurant: 'r2', points: 2, firstChoices: 1, voters: 1 }, { restaurant: 'r1', points: 0, firstChoices: 0, voters: 0 }],
+}
+
 vi.mock('@/lib/api', () => ({
   PARTY_EXPAND: '',
   occ: {
@@ -38,6 +44,7 @@ vi.mock('@/lib/api', () => ({
     nearby: vi.fn(async () => [{ ...resto, distanceKm: 0.4 }, { ...resto2, distanceKm: 1.2 }]),
     summary: vi.fn(async () => summary),
     paymentQR: vi.fn(async () => ({ amount: 1400, reference: 'OCC K7M2QX Bob', beneficiary: 'Alice', epc: 'BCD', iban: 'BE71096123456769', links: [], wero: { id: '+32470123456', hasQr: false }, bancontact: null, methods: ['qr', 'wero', 'cash', 'later'] })),
+    collectQR: vi.fn(async () => ({ beneficiary: 'Alice', iban: 'BE71096123456769', items: [{ payment: 'pay2', debtor: bob, amount: 149, status: 'declared', method: 'wero', reference: 'OCC K7M2QX Bob', epc: 'BCD', links: [] }] })),
   },
   restaurantsApi: {
     categories: vi.fn(async () => [{ id: 'c1', restaurant: 'r1', name: 'Pizzas', position: 1 }]),
@@ -49,7 +56,15 @@ vi.mock('@/lib/api', () => ({
       { id: 'pm1', party: 'p1', user: 'u1', role: 'host', ready: true, expand: { user: me } },
       { id: 'pm2', party: 'p1', user: 'u2', role: 'member', ready: false, expand: { user: bob } },
     ]),
-    votes: vi.fn(async () => [{ id: 'v1', party: 'p1', user: 'u2', restaurant: 'r2' }]),
+    votes: vi.fn(async () => [
+      { id: 'v1', party: 'p1', user: 'u2', restaurant: 'r2', rank: 1 },
+      ...myBallot.map((restaurant, i) => ({ id: `m${i}`, party: 'p1', user: 'u1', restaurant, rank: i + 1 })),
+    ]),
+    tally: vi.fn(async () => tally),
+    ballot: vi.fn(async (_p: string, ranking: string[]) => {
+      myBallot = ranking
+      return { ballot: ranking, tally }
+    }),
     orderItems: vi.fn(async () => [{ id: 'o1', party: 'p1', user: 'u1', menu_item: 'm1', quantity: 1, selected_options: [], note: '', name: 'Margherita', options_label: '', unit_price: 1250, total: 1250 }]),
     payments: vi.fn(async () => [
       { id: 'pay1', party: 'p1', debtor: 'u1', creditor: 'u1', amount: 1400, method: 'self', status: 'confirmed', reference: '', declared_at: '', confirmed_at: '' },
@@ -86,10 +101,10 @@ async function renderParty() {
 describe('PartyPage — chaque étape se rend', () => {
   it.each<[PartyStatus, RegExp]>([
     ['lobby', /On commande où/],
-    ['voting', /Vote pour tes restos/],
+    ['voting', /Classe tes restos/],
     ['ordering', /On commande chez Pizza Nonna/],
     ['review', /Qui a pris quoi/],
-    ['paying', /Les parts/],
+    ['paying', /Encaisser/],
     ['closed', /Tout est réglé|Commande clôturée/],
     ['cancelled', /Commande annulée/],
   ])('%s', async (s, text) => {
@@ -97,7 +112,7 @@ describe('PartyPage — chaque étape se rend', () => {
     const { unmount } = await renderParty()
     expect(await screen.findByText(text, {}, { timeout: 3000 })).toBeInTheDocument()
     unmount()
-  })
+  }, 20000)
 })
 
 describe('PartyPage — vue du payeur', () => {
@@ -107,7 +122,7 @@ describe('PartyPage — vue du payeur', () => {
     expect(await screen.findByText(/Aucun moyen renseigné/, {}, { timeout: 3000 })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Compléter mon profil' })).toHaveAttribute('href', '/profile?onglet=infos')
     unmount()
-  })
+  }, 20000)
 })
 
 describe('PartyPage — restaurant à carte partielle (instantané Uber Eats)', () => {
@@ -125,4 +140,31 @@ describe('PartyPage — restaurant à carte partielle (instantané Uber Eats)', 
     view.unmount()
     partialMenu = false
   })
+})
+
+describe('PartyPage — vote par classement', () => {
+  it('ajoute un resto à mon classement, le réordonne et envoie le bulletin complet', async () => {
+    status = 'voting'
+    const { partiesApi } = await import('@/lib/api')
+    const ballot = vi.mocked(partiesApi.ballot)
+    ballot.mockClear()
+    const { unmount } = await renderParty()
+    // classement en direct venu du serveur : Sushi Go en tête avec 2 pts
+    expect(await screen.findByRole('meter', { name: 'Sushi Go : 2 pts' }, { timeout: 5000 })).toBeInTheDocument()
+    expect(screen.getAllByText('En tête').length).toBeGreaterThan(0)
+    expect(screen.getByText(/Ton 1er choix vaut le plus de points/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter Pizza Nonna à mon classement' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter Sushi Go à mon classement' }))
+    await waitFor(() => expect(ballot).toHaveBeenCalledTimes(2))
+    expect(ballot.mock.calls[0]!.slice(0, 2)).toEqual(['p1', ['r1']])
+    expect(ballot.mock.calls[1]!.slice(0, 2)).toEqual(['p1', ['r1', 'r2']])
+    expect(screen.getByRole('button', { name: 'Retirer Pizza Nonna de mon classement (1er choix)' })).toHaveAttribute('aria-pressed', 'true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Monter Sushi Go (actuellement 2e choix)' }))
+    await waitFor(() => expect(ballot).toHaveBeenCalledTimes(3))
+    expect(ballot.mock.calls[2]!.slice(0, 2)).toEqual(['p1', ['r2', 'r1']])
+    expect(screen.getByText('Sushi Go est maintenant ton 1er choix.')).toBeInTheDocument()
+    unmount()
+  }, 20000)
 })

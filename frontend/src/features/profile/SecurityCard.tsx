@@ -13,6 +13,7 @@ import { errorMessage, hasFieldError } from '@/lib/errors'
 import { formatRelativeTime } from '@/lib/format'
 import { qk } from '@/lib/queryKeys'
 import type { AccountInfo, User } from '@/lib/types'
+import { PasskeysSection } from './PasskeysSection'
 
 /** Mot à taper pour supprimer son compte (même règle que le serveur). */
 export const DELETE_WORD = 'SUPPRIMER'
@@ -33,11 +34,12 @@ export function SecurityCard({ user }: { user: User }) {
       <CardBody className="space-y-6">
         <div className="space-y-1">
           <h2 className="font-display text-lg font-semibold">Sécurité</h2>
-          <p className="text-sm text-muted">Ton adresse, ton mot de passe et les comptes avec lesquels tu te connectes.</p>
+          <p className="text-sm text-muted">Ton adresse, ton mot de passe, les comptes et les passkeys avec lesquels tu te connectes.</p>
         </div>
         <EmailSection user={user} acc={acc} />
         <PasswordSection user={user} acc={acc} />
         <ProvidersSection user={user} acc={acc} />
+        <PasskeysSection user={user} />
       </CardBody>
     </Card>
   )

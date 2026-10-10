@@ -19,6 +19,11 @@ export function useVotes(id: string | undefined, enabled = true) {
   return useQuery({ queryKey: qk.votes(id ?? ''), queryFn: () => partiesApi.votes(id!), enabled: !!id && enabled })
 }
 
+/** Classement en direct (serveur) ; rechargé avec les votes (clé sous `votes`). */
+export function useTally(id: string | undefined, enabled = true) {
+  return useQuery({ queryKey: qk.tally(id ?? ''), queryFn: () => partiesApi.tally(id!), enabled: !!id && enabled })
+}
+
 export function useOrderItems(id: string | undefined, enabled = true) {
   return useQuery({ queryKey: qk.items(id ?? ''), queryFn: () => partiesApi.orderItems(id!), enabled: !!id && enabled })
 }

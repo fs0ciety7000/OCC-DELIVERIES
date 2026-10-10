@@ -71,7 +71,7 @@ func bindHooks(app core.App) {
 	})
 
 	// ------------------------------------------------------------- votes
-	app.OnRecordCreateRequest(colVotes).BindFunc(onVoteCreate)
+	// written only by PUT /api/occ/parties/{id}/ballot (routes_vote.go)
 
 	// --------------------------------------------------- payout_profiles
 	app.OnRecordCreateRequest(colPayoutProfiles).BindFunc(onPayoutProfileUpsert)
@@ -317,27 +317,6 @@ func onOrderItemUpsert(e *core.RecordRequestEvent) error {
 		}
 		return resetReady(tx, r.GetString("party"), r.GetString("user"))
 	})
-}
-
-func onVoteCreate(e *core.RecordRequestEvent) error {
-	// a replayed vote (same client key, or the same restaurant again) returns
-	// the existing vote instead of failing on the unique index
-	if done, err := replayByClientKey(e, colVotes, dbx.HashExp{
-		"party": e.Record.GetString("party"), "user": e.Record.GetString("user"), "restaurant": e.Record.GetString("restaurant"),
-	}); done {
-		return err
-	}
-	party, err := e.App.FindRecordById(colParties, e.Record.GetString("party"))
-	if err != nil {
-		return badRequest("Commande introuvable.")
-	}
-	if party.GetString("status") != domain.StatusVoting {
-		return badRequest("Le vote n'est pas ouvert.")
-	}
-	if !slices.Contains(party.GetStringSlice("candidates"), e.Record.GetString("restaurant")) {
-		return badRequest("Ce restaurant ne fait pas partie des candidats.")
-	}
-	return e.Next()
 }
 
 // replayByClientKey implements the offline outbox idempotency: when the

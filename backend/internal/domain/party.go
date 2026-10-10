@@ -1,10 +1,5 @@
 package domain
 
-import (
-	"sort"
-	"strings"
-)
-
 // Party statuses.
 const (
 	StatusLobby     = "lobby"
@@ -99,30 +94,4 @@ type Candidate struct {
 	ID     string
 	Name   string
 	Rating float64
-}
-
-// ElectWinner returns the candidate with the most (approval) votes.
-// Ties are broken by higher rating, then by name (case-insensitive), then id.
-// votes maps restaurant id → number of votes. Returns "" when no candidate.
-func ElectWinner(candidates []Candidate, votes map[string]int) string {
-	if len(candidates) == 0 {
-		return ""
-	}
-	cs := make([]Candidate, len(candidates))
-	copy(cs, candidates)
-	sort.SliceStable(cs, func(i, j int) bool {
-		a, b := cs[i], cs[j]
-		if votes[a.ID] != votes[b.ID] {
-			return votes[a.ID] > votes[b.ID]
-		}
-		if a.Rating != b.Rating {
-			return a.Rating > b.Rating
-		}
-		an, bn := strings.ToLower(a.Name), strings.ToLower(b.Name)
-		if an != bn {
-			return an < bn
-		}
-		return a.ID < b.ID
-	})
-	return cs[0].ID
 }

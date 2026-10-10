@@ -297,7 +297,7 @@ func TestPushPartyEvents(t *testing.T) {
 		t.Fatalf("voting (actor and muted excluded): %v", got)
 	}
 
-	pe.expect(200, "POST", "/api/collections/votes/records", bob.token, map[string]any{"party": pid, "user": bob.id(), "restaurant": pizza})
+	pe.expect(200, "PUT", path("/api/occ/parties/%s/ballot", pid), bob.token, map[string]any{"ranking": []string{pizza}})
 	pe.expect(200, "POST", path("/api/occ/parties/%s/transition", pid), alice.token, map[string]any{"to": "ordering"})
 	if got := pe.flush(); strings.Join(got, "|") != "bob: On commande chez Test Pizza 🍽️|carol: On commande chez Test Pizza 🍽️" {
 		t.Fatalf("ordering: %v", got)

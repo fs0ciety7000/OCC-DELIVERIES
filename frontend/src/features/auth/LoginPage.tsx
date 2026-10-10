@@ -1,3 +1,4 @@
+import { Fingerprint } from 'lucide-react'
 import { ClientResponseError } from 'pocketbase'
 import { useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
@@ -9,6 +10,7 @@ import { errorMessage } from '@/lib/errors'
 import { AuthLayout } from './AuthLayout'
 import { safeNext } from './safeNext'
 import { OAuthButtons } from './OAuthButtons'
+import { usePasskeyLogin } from './usePasskeyLogin'
 
 export function LoginPage() {
   const [params] = useSearchParams()
@@ -20,12 +22,13 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  if (isAuthenticated && !busy) return <Navigate to={next} replace />
-
   const done = () => {
     toast.success('Content de te revoir !')
     navigate(next, { replace: true })
   }
+  const passkey = usePasskeyLogin(done, !isAuthenticated)
+
+  if (isAuthenticated && !busy && !passkey.busy) return <Navigate to={next} replace />
 
   return (
     <AuthLayout
@@ -58,7 +61,7 @@ export function LoginPage() {
         }}
       >
         <Field label="E-mail">
-          {(p) => <Input {...p} type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="prenom@entreprise.be" />}
+          {(p) => <Input {...p} type="email" autoComplete={passkey.conditional ? 'username webauthn' : 'email'} required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="prenom@entreprise.be" />}
         </Field>
         <div className="space-y-1.5">
           <Field label="Mot de passe" error={error}>
@@ -73,6 +76,18 @@ export function LoginPage() {
         <Button type="submit" block size="lg" loading={busy}>
           Se connecter
         </Button>
+        {passkey.available && (
+          <div className="space-y-2">
+            <Button type="button" variant="secondary" block leftIcon={<Fingerprint aria-hidden className="size-4" />} loading={passkey.busy} onClick={passkey.start}>
+              Se connecter avec une passkey
+            </Button>
+            {passkey.error && (
+              <p role="alert" className="text-center text-sm text-danger">
+                {passkey.error}
+              </p>
+            )}
+          </div>
+        )}
         <OAuthButtons onSuccess={done} />
       </form>
     </AuthLayout>

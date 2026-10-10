@@ -27,7 +27,7 @@ import { fromSelectedOptions, toSelectedOptions } from '@/lib/price'
 import { qk } from '@/lib/queryKeys'
 import type { MenuItem, OrderItem } from '@/lib/types'
 import type { PartyCtx } from '../context'
-import { useOrderItems, useReady, useTransition } from '../hooks'
+import { useOrderItems, useReady, useTally, useTransition } from '../hooks'
 import { ReorderCard } from '../ReorderCard'
 import { cartStatsByUser } from '../logic'
 
@@ -70,6 +70,12 @@ export function OrderingStep({ ctx }: { ctx: PartyCtx }) {
   // Révélation du gagnant, une fois par party, seulement après un vrai vote.
   const firstReveal = useFirstTime(`occ-winner-${party.id}`, (party.candidates?.length ?? 0) >= 2 && !!restaurant)
   const [revealing, setRevealing] = useState(firstReveal)
+  const tally = useTally(party.id, revealing)
+  const winnerScore = tally.data?.standings.find((s) => s.restaurant === restaurant?.id)
+  const revealDetail =
+    winnerScore && winnerScore.points > 0
+      ? `${plural(winnerScore.points, 'pt', 'pts')} · ${plural(winnerScore.firstChoices, '1er choix', '1ers choix')}`
+      : undefined
 
   const toggleReady = (onDone?: () => void) =>
     ready.mutate(!amReady, {
@@ -149,7 +155,7 @@ export function OrderingStep({ ctx }: { ctx: PartyCtx }) {
     <div className="grid gap-6 pb-36 lg:grid-cols-[minmax(0,1fr)_320px]">
       {revealing && restaurant && (
         <Suspense fallback={null}>
-          <WinnerReveal emoji={restaurant.emoji || '🍽️'} name={restaurant.name} onDone={() => setRevealing(false)} />
+          <WinnerReveal emoji={restaurant.emoji || '🍽️'} name={restaurant.name} detail={revealDetail} onDone={() => setRevealing(false)} />
         </Suspense>
       )}
       <div className="min-w-0 space-y-4">

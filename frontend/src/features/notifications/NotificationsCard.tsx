@@ -19,8 +19,13 @@ const PREF_ROWS: { key: keyof NotifyPrefs; label: string; hint: string }[] = [
 const prefsKey = (userId: string) => ['push', 'prefs', userId] as const
 const DEVICE_KEY = ['push', 'device'] as const
 
-/** Carte « Notifications » du profil (Mes infos) : activation, test, préférences, installation. */
-export function NotificationsCard({ userId }: { userId: string }) {
+const EMAIL_ROW = {
+  label: 'Bon de commande par e-mail',
+  hint: 'Quand la commande est validée : ta commande, ta part et à qui rembourser, plus le bon complet.',
+}
+
+/** Carte « Notifications » du profil (Mes infos) : activation, test, préférences, e-mail, installation. */
+export function NotificationsCard({ userId, guest = false }: { userId: string; guest?: boolean }) {
   const qc = useQueryClient()
   const support = pushSupport()
   const prefs = useQuery({ queryKey: prefsKey(userId), queryFn: pushApi.prefs })
@@ -164,6 +169,16 @@ export function NotificationsCard({ userId }: { userId: string }) {
               </p>
             )}
           </fieldset>
+        )}
+        {/* E-mail : indépendant des notifications push (aucun appareil requis) ; invités sans adresse exclus. */}
+        {!guest && prefs.data?.mail && (
+          <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium">{EMAIL_ROW.label}</p>
+              <p className="text-xs text-muted">{EMAIL_ROW.hint}</p>
+            </div>
+            <Toggle label={EMAIL_ROW.label} checked={prefs.data.prefs.emails} onChange={(v) => setPref.mutate({ emails: v })} />
+          </div>
         )}
         <InstallRow />
       </CardBody>

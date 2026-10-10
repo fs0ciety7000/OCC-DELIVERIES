@@ -51,6 +51,8 @@ type Config struct {
 	Google GoogleConfig
 	// Push is the Web Push configuration (OCC_VAPID_*, OCC_PUSH_ENABLED).
 	Push PushConfig
+	// WebAuthn is the passkeys relying party (OCC_WEBAUTHN_*, passkeys.go).
+	WebAuthn WebAuthnConfig
 }
 
 // ConfigFromEnv reads the OCC_* environment variables.
@@ -65,6 +67,7 @@ func ConfigFromEnv(version string) Config {
 	cfg.Sync = syncConfigFromEnv()
 	authConfigFromEnv(&cfg)
 	cfg.Push = pushConfigFromEnv(cfg.Mail.From, cfg.PublicURL)
+	cfg.WebAuthn = webAuthnConfigFromEnv()
 	cfg.AdminEmails = parseEmails(os.Getenv("OCC_ADMIN_EMAIL") + "," + os.Getenv("OCC_ADMINS"))
 	for _, p := range strings.Split(envOr("OCC_PROVIDERS", "ubereats,takeaway,deliveroo,weloveat"), ",") {
 		p = strings.ToLower(strings.TrimSpace(p))
@@ -123,6 +126,8 @@ func register(app core.App, cfg Config) *handlers {
 	SetTeamNotifier(h.push)
 	h.deadlines = newDeadlineScheduler(app, h.push, cfg.Push.Now)
 	h.deadlines.bind()
+	h.orderMail = newOrderMailer(app, cfg.PublicURL)
+	h.orderMail.bind()
 	bindHooks(app)
 	bindRoleHooks(app, cfg)
 	bindCatalogHooks(app)
@@ -131,6 +136,8 @@ func register(app core.App, cfg Config) *handlers {
 	bindAccountHooks(app)
 	bindTeamHooks(app) // after bindHooks: runs inside onPartyCreate
 	bindGuestHooks(app)
+	h.passkeys = newPasskeyService(app, cfg)
+	bindPasskeyHooks(app)
 	search.Bind(app)
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
 		if err := applyAuthSettings(se.App, cfg); err != nil {
@@ -151,7 +158,9 @@ type handlers struct {
 	sync      *syncer
 	push      *pushService
 	deadlines *deadlineScheduler
-	guests    *guestState // rate limits of the guest endpoints
+	guests    *guestState     // rate limits of the guest endpoints
+	orderMail *orderMailer    // « bon de commande » e-mail (ordermail.go)
+	passkeys  *passkeyService // WebAuthn sign-in (passkeys.go)
 }
 
 func (h *handlers) routes(r *router.Router[*core.RequestEvent]) {
@@ -180,9 +189,12 @@ func (h *handlers) routes(r *router.Router[*core.RequestEvent]) {
 	h.pushRoutes(g)
 	g.POST("/payments/{id}/action", h.paymentAction).Bind(user)
 	g.GET("/payments/{id}/qr", h.paymentQR).Bind(user)
+	g.GET("/parties/{id}/payments/qr", h.paymentsCollectQR).Bind(user)
 	g.GET("/payments/{id}/wallet-qr/{kind}", h.walletQR).Bind(user)
 	h.teamRoutes(g, user)
 	h.guestRoutes(g, user)
+	h.passkeyRoutes(g, user)
+	h.voteRoutes(g, user)
 
 	admin := g.Group("/admin")
 	admin.BindFunc(requireAdmin)

@@ -63,27 +63,33 @@ func TestAuthz(t *testing.T) {
 	e.expect(403, "POST", "/api/collections/payments/records", alice.token, map[string]any{"party": pid, "debtor": bob.id(), "creditor": alice.id(), "status": "confirmed"})
 
 	// vote outside the voting phase
-	e.expect(400, "POST", "/api/collections/votes/records", bob.token, map[string]any{"party": pid, "user": bob.id(), "restaurant": pizza})
+	ballot := path("/api/occ/parties/%s/ballot", pid)
+	e.expect(400, "PUT", ballot, bob.token, map[string]any{"ranking": []string{pizza}})
 
-	// voting: candidates only, members only, own votes only
+	// voting: candidates only, members only, server-written ballots only
 	e.expect(200, "POST", path("/api/occ/parties/%s/transition", pid), alice.token, map[string]any{"to": "voting"})
 	seedRest, err := e.app.FindFirstRecordByData(colRestaurants, "slug", "la-bella-nonna")
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := e.expect(400, "POST", "/api/collections/votes/records", bob.token, map[string]any{"party": pid, "user": bob.id(), "restaurant": seedRest.Id})
+	r := e.expect(400, "PUT", ballot, bob.token, map[string]any{"ranking": []string{pizza, seedRest.Id}})
 	if !strings.Contains(string(r.body), "candidats") {
 		t.Fatalf("non-candidate vote: %s", r.body)
 	}
-	e.expect(400, "POST", "/api/collections/votes/records", carol.token, map[string]any{"party": pid, "user": carol.id(), "restaurant": pizza})
-	e.expect(400, "POST", "/api/collections/votes/records", bob.token, map[string]any{"party": pid, "user": alice.id(), "restaurant": pizza})
-	v := e.expect(200, "POST", "/api/collections/votes/records", bob.token, map[string]any{"party": pid, "user": bob.id(), "restaurant": pizza}).m(t)
-	// same vote again (offline replay): idempotent, the existing vote is returned
-	if again := e.expect(200, "POST", "/api/collections/votes/records", bob.token, map[string]any{"party": pid, "user": bob.id(), "restaurant": pizza}).m(t); again["id"] != v["id"] {
-		t.Fatalf("duplicate vote must return the existing one: %v", again)
+	e.expect(400, "PUT", ballot, bob.token, map[string]any{"ranking": []string{pizza, pizza}})
+	e.expect(403, "PUT", ballot, carol.token, map[string]any{"ranking": []string{pizza}})
+	e.expect(403, "GET", path("/api/occ/parties/%s/tally", pid), carol.token, nil)
+	e.expect(401, "PUT", ballot, "", map[string]any{"ranking": []string{pizza}})
+	// the collection itself is read-only for everyone but superusers
+	e.expect(403, "POST", "/api/collections/votes/records", bob.token, map[string]any{"party": pid, "user": bob.id(), "restaurant": pizza, "rank": 1})
+	e.expect(200, "PUT", ballot, bob.token, map[string]any{"ranking": []string{pizza}})
+	v, err := e.app.FindFirstRecordByFilter(colVotes, "party = {:p} && user = {:u}", dbx.Params{"p": pid, "u": bob.id()})
+	if err != nil || v.GetInt("rank") != 1 {
+		t.Fatalf("ballot not stored: %v", err)
 	}
-	e.expect(403, "PATCH", "/api/collections/votes/records/"+v["id"].(string), bob.token, map[string]any{"restaurant": pizza})
-	e.expect(404, "DELETE", "/api/collections/votes/records/"+v["id"].(string), alice.token, nil)
+	e.expect(403, "PATCH", "/api/collections/votes/records/"+v.Id, bob.token, map[string]any{"rank": 2})
+	e.expect(403, "DELETE", "/api/collections/votes/records/"+v.Id, bob.token, nil)
+	e.expect(403, "DELETE", "/api/collections/votes/records/"+v.Id, carol.token, nil)
 
 	// review → paying only through /payer ; imposed restaurant must be a candidate
 	e.expect(400, "POST", path("/api/occ/parties/%s/transition", pid), alice.token, map[string]any{"to": "ordering", "restaurant": seedRest.Id})

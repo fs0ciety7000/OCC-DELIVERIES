@@ -22,6 +22,7 @@ describe('règles de cache du service worker', () => {
     ['menu', get('/api/collections/menu_items/records?filter=x'), 'api'],
     ['fiche resto', get('/api/collections/restaurants/records/abc123'), 'api'],
     ['récap de party (réseau d’abord)', get('/api/occ/parties/abc123/summary'), 'live'],
+    ['classement du vote (réseau d’abord)', get('/api/occ/parties/abc123/tally'), 'live'],
     ['party (réseau d’abord)', get('/api/collections/parties/records/abc123?expand=host'), 'live'],
     ['paniers (réseau d’abord)', get('/api/collections/order_items/records?filter=x'), 'live'],
     ['export (téléchargement)', get('/api/occ/parties/abc/export?format=csv'), 'none'],

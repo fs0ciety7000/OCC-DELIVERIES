@@ -271,30 +271,44 @@ test('commande groupée complète : vote → paniers → récap → dispatch →
       await expect(resume).toContainText('Étape 2/5 · Vote')
       await resume.click()
       await bp.waitForURL(`**${partyPath}`)
-      for (const a of members) await expect(a.page.getByRole('heading', { name: 'Vote pour tes restos préférés' })).toBeVisible()
+      for (const a of members) await expect(a.page.getByRole('heading', { name: 'Classe tes restos préférés' })).toBeVisible()
       await expect(bp.getByRole('complementary', { name: 'Commande en cours' })).toHaveCount(0) // masqué dans la salle
 
-      const meter = (p: Page, n: number, r: string) => p.getByRole('meter', { name: `${n} vote(s) pour ${r}`, exact: true })
+      // Vote par classement (3 candidats) : 1er choix 3 pts, 2e 2 pts, 3e 1 pt — scores calculés par le serveur.
+      const [, C1, C2] = CANDIDATES as [string, string, string]
+      const pts = (n: number) => `${n} ${n >= 2 ? 'pts' : 'pt'}`
+      const meter = (p: Page, n: number, r: string) => p.getByRole('meter', { name: `${pts(n)} pour ${r}`, exact: true })
+      const add = (p: Page, r: string) => p.getByRole('button', { name: `Ajouter ${r} à mon classement`, exact: true }).click()
 
-      await bob.page.getByRole('button', { name: `Voter pour ${WINNER}`, exact: true }).click()
-      await bob.page.getByRole('button', { name: `Voter pour ${CANDIDATES[1]}`, exact: true }).click()
+      // Bob : le gagnant puis C1.
+      await add(bob.page, WINNER)
+      await add(bob.page, C1)
+      await expect(bob.page.getByRole('button', { name: `Retirer ${C1} de mon classement (2e choix)`, exact: true })).toHaveAttribute('aria-pressed', 'true')
       // Visible chez Alice et Chloé sans rechargement.
       for (const a of [alice, chloe]) {
-        await expect(meter(a.page, 1, WINNER)).toBeVisible()
-        await expect(meter(a.page, 1, CANDIDATES[1]!)).toBeVisible()
-      }
-      await chloe.page.getByRole('button', { name: `Voter pour ${WINNER}`, exact: true }).click()
-      await chloe.page.getByRole('button', { name: `Voter pour ${CANDIDATES[2]}`, exact: true }).click()
-      await chloe.page.getByRole('button', { name: `Retirer mon vote pour ${CANDIDATES[2]}`, exact: true }).click()
-      await expect(meter(alice.page, 2, WINNER)).toBeVisible()
-      await expect(meter(bob.page, 2, WINNER)).toBeVisible()
-      await expect(meter(bob.page, 0, CANDIDATES[2]!)).toBeVisible()
-
-      await ap.getByRole('button', { name: `Voter pour ${WINNER}`, exact: true }).click()
-      for (const a of members) {
         await expect(meter(a.page, 3, WINNER)).toBeVisible()
+        await expect(meter(a.page, 2, C1)).toBeVisible()
+      }
+      // Chloé : C2 puis le gagnant, remonte le gagnant en 1er, puis retire C2.
+      const cp = chloe.page
+      await add(cp, C2)
+      await add(cp, WINNER)
+      await cp.getByRole('button', { name: `Monter ${WINNER} (actuellement 2e choix)`, exact: true }).click()
+      await expect(cp.getByRole('list', { name: 'Mon classement' }).getByRole('listitem').first()).toContainText(WINNER)
+      await cp.getByRole('button', { name: `Retirer ${C2} de mon classement`, exact: true }).click()
+      await expect(meter(alice.page, 6, WINNER)).toBeVisible()
+      await expect(meter(bob.page, 6, WINNER)).toBeVisible()
+      await expect(meter(bob.page, 0, C2)).toBeVisible()
+
+      // Alice : C1 en 1er, le gagnant en 2e → gagnant 8 pts, C1 5 pts.
+      await add(ap, C1)
+      await add(ap, WINNER)
+      for (const a of members) {
+        await expect(meter(a.page, 8, WINNER)).toBeVisible()
+        await expect(meter(a.page, 5, C1)).toBeVisible()
         await expect(a.page.getByText('3/3 ont voté')).toBeVisible()
       }
+      await expect(ap.getByRole('list', { name: 'Classement en direct' }).getByRole('listitem').first()).toContainText(WINNER)
 
       await ap.getByRole('button', { name: 'Clore le vote' }).click()
       await ap.getByRole('button', { name: `Valider — ${WINNER}` }).click()

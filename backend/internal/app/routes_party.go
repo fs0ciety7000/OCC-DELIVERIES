@@ -196,30 +196,17 @@ func applyTransition(tx core.App, p *core.Record, to, restaurant string) error {
 	return nil
 }
 
+// electWinner applies the ranked vote rule (ADR 0005): the same tally as
+// GET /tally, for the host and the deadline scheduler.
 func electWinner(app core.App, partyID string, candidates []string) (string, error) {
-	recs, err := app.FindRecordsByIds(colRestaurants, candidates)
+	tally, err := partyTally(app, partyID, candidates)
 	if err != nil {
 		return "", err
 	}
-	cands := make([]domain.Candidate, 0, len(recs))
-	for _, r := range recs {
-		if r.GetBool("active") {
-			cands = append(cands, domain.Candidate{ID: r.Id, Name: r.GetString("name"), Rating: r.GetFloat("rating")})
-		}
-	}
-	votes, err := app.FindAllRecords(colVotes, dbx.HashExp{"party": partyID})
-	if err != nil {
-		return "", err
-	}
-	counts := map[string]int{}
-	for _, v := range votes {
-		counts[v.GetString("restaurant")]++
-	}
-	winner := domain.ElectWinner(cands, counts)
-	if winner == "" {
+	if tally.Winner == "" {
 		return "", badRequest("Aucun restaurant candidat disponible.")
 	}
-	return winner, nil
+	return tally.Winner, nil
 }
 
 func (h *handlers) ready(e *core.RequestEvent) error {

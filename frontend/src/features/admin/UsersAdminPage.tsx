@@ -104,7 +104,7 @@ export function UsersAdminPage() {
           <p className="text-xs break-words text-subtle">
             {mailOn && mail.data
               ? `${mail.data.senderName} <${mail.data.senderAddress}> · ${mail.data.host}:${mail.data.port}${mail.data.fromEnv ? ' · OCC_SMTP_*' : ''}`
-              : 'Renseigne OCC_SMTP_HOST, OCC_SMTP_USERNAME, OCC_SMTP_PASSWORD et OCC_MAIL_FROM puis redéploie : vérification, mot de passe oublié et liens de réinitialisation.'}
+              : 'Renseigne OCC_SMTP_HOST, OCC_SMTP_USERNAME, OCC_SMTP_PASSWORD et OCC_MAIL_FROM puis redéploie : vérification, mot de passe oublié, liens de réinitialisation et bons de commande.'}
           </p>
         </div>
         {mailOn && (

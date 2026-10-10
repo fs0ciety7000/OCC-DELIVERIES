@@ -28,16 +28,10 @@ async function sendOrQueue(action: OutboxAction, key: string, send: () => Promis
   }
 }
 
-export function voteAction(partyId: string, userId: string, restaurantId: string): Promise<ActionResult> {
+/** Remplace mon bulletin (1er choix d'abord, `[]` = retirer mon vote) ; hors ligne : seul le dernier est gardé. */
+export function ballotAction(partyId: string, ranking: string[]): Promise<ActionResult> {
   const key = newClientKey()
-  return sendOrQueue({ kind: 'vote', partyId, userId, restaurantId }, key, () => partiesApi.vote(partyId, userId, restaurantId, key))
-}
-
-/** `voteId` : identifiant connu du vote (absent / « tmp-… » si le vote n'est pas encore envoyé). */
-export function unvoteAction(partyId: string, userId: string, restaurantId: string, voteId?: string): Promise<ActionResult> {
-  const action: OutboxAction = { kind: 'unvote', partyId, userId, restaurantId }
-  const known = voteId && !voteId.startsWith('tmp-') ? voteId : null
-  return sendOrQueue(action, newClientKey(), () => (known ? partiesApi.unvote(known) : removeMyVotes(action)))
+  return sendOrQueue({ kind: 'ballot', partyId, ranking }, key, () => partiesApi.ballot(partyId, ranking, key))
 }
 
 export function readyAction(partyId: string, ready: boolean): Promise<ActionResult> {
@@ -51,27 +45,28 @@ export function addItemAction(input: OrderItemInput, label: string): Promise<Act
   return sendOrQueue({ kind: 'addItem', partyId: input.party, input: withKey, label }, key, () => partiesApi.addItem(withKey))
 }
 
-async function removeMyVotes(a: Extract<OutboxAction, { kind: 'unvote' }>) {
-  const votes = await partiesApi.votes(a.partyId)
-  for (const v of votes) {
-    if (v.user !== a.userId || v.restaurant !== a.restaurantId) continue
-    try {
-      await partiesApi.unvote(v.id)
-    } catch (err) {
-      if ((err as { status?: number }).status !== 404) throw err
-    }
-  }
+/** Ancienne entrée « vote / retrait » (avant le vote par classement) : relit mon bulletin et le réécrit. */
+async function replayLegacyVote(a: Extract<OutboxAction, { kind: 'vote' | 'unvote' }>, key: string) {
+  const mine = (await partiesApi.votes(a.partyId))
+    .filter((v) => v.user === a.userId)
+    .sort((x, y) => x.rank - y.rank)
+    .map((v) => v.restaurant)
+  const has = mine.includes(a.restaurantId)
+  if (a.kind === 'vote' ? has : !has) return
+  const ranking = a.kind === 'vote' ? [...mine, a.restaurantId] : mine.filter((r) => r !== a.restaurantId)
+  await partiesApi.ballot(a.partyId, ranking, key)
 }
 
 /** Exécute une action de la file (rejeu). */
 export async function executeEntry(entry: OutboxEntry): Promise<void> {
   const a = entry.action
   switch (a.kind) {
-    case 'vote':
-      await partiesApi.vote(a.partyId, a.userId, a.restaurantId, entry.id)
+    case 'ballot':
+      await partiesApi.ballot(a.partyId, a.ranking, entry.id)
       return
+    case 'vote':
     case 'unvote':
-      await removeMyVotes(a)
+      await replayLegacyVote(a, entry.id)
       return
     case 'ready':
       await occ.ready(a.partyId, a.ready)

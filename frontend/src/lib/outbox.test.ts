@@ -2,7 +2,7 @@ import { ClientResponseError } from 'pocketbase'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { partiesApi, occ } from './api'
 import { createOutbox, memoryStorage, newClientKey, actionLabel, type OutboxEntry } from './outbox'
-import { addItemAction, executeEntry, outbox, readyAction, replayOutbox, voteAction } from './offlineActions'
+import { addItemAction, ballotAction, executeEntry, outbox, readyAction, replayOutbox } from './offlineActions'
 import { isNetworkError } from './online'
 
 const network = () => new ClientResponseError({ status: 0, response: {} })
@@ -11,13 +11,13 @@ const refused = () => new ClientResponseError({ status: 400, response: { message
 describe('file hors ligne', () => {
   it('rejoue dans l’ordre et s’arrête à la première erreur réseau', async () => {
     const box = createOutbox(memoryStorage())
-    await box.enqueue({ kind: 'vote', partyId: 'p', userId: 'u', restaurantId: 'r1' })
+    await box.enqueue({ kind: 'ballot', partyId: 'p1', ranking: ['r1'] })
     await box.enqueue({ kind: 'ready', partyId: 'p', ready: true })
-    await box.enqueue({ kind: 'vote', partyId: 'p', userId: 'u', restaurantId: 'r2' })
+    await box.enqueue({ kind: 'ballot', partyId: 'p2', ranking: ['r2'] })
     const seen: string[] = []
     let fail = true
     const exec = async (e: OutboxEntry) => {
-      const label = e.action.kind === 'vote' ? e.action.restaurantId : e.action.kind
+      const label = e.action.kind === 'ballot' ? e.action.ranking.join() : e.action.kind
       if (label === 'ready' && fail) throw network()
       seen.push(label)
     }
@@ -34,10 +34,10 @@ describe('file hors ligne', () => {
 
   it('abandonne une action refusée par le serveur et continue', async () => {
     const box = createOutbox(memoryStorage())
-    await box.enqueue({ kind: 'vote', partyId: 'p', userId: 'u', restaurantId: 'r1' })
+    await box.enqueue({ kind: 'ballot', partyId: 'p', ranking: ['r1'] })
     await box.enqueue({ kind: 'ready', partyId: 'p', ready: true })
     const res = await box.replay(async (e) => {
-      if (e.action.kind === 'vote') throw refused()
+      if (e.action.kind === 'ballot') throw refused()
     }, isNetworkError)
     expect(res.failed).toHaveLength(1)
     expect(res.done).toHaveLength(1)
@@ -54,8 +54,23 @@ describe('file hors ligne', () => {
     const list = await box.list()
     expect(list).toHaveLength(1)
     expect(list[0]!.action).toEqual({ kind: 'ready', partyId: 'p', ready: false })
-    for (const r of ['a', 'b', 'c', 'd']) await box.enqueue({ kind: 'vote', partyId: 'p', userId: 'u', restaurantId: r })
-    expect((await box.list()).map((e) => (e.action.kind === 'vote' ? e.action.restaurantId : e.action.kind))).toEqual(['b', 'c', 'd'])
+    for (const r of ['a', 'b', 'c', 'd']) await box.enqueue({ kind: 'ballot', partyId: r, ranking: [r] })
+    expect((await box.list()).map((e) => (e.action.kind === 'ballot' ? e.action.partyId : e.action.kind))).toEqual(['b', 'c', 'd'])
+  })
+
+  it('bulletin : seul le dernier est gardé par commande, il remplace les anciens votes en file', async () => {
+    const box = createOutbox(memoryStorage())
+    await box.enqueue({ kind: 'vote', partyId: 'p', userId: 'u', restaurantId: 'r9' })
+    await box.enqueue({ kind: 'ballot', partyId: 'p', ranking: ['r1'] })
+    await box.enqueue({ kind: 'ballot', partyId: 'q', ranking: ['r5'] })
+    await box.enqueue({ kind: 'ballot', partyId: 'p', ranking: ['r2', 'r1'] })
+    const list = await box.list()
+    expect(list.map((e) => e.action)).toEqual([
+      { kind: 'ballot', partyId: 'q', ranking: ['r5'] },
+      { kind: 'ballot', partyId: 'p', ranking: ['r2', 'r1'] },
+    ])
+    expect(actionLabel(list[1]!.action)).toBe('Classement du vote')
+    expect(actionLabel({ kind: 'ballot', partyId: 'p', ranking: [] })).toBe('Retrait de vote')
   })
 
   it('clés compatibles avec le serveur et libellés français', () => {
@@ -92,20 +107,31 @@ describe('actions rejouables', () => {
   })
 
   it('en ligne mais serveur injoignable : mise en file ; refus du serveur : erreur', async () => {
-    vi.spyOn(partiesApi, 'vote').mockRejectedValueOnce(network()).mockRejectedValueOnce(refused())
-    expect(await voteAction('p1', 'u1', 'r1')).toBe('queued')
-    await expect(voteAction('p1', 'u1', 'r2')).rejects.toThrow()
+    vi.spyOn(partiesApi, 'ballot').mockRejectedValueOnce(network()).mockRejectedValueOnce(refused())
+    expect(await ballotAction('p1', ['r1'])).toBe('queued')
+    await expect(ballotAction('p2', ['r2'])).rejects.toThrow()
     expect(outbox.count()).toBe(1)
   })
 
-  it('rejeu d’un retrait de vote : supprime mes votes pour ce resto (404 ignoré)', async () => {
+  it('rejeu d’un bulletin avec sa clé d’idempotence', async () => {
+    const put = vi.spyOn(partiesApi, 'ballot').mockResolvedValue({} as never)
+    await executeEntry({ id: 'k-1', seq: 1, createdAt: 0, action: { kind: 'ballot', partyId: 'p1', ranking: ['r2', 'r1'] } })
+    expect(put).toHaveBeenCalledWith('p1', ['r2', 'r1'], 'k-1')
+  })
+
+  it('rejeu d’anciennes entrées vote / retrait : relit mon bulletin et le réécrit', async () => {
     vi.spyOn(partiesApi, 'votes').mockResolvedValue([
-      { id: 'v1', party: 'p1', user: 'u1', restaurant: 'r1' },
-      { id: 'v2', party: 'p1', user: 'u2', restaurant: 'r1' },
+      { id: 'v2', party: 'p1', user: 'u1', restaurant: 'r2', rank: 2 },
+      { id: 'v1', party: 'p1', user: 'u1', restaurant: 'r1', rank: 1 },
+      { id: 'v3', party: 'p1', user: 'u2', restaurant: 'r3', rank: 1 },
     ])
-    const del = vi.spyOn(partiesApi, 'unvote').mockRejectedValueOnce(new ClientResponseError({ status: 404, response: {} }))
-    await executeEntry({ id: 'k', seq: 1, createdAt: 0, action: { kind: 'unvote', partyId: 'p1', userId: 'u1', restaurantId: 'r1' } })
-    expect(del).toHaveBeenCalledTimes(1)
-    expect(del).toHaveBeenCalledWith('v1')
+    const put = vi.spyOn(partiesApi, 'ballot').mockResolvedValue({} as never)
+    await executeEntry({ id: 'k', seq: 1, createdAt: 0, action: { kind: 'vote', partyId: 'p1', userId: 'u1', restaurantId: 'r3' } })
+    expect(put).toHaveBeenLastCalledWith('p1', ['r1', 'r2', 'r3'], 'k')
+    await executeEntry({ id: 'k2', seq: 2, createdAt: 0, action: { kind: 'unvote', partyId: 'p1', userId: 'u1', restaurantId: 'r1' } })
+    expect(put).toHaveBeenLastCalledWith('p1', ['r2'], 'k2')
+    // déjà dans l'état voulu : rien à envoyer
+    await executeEntry({ id: 'k3', seq: 3, createdAt: 0, action: { kind: 'vote', partyId: 'p1', userId: 'u1', restaurantId: 'r1' } })
+    expect(put).toHaveBeenCalledTimes(2)
   })
 })

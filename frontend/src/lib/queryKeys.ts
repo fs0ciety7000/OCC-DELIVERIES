@@ -8,10 +8,14 @@ export const qk = {
   partyDetail: (id: string) => ['party', id, 'detail'] as const,
   members: (id: string) => ['party', id, 'members'] as const,
   votes: (id: string) => ['party', id, 'votes'] as const,
+  /** Sous `votes` : invalidé avec les votes (temps réel). */
+  tally: (id: string) => ['party', id, 'votes', 'tally'] as const,
   items: (id: string) => ['party', id, 'items'] as const,
   payments: (id: string) => ['party', id, 'payments'] as const,
   summary: (id: string) => ['party', id, 'summary'] as const,
   paymentQR: (paymentId: string) => ['paymentQR', paymentId] as const,
+  /** Sous `payments` : invalidé avec la liste des paiements. */
+  paymentsCollect: (partyId: string) => ['party', partyId, 'payments', 'collect'] as const,
   myParties: (userId: string) => ['myParties', userId] as const,
   history: (userId: string) => ['history', userId] as const,
   myStats: (userId: string) => ['history', userId, 'stats'] as const,
@@ -19,6 +23,7 @@ export const qk = {
   payout: (userId: string) => ['payout', userId] as const,
   authMethods: ['authMethods'] as const,
   account: (userId: string) => ['account', userId] as const,
+  passkeys: (userId: string) => ['passkeys', userId] as const,
   admin: {
     all: ['admin'] as const,
     stats: ['admin', 'stats'] as const,

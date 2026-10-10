@@ -69,7 +69,7 @@ func TestDeadlineVoteRemindersAndAutoClose(t *testing.T) {
 	end := f.base.Add(10 * time.Minute) // 11:40 Brussels
 	f.setDeadline("voting_ends_at", end)
 	f.expect(200, "POST", path("/api/occ/parties/%s/transition", f.pid), f.alice.token, map[string]any{"to": "voting"})
-	f.expect(200, "POST", "/api/collections/votes/records", f.bob.token, map[string]any{"party": f.pid, "user": f.bob.id(), "restaurant": f.burger})
+	f.expect(200, "PUT", path("/api/occ/parties/%s/ballot", f.pid), f.bob.token, map[string]any{"ranking": []string{f.burger, f.pizza}})
 	f.flush()
 
 	steps := []struct {
@@ -262,25 +262,64 @@ func TestClientKeyDedupe(t *testing.T) {
 	pid := party["id"].(string)
 	e.expect(200, "POST", "/api/occ/parties/join", bob.token, map[string]any{"code": party["code"]})
 
-	// votes: replay by key, and the same restaurant twice → the existing vote
+	// ballots: the same ranking or a replayed key writes nothing
 	e.expect(200, "POST", path("/api/occ/parties/%s/transition", pid), alice.token, map[string]any{"to": "voting"})
-	vote := map[string]any{"party": pid, "user": bob.id(), "restaurant": pizza, "client_key": "v-1"}
-	v1 := e.expect(200, "POST", "/api/collections/votes/records", bob.token, vote).m(t)
-	v2 := e.expect(200, "POST", "/api/collections/votes/records", bob.token, vote).m(t)
-	vote["client_key"] = "v-2"
-	v3 := e.expect(200, "POST", "/api/collections/votes/records", bob.token, vote).m(t)
-	if v1["id"] != v2["id"] || v1["id"] != v3["id"] {
-		t.Fatalf("vote replay: %v %v %v", v1["id"], v2["id"], v3["id"])
+	ballot := path("/api/occ/parties/%s/ballot", pid)
+	voteIDs := func() string {
+		recs, _ := e.app.FindRecordsByFilter(colVotes, "party = {:p} && user = {:u}", "rank", 0, 0, dbx.Params{"p": pid, "u": bob.id()})
+		ids := []string{}
+		for _, r := range recs {
+			ids = append(ids, r.Id+":"+r.GetString("restaurant")+":"+r.GetString("rank"))
+		}
+		return strings.Join(ids, ",")
 	}
-	if n, _ := e.app.CountRecords(colVotes, dbx.HashExp{"party": pid}); n != 1 {
-		t.Fatalf("votes: %d", n)
+	var br struct {
+		Ballot []string `json:"ballot"`
+		Tally  struct {
+			Voters    int    `json:"voters"`
+			Winner    string `json:"winner"`
+			Standings []struct {
+				Restaurant string `json:"restaurant"`
+				Points     int    `json:"points"`
+			} `json:"standings"`
+		} `json:"tally"`
 	}
-	// someone else's key does not leak their vote
-	e.expect(200, "POST", "/api/collections/votes/records", alice.token, map[string]any{"party": pid, "user": alice.id(), "restaurant": pizza, "client_key": "v-1"})
+	e.expect(200, "PUT", ballot, bob.token, map[string]any{"ranking": []string{pizza}, "clientKey": "v-1"}).json(t, &br)
+	first := voteIDs()
+	e.expect(200, "PUT", ballot, bob.token, map[string]any{"ranking": []string{pizza}, "clientKey": "v-1"})
+	e.expect(200, "PUT", ballot, bob.token, map[string]any{"ranking": []string{pizza}, "clientKey": "v-1b"})
+	if voteIDs() != first || len(br.Ballot) != 1 || br.Ballot[0] != pizza {
+		t.Fatalf("ballot replay rewrote the votes: %s → %s (%v)", first, voteIDs(), br.Ballot)
+	}
+	e.expect(200, "PUT", ballot, bob.token, map[string]any{"ranking": []string{burger, pizza}, "clientKey": "v-2"}).json(t, &br)
+	second := voteIDs()
+	if len(br.Ballot) != 2 || br.Ballot[0] != burger || br.Tally.Winner != burger || br.Tally.Voters != 1 ||
+		br.Tally.Standings[0].Points != 2 || br.Tally.Standings[1].Points != 1 {
+		t.Fatalf("ranked ballot: %+v", br)
+	}
+	// a replay of the same key with a stale body changes nothing either
+	e.expect(200, "PUT", ballot, bob.token, map[string]any{"ranking": []string{burger, pizza}, "clientKey": "v-2"})
+	if voteIDs() != second {
+		t.Fatalf("v-2 replay: %s → %s", second, voteIDs())
+	}
 	if n, _ := e.app.CountRecords(colVotes, dbx.HashExp{"party": pid}); n != 2 {
 		t.Fatalf("votes: %d", n)
 	}
-	e.expect(400, "POST", "/api/collections/votes/records", bob.token, map[string]any{"party": pid, "user": bob.id(), "restaurant": burger, "client_key": "bad key!"})
+	e.expect(400, "PUT", ballot, bob.token, map[string]any{"ranking": []string{burger}, "clientKey": "bad key!"})
+	// alice's ballot is hers; an empty ranking withdraws bob's
+	e.expect(200, "PUT", ballot, alice.token, map[string]any{"ranking": []string{pizza}, "clientKey": "v-2"})
+	e.expect(200, "PUT", ballot, bob.token, map[string]any{"ranking": []string{}}).json(t, &br)
+	if n, _ := e.app.CountRecords(colVotes, dbx.HashExp{"party": pid}); n != 1 || len(br.Ballot) != 0 || br.Tally.Winner != pizza {
+		t.Fatalf("withdraw: %d votes, %+v", n, br)
+	}
+	var tally struct {
+		Voters int    `json:"voters"`
+		Winner string `json:"winner"`
+	}
+	e.expect(200, "GET", path("/api/occ/parties/%s/tally", pid), bob.token, nil).json(t, &tally)
+	if tally.Voters != 1 || tally.Winner != pizza {
+		t.Fatalf("tally: %+v", tally)
+	}
 
 	// order items
 	e.expect(200, "POST", path("/api/occ/parties/%s/transition", pid), alice.token, map[string]any{"to": "ordering"})

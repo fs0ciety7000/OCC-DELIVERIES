@@ -96,7 +96,7 @@ func TestGuestJoinAndGuards(t *testing.T) {
 
 	// guests can vote / order / mark ready
 	e.expect(200, "POST", path("/api/occ/parties/%s/transition", pid), alice.token, map[string]any{"to": "voting"})
-	e.expect(200, "POST", "/api/collections/votes/records", lea.token, map[string]any{"party": pid, "user": r.Id, "restaurant": pizza})
+	e.expect(200, "PUT", path("/api/occ/parties/%s/ballot", pid), lea.token, map[string]any{"ranking": []string{pizza}})
 	e.expect(200, "POST", path("/api/occ/parties/%s/transition", pid), alice.token, map[string]any{"to": "ordering", "restaurant": pizza})
 	e.expect(200, "POST", "/api/collections/order_items/records", lea.token, map[string]any{"party": pid, "user": r.Id, "menu_item": e.menuItem(pizza, "Tiramisu")})
 	e.expect(200, "POST", path("/api/occ/parties/%s/ready", pid), lea.token, map[string]any{"ready": true})

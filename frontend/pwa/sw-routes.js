@@ -32,7 +32,7 @@ export const SWR_PATTERNS = [
  * évènement temps réel : l'invalidation TanStack recevrait une réponse périmée.)
  */
 export const LIVE_PATTERNS = [
-  /^\/api\/occ\/parties\/[a-z0-9]+\/summary$/,
+  /^\/api\/occ\/parties\/[a-z0-9]+\/(summary|tally)$/,
   /^\/api\/collections\/(parties|party_members|votes|order_items|payments)\/records(\/[a-z0-9]+)?$/,
 ]
 

@@ -656,6 +656,7 @@ func (h *handlers) pushPrefs(e *core.RequestEvent) error {
 		"prefs":   notify.ParsePrefs([]byte(u.GetString("notify_prefs"))),
 		"devices": n,
 		"enabled": h.push.enabled(),
+		"mail":    mailEnabled(e.App),
 	})
 }
 
@@ -664,11 +665,12 @@ func (h *handlers) pushSetPrefs(e *core.RequestEvent) error {
 		Party     *bool `json:"party"`
 		Payments  *bool `json:"payments"`
 		Reminders *bool `json:"reminders"`
+		Emails    *bool `json:"emails"`
 	}
 	if err := bindJSON(e, &body); err != nil {
 		return err
 	}
-	if body.Party == nil && body.Payments == nil && body.Reminders == nil {
+	if body.Party == nil && body.Payments == nil && body.Reminders == nil && body.Emails == nil {
 		return badRequest("Aucune préférence à enregistrer.")
 	}
 	u, err := e.App.FindRecordById(colUsers, e.Auth.Id)
@@ -684,6 +686,9 @@ func (h *handlers) pushSetPrefs(e *core.RequestEvent) error {
 	}
 	if body.Reminders != nil {
 		p.Reminders = *body.Reminders
+	}
+	if body.Emails != nil {
+		p.Emails = *body.Emails
 	}
 	u.Set("notify_prefs", p)
 	if err := e.App.Save(u); err != nil {

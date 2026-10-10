@@ -34,6 +34,7 @@ import type {
   Payment,
   PaymentAction,
   PaymentQR,
+  CollectQR,
   PayoutProfile,
   Restaurant,
   RestaurantImport,
@@ -48,6 +49,8 @@ import type {
   TransitionBody,
   User,
   Vote,
+  BallotResponse,
+  Tally,
   WalletKind,
   PushPrefsResponse,
   PushPublicKey,
@@ -152,6 +155,9 @@ export const occ = {
   },
 
   paymentQR: (paymentId: string) => pb.send<PaymentQR>(`/api/occ/payments/${paymentId}/qr`, { method: 'GET' }),
+
+  /** Payeur seulement : QR (EPC + liens avec montant) de chaque part à encaisser. */
+  collectQR: (partyId: string) => pb.send<CollectQR>(`/api/occ/parties/${partyId}/payments/qr`, { method: 'GET' }),
 
   /** Mes commandes (membre), plus récentes d'abord, 10 par page. */
   history: (page = 1, perPage = 10) => pb.send<HistoryPage>('/api/occ/me/history', { method: 'GET', query: { page, perPage } }),
@@ -349,11 +355,11 @@ export const partiesApi = {
   votes: (partyId: string) =>
     pb.collection('votes').getFullList<Vote>({ filter: pb.filter('party = {:p}', { p: partyId }), sort: 'created' }),
 
-  /** `clientKey` : idempotence (un rejeu de la file hors ligne renvoie le vote existant). */
-  vote: (partyId: string, userId: string, restaurantId: string, clientKey?: string) =>
-    pb.collection('votes').create<Vote>({ party: partyId, user: userId, restaurant: restaurantId, ...(clientKey ? { client_key: clientKey } : {}) }),
+  /** Remplace tout mon bulletin (1er choix d'abord, `[]` = retirer). `clientKey` : idempotence (file hors ligne). */
+  ballot: (partyId: string, ranking: string[], clientKey?: string) =>
+    pb.send<BallotResponse>(`/api/occ/parties/${partyId}/ballot`, { ...json({ ranking, ...(clientKey ? { clientKey } : {}) }), method: 'PUT' }),
 
-  unvote: (voteId: string) => pb.collection('votes').delete(voteId),
+  tally: (partyId: string) => pb.send<Tally>(`/api/occ/parties/${partyId}/tally`, { method: 'GET' }),
 
   orderItems: (partyId: string) =>
     pb.collection('order_items').getFullList<OrderItem>({ filter: pb.filter('party = {:p}', { p: partyId }), sort: 'created' }),

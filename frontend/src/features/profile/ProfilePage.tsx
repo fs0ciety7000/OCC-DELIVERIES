@@ -66,7 +66,7 @@ export function ProfilePage() {
       {/* Invité·e : pas de coordonnées de remboursement ni de sécurité avant de créer son compte (refusé côté serveur). */}
       {!user.is_guest && <PayoutCard userId={user.id} />}
       {!user.is_guest && <SecurityCard user={user} />}
-      <NotificationsCard userId={user.id} />
+      <NotificationsCard userId={user.id} guest={!!user.is_guest} />
       <Card>
         <CardBody className="space-y-3">
           <h2 className="font-display text-lg font-semibold">Apparence</h2>

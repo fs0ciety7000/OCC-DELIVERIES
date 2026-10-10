@@ -67,14 +67,13 @@ func TestHappyPath(t *testing.T) {
 	e.expect(200, "PATCH", "/api/collections/parties/records/"+pid, alice.token, map[string]any{"candidates": []string{pizza, burger}})
 
 	// --- voting ------------------------------------------------------------
-	e.expect(400, "POST", "/api/collections/votes/records", bob.token, map[string]any{"party": pid, "user": bob.id(), "restaurant": pizza})
+	e.expect(400, "PUT", path("/api/occ/parties/%s/ballot", pid), bob.token, map[string]any{"ranking": []string{pizza}})
 	e.expect(200, "POST", path("/api/occ/parties/%s/transition", pid), alice.token, map[string]any{"to": "voting"})
 	e.expect(400, "PATCH", "/api/collections/parties/records/"+pid, alice.token, map[string]any{"candidates": []string{pizza}})
 
-	e.expect(200, "POST", "/api/collections/votes/records", bob.token, map[string]any{"party": pid, "user": bob.id(), "restaurant": pizza})
-	e.expect(200, "POST", "/api/collections/votes/records", alice.token, map[string]any{"party": pid, "user": alice.id(), "restaurant": pizza})
-	e.expect(200, "POST", "/api/collections/votes/records", alice.token, map[string]any{"party": pid, "user": alice.id(), "restaurant": burger})
-	// burger has the best rating but pizza has more votes
+	// ranked ballots: pizza 2+2 = 4 points, burger 1 (its rating does not matter)
+	e.expect(200, "PUT", path("/api/occ/parties/%s/ballot", pid), bob.token, map[string]any{"ranking": []string{pizza}})
+	e.expect(200, "PUT", path("/api/occ/parties/%s/ballot", pid), alice.token, map[string]any{"ranking": []string{pizza, burger}})
 	var tr partyResp
 	e.expect(200, "POST", path("/api/occ/parties/%s/transition", pid), alice.token, map[string]any{"to": "ordering"}).json(t, &tr)
 	if tr.Party.Status != "ordering" || tr.Party.Restaurant != pizza {

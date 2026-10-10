@@ -1,6 +1,6 @@
 /**
  * File d'attente hors ligne (« outbox ») : seules des actions sûres et idempotentes y
- * entrent (prêt·e, vote, retrait de vote, ajout au panier avec clé d'idempotence). Elles
+ * entrent (prêt·e, classement du vote, ajout au panier avec clé d'idempotence). Elles
  * sont rejouées dans l'ordre au retour du réseau ; le serveur dédoublonne grâce à
  * `client_key` (voir docs/ARCHITECTURE.md, « Mode hors ligne »).
  */
@@ -8,6 +8,9 @@ import type { OrderItemInput } from './types'
 
 export type OutboxAction =
   | { kind: 'ready'; partyId: string; ready: boolean }
+  /** Mon bulletin entier (1er choix d'abord) : seul le dernier compte. */
+  | { kind: 'ballot'; partyId: string; ranking: string[] }
+  /** Anciennes actions (vote par approbation) encore en file : rejouées sur le bulletin. */
   | { kind: 'vote'; partyId: string; userId: string; restaurantId: string }
   | { kind: 'unvote'; partyId: string; userId: string; restaurantId: string }
   | { kind: 'addItem'; partyId: string; input: OrderItemInput; label: string }
@@ -84,6 +87,8 @@ export function actionLabel(a: OutboxAction): string {
   switch (a.kind) {
     case 'ready':
       return a.ready ? 'Je suis prêt·e' : 'Panier rouvert'
+    case 'ballot':
+      return a.ranking.length ? 'Classement du vote' : 'Retrait de vote'
     case 'vote':
       return 'Vote'
     case 'unvote':
@@ -140,6 +145,13 @@ export function createOutbox(storage: OutboxStorage, { max = 50 }: { max?: numbe
             await storage.delete(twin.id)
             await refresh()
             return null
+          }
+        }
+        // bulletin : seul le dernier compte (il contient aussi les anciens votes en file)
+        if (action.kind === 'ballot') {
+          for (const e of list) {
+            const k = e.action.kind
+            if ((k === 'ballot' || k === 'vote' || k === 'unvote') && e.action.partyId === action.partyId) await storage.delete(e.id)
           }
         }
         // « prêt·e » : seul le dernier état compte

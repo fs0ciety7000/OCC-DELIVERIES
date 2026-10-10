@@ -249,7 +249,7 @@ func TestIncompleteMenusHiddenFromListings(t *testing.T) {
 
 	// the party chosen before keeps working: vote then impose the burger
 	e.expect(200, "POST", "/api/occ/parties/"+pid+"/transition", alice.token, map[string]any{"to": "voting"})
-	e.expect(200, "POST", "/api/collections/votes/records", bob.token, map[string]any{"party": pid, "user": bob.id(), "restaurant": burger})
+	e.expect(200, "PUT", path("/api/occ/parties/%s/ballot", pid), bob.token, map[string]any{"ranking": []string{burger}})
 	p := e.expect(200, "POST", "/api/occ/parties/"+pid+"/transition", alice.token, map[string]any{"to": "ordering", "restaurant": burger}).m(t)
 	if p["party"].(map[string]any)["restaurant"] != burger {
 		t.Fatalf("party %v", p)
