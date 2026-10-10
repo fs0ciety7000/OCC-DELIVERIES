@@ -51,7 +51,6 @@ import type {
   Vote,
   BallotResponse,
   Tally,
-  WalletKind,
   PushPrefsResponse,
   PushPublicKey,
   NotifyPrefs,
@@ -143,16 +142,6 @@ export const occ = {
 
   paymentAction: (paymentId: string, action: PaymentAction, method?: DeclareMethod) =>
     pb.send<{ payment: Payment }>(`/api/occ/payments/${paymentId}/action`, json(method ? { action, method } : { action })),
-
-  /** Image QR « recevoir » du payeur (Wero / Bancontact Pay) → blob URL (à révoquer). */
-  walletQrObjectUrl: async (paymentId: string, kind: WalletKind): Promise<string | null> => {
-    const res = await fetch(pb.buildURL(`/api/occ/payments/${paymentId}/wallet-qr/${kind}`), {
-      headers: { Authorization: pb.authStore.token },
-    })
-    if (res.status === 404) return null
-    if (!res.ok) throw new Error('Impossible de charger le QR du payeur.')
-    return URL.createObjectURL(await res.blob())
-  },
 
   paymentQR: (paymentId: string) => pb.send<PaymentQR>(`/api/occ/payments/${paymentId}/qr`, { method: 'GET' }),
 
@@ -451,7 +440,7 @@ function openAuthPopup(): Window | null {
   return window.open('', 'occ_oauth2', `width=${w},height=${h},left=${left},top=${top},resizable,menubar=no`)
 }
 
-export type PayoutProfileInput = Pick<PayoutProfile, 'holder_name' | 'iban' | 'bic' | 'revolut_tag' | 'paypal_me' | 'payment_link' | 'wero_id' | 'bancontact_phone'>
+export type PayoutProfileInput = Pick<PayoutProfile, 'holder_name' | 'iban' | 'bic' | 'revolut_tag' | 'paypal_me' | 'payment_link'>
 
 export const payoutApi = {
   /** `null` si l'utilisateur n'a pas encore de profil. */
@@ -461,33 +450,10 @@ export const payoutApi = {
     })
     return list.items[0] ?? null
   },
-  /**
-   * Création / mise à jour en FormData (fichiers QR Wero / Bancontact).
-   * `files[kind] = File` téléverse, `null` supprime, `undefined` ne change rien.
-   */
-  save: (
-    userId: string,
-    existingId: string | null,
-    data: PayoutProfileInput,
-    files: Partial<Record<'wero_qr' | 'bancontact_qr', File | null>> = {},
-  ) => {
-    const fd = new FormData()
-    for (const [k, v] of Object.entries(data)) fd.append(k, v)
-    for (const [k, v] of Object.entries(files)) {
-      if (v === null) fd.append(k, '')
-      else if (v) fd.append(k, v)
-    }
-    if (existingId) return pb.collection('payout_profiles').update<PayoutProfile>(existingId, fd)
-    fd.append('user', userId)
-    return pb.collection('payout_profiles').create<PayoutProfile>(fd)
-  },
-
-  /** URL d'un fichier protégé de son propre profil (jeton de fichier court). */
-  fileUrl: async (profile: PayoutProfile, field: 'wero_qr' | 'bancontact_qr') => {
-    const filename = profile[field]
-    if (!filename) return null
-    const token = await pb.files.getToken()
-    return pb.files.getURL(profile as unknown as { id: string; collectionId: string; collectionName: string }, filename, { token })
+  /** Création / mise à jour (le serveur normalise IBAN, BIC, revtag, PayPal.me et lien). */
+  save: (userId: string, existingId: string | null, data: PayoutProfileInput) => {
+    if (existingId) return pb.collection('payout_profiles').update<PayoutProfile>(existingId, data)
+    return pb.collection('payout_profiles').create<PayoutProfile>({ ...data, user: userId })
   },
 }
 

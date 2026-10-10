@@ -27,7 +27,7 @@ func TestPaymentsCollectQR(t *testing.T) {
 
 	e.expect(200, "POST", "/api/collections/payout_profiles/records", bob.token, map[string]any{
 		"user": bob.id(), "holder_name": "Bob Martin", "iban": "be71 0961 2345 6769",
-		"revolut_tag": "bobm", "paypal_me": "bob", "wero_id": "0470123456",
+		"revolut_tag": "bobm", "paypal_me": "bob",
 	})
 	// bob (a guest of alice's party, not the host) advanced the money
 	e.expect(200, "POST", path("/api/occ/parties/%s/payer", pid), alice.token, map[string]any{"payer": bob.id()})

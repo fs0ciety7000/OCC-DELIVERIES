@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, ImagePlus, LogOut, Trash2 } from 'lucide-react'
-import { useEffect, useState, type ChangeEvent } from 'react'
+import { Check, LogOut } from 'lucide-react'
+import { useState, type ChangeEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
-import { Avatar, Badge, Button, Card, CardBody, Field, Input, Segmented, Skeleton } from '@/components/ui'
+import { Avatar, Button, Card, CardBody, Field, Input, Segmented, Skeleton } from '@/components/ui'
 import { MethodMark } from '@/features/party/steps/PaymentMethods'
 import { payoutApi, usersApi, type PayoutProfileInput } from '@/lib/api'
 import { logout, useAuth } from '@/lib/auth'
@@ -14,7 +14,7 @@ import { formatIban, isValidBic, isValidIban, normalizeIban } from '@/lib/iban'
 import { qk } from '@/lib/queryKeys'
 import { useTheme, type ThemePref } from '@/lib/theme'
 import type { PayoutProfile, User } from '@/lib/types'
-import { checkQrFile, isValidMobile, isValidWeroId, normalizeMobile, normalizePaymentLink, normalizePayPalMe, normalizeRevolutTag, normalizeWeroId } from '@/lib/wallet'
+import { normalizePaymentLink, normalizePayPalMe, normalizeRevolutTag } from '@/lib/wallet'
 import { OrderHistory } from './OrderHistory'
 import { panelId, tabId, type ProfileTab } from './tabs'
 import { MotionPrefRow } from './MotionPrefRow'
@@ -165,8 +165,6 @@ function PayoutCard({ userId }: { userId: string }) {
   return <PayoutForm key={profile.data?.updated ?? 'new'} userId={userId} profile={profile.data} />
 }
 
-type QrField = 'wero_qr' | 'bancontact_qr'
-
 function PayoutForm({ userId, profile }: { userId: string; profile: PayoutProfile | null }) {
   const qc = useQueryClient()
   const [v, setV] = useState<PayoutProfileInput>({
@@ -176,10 +174,7 @@ function PayoutForm({ userId, profile }: { userId: string; profile: PayoutProfil
     revolut_tag: profile?.revolut_tag ?? '',
     paypal_me: profile?.paypal_me ?? '',
     payment_link: profile?.payment_link ?? '',
-    wero_id: profile?.wero_id ?? '',
-    bancontact_phone: profile?.bancontact_phone ?? '',
   })
-  const [files, setFiles] = useState<Partial<Record<QrField, File | null>>>({})
   const set = (k: keyof PayoutProfileInput) => (e: ChangeEvent<HTMLInputElement>) => setV((s) => ({ ...s, [k]: e.target.value }))
 
   const errors = {
@@ -188,28 +183,19 @@ function PayoutForm({ userId, profile }: { userId: string; profile: PayoutProfil
     revolut_tag: normalizeRevolutTag(v.revolut_tag) === null ? 'Revtag invalide (ex. @jdoe ou revolut.me/jdoe).' : undefined,
     paypal_me: normalizePayPalMe(v.paypal_me) === null ? 'Nom PayPal.me invalide (ex. jdoe ou paypal.me/jdoe).' : undefined,
     payment_link: normalizePaymentLink(v.payment_link) === null ? 'Lien invalide (ex. https://…).' : undefined,
-    wero_id: !isValidWeroId(v.wero_id) ? 'Numéro de mobile (ex. 0470 12 34 56) ou e-mail.' : undefined,
-    bancontact_phone: !isValidMobile(v.bancontact_phone) ? 'Numéro de mobile invalide (ex. 0470 12 34 56).' : undefined,
   }
   const hasErrors = Object.values(errors).some(Boolean)
 
   const save = useMutation({
     mutationFn: () =>
-      payoutApi.save(
-        userId,
-        profile?.id ?? null,
-        {
-          holder_name: v.holder_name.trim(),
-          iban: normalizeIban(v.iban),
-          bic: v.bic.replace(/\s/g, '').toUpperCase(),
-          revolut_tag: normalizeRevolutTag(v.revolut_tag) ?? '',
-          paypal_me: normalizePayPalMe(v.paypal_me) ?? '',
-          payment_link: normalizePaymentLink(v.payment_link) ?? '',
-          wero_id: normalizeWeroId(v.wero_id),
-          bancontact_phone: v.bancontact_phone.trim() ? normalizeMobile(v.bancontact_phone) : '',
-        },
-        files,
-      ),
+      payoutApi.save(userId, profile?.id ?? null, {
+        holder_name: v.holder_name.trim(),
+        iban: normalizeIban(v.iban),
+        bic: v.bic.replace(/\s/g, '').toUpperCase(),
+        revolut_tag: normalizeRevolutTag(v.revolut_tag) ?? '',
+        paypal_me: normalizePayPalMe(v.paypal_me) ?? '',
+        payment_link: normalizePaymentLink(v.payment_link) ?? '',
+      }),
     onSuccess: (p) => {
       qc.setQueryData(qk.payout(userId), p)
       toast.success('Coordonnées de remboursement enregistrées')
@@ -236,7 +222,9 @@ function PayoutForm({ userId, profile }: { userId: string; profile: PayoutProfil
             <h3 id="h-sepa" className="flex items-center gap-2 font-semibold">
               <MethodMark method="qr" /> Virement (QR SEPA)
             </h3>
-            <p className="text-sm text-muted">Recommandé : tes collègues scannent un QR qui remplit le montant et la communication dans leur app bancaire.</p>
+            <p className="text-sm text-muted">
+              Recommandé : tes collègues scannent un QR avec leur app bancaire (KBC, BNP Paribas Fortis, ING, Belfius, Argenta…) — <strong className="text-fg">montant et communication déjà remplis</strong>.
+            </p>
             <Field label="Titulaire du compte" optional>
               {(p) => <Input {...p} value={v.holder_name} onChange={set('holder_name')} autoComplete="name" />}
             </Field>
@@ -278,121 +266,11 @@ function PayoutForm({ userId, profile }: { userId: string; profile: PayoutProfil
             </Field>
           </section>
 
-          <section className="space-y-3 border-t border-border pt-5" aria-labelledby="h-wero">
-            <h3 id="h-wero" className="flex items-center gap-2 font-semibold">
-              <MethodMark method="wero" /> Wero
-            </h3>
-            <Field label="Mobile ou e-mail Wero" optional error={errors.wero_id} hint="Celui enregistré dans ton app bancaire (KBC, BNP Paribas Fortis, ING, Belfius…).">
-              {(p) => <Input {...p} value={v.wero_id} onChange={set('wero_id')} placeholder="0470 12 34 56 ou toi@mail.be" autoComplete="tel" />}
-            </Field>
-            <QrUpload
-              label="QR « recevoir » Wero"
-              help="Dans ton app bancaire : Wero → Recevoir → Mon QR code, puis fais une capture d'écran. Ce QR ne contient pas de montant : tes collègues devront le saisir (préfère ton numéro ou ton IBAN)."
-              profile={profile}
-              field="wero_qr"
-              value={files.wero_qr}
-              onChange={(f) => setFiles((s) => ({ ...s, wero_qr: f }))}
-            />
-          </section>
-
-          <section className="space-y-3 border-t border-border pt-5" aria-labelledby="h-bcp">
-            <h3 id="h-bcp" className="flex items-center gap-2 font-semibold">
-              <MethodMark method="bancontact" /> Bancontact Pay
-            </h3>
-            <Field label="Mobile lié à Bancontact Pay" optional error={errors.bancontact_phone}>
-              {(p) => <Input {...p} type="tel" value={v.bancontact_phone} onChange={set('bancontact_phone')} placeholder="0470 12 34 56" autoComplete="tel" />}
-            </Field>
-            <QrUpload
-              label="QR « recevoir » Bancontact Pay"
-              help="Dans l'app Bancontact Pay : Recevoir de l'argent → Afficher mon QR code, sans montant, puis capture d'écran. Tes collègues devront saisir leur montant."
-              profile={profile}
-              field="bancontact_qr"
-              value={files.bancontact_qr}
-              onChange={(f) => setFiles((s) => ({ ...s, bancontact_qr: f }))}
-            />
-          </section>
-
           <Button type="submit" block size="lg" disabled={hasErrors} loading={save.isPending}>
             Enregistrer
           </Button>
         </form>
       </CardBody>
     </Card>
-  )
-}
-
-function QrUpload({
-  label,
-  help,
-  profile,
-  field,
-  value,
-  onChange,
-}: {
-  label: string
-  help: string
-  profile: PayoutProfile | null
-  field: QrField
-  value: File | null | undefined
-  onChange: (f: File | null | undefined) => void
-}) {
-  const existing = useQuery({
-    queryKey: ['payoutFile', profile?.id, profile?.[field]],
-    queryFn: () => payoutApi.fileUrl(profile!, field),
-    enabled: !!profile?.[field],
-    staleTime: 60_000,
-  })
-  const [localUrl, setLocalUrl] = useState<string | null>(null)
-  useEffect(() => {
-    if (!value) return
-    const url = URL.createObjectURL(value)
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- synchronise une ressource externe (blob URL)
-    setLocalUrl(url)
-    return () => URL.revokeObjectURL(url)
-  }, [value])
-  const preview = value ? localUrl : value === null ? null : (existing.data ?? null)
-  const inputId = `qr-${field}`
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">{label}</span>
-        <span className="text-xs text-subtle">facultatif</span>
-      </div>
-      <div className="flex items-start gap-3">
-        <div className="grid size-24 shrink-0 place-items-center overflow-hidden rounded-md border border-dashed border-border-strong bg-qr-bg">
-          {preview ? <img src={preview} alt={`Aperçu ${label}`} className="size-full object-contain" /> : <ImagePlus aria-hidden className="size-6 text-subtle" />}
-        </div>
-        <div className="min-w-0 flex-1 space-y-2">
-          <p className="text-xs text-muted">{help}</p>
-          <div className="flex flex-wrap gap-2">
-            <label htmlFor={inputId} className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-sm border border-border-strong bg-surface px-3 text-sm font-semibold hover:bg-elevated focus-within:outline-2 focus-within:outline-brand">
-              <ImagePlus aria-hidden className="size-4" /> {preview ? 'Remplacer' : 'Téléverser'}
-              <input
-                id={inputId}
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                className="sr-only"
-                onChange={(e) => {
-                  const f = e.target.files?.[0]
-                  e.target.value = ''
-                  if (!f) return
-                  const err = checkQrFile(f)
-                  if (err) toast.error(err)
-                  else onChange(f)
-                }}
-              />
-            </label>
-            {preview && (
-              <Button variant="ghost" size="sm" leftIcon={<Trash2 className="size-4" />} onClick={() => onChange(profile?.[field] ? null : undefined)}>
-                Retirer
-              </Button>
-            )}
-            {value && <Badge variant="warning">À enregistrer</Badge>}
-            {value === null && <Badge variant="warning">Sera supprimé</Badge>}
-          </div>
-        </div>
-      </div>
-    </div>
   )
 }

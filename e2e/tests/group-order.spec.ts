@@ -418,10 +418,11 @@ test('commande groupée complète : vote → paniers → récap → dispatch →
     })
 
     await shot(members, '4-review')
-    await test.step('5. Bob renseigne son profil (IBAN, Revolut, PayPal, Wero), devient payeur ; Wero + espèces → clôture', async () => {
+    await test.step('5. Bob renseigne son profil (IBAN, Revolut, PayPal), devient payeur ; Revolut + espèces → clôture', async () => {
       const bp = bob.page
       await bp.goto('/profile?onglet=infos') // onglet « Mes infos » (« Mes commandes » par défaut)
-      await bp.getByLabel('Mobile ou e-mail Wero').fill('+32470123456')
+      // Wero / Bancontact Pay retirés (ADR 0003 mise à jour 3) : plus aucun champ.
+      await expect(bp.getByLabel(/Wero|Bancontact/)).toHaveCount(0)
       await bp.getByLabel('Titulaire du compte').fill('Bob Martin')
       await bp.getByLabel('IBAN').fill('BE71096123456769')
       await expect(bp.getByText('IBAN valide ✓')).toBeVisible()
@@ -449,12 +450,12 @@ test('commande groupée complète : vote → paniers → récap → dispatch →
         const cents = shares[debtor.name]!
         if (debtor === alice) {
           // Desktop : le QR virement (montant + communication) d'abord, en grand.
-          await expect(tiles.getByRole('radio').first()).toHaveAccessibleName(/Virement QR/)
+          await expect(tiles.getByRole('radio').first()).toHaveAccessibleName(/Virement \(QR\)/)
           await expect(p.getByRole('img', { name: /QR virement SEPA de .* vers Bob Martin/ })).toBeVisible()
         } else {
           // Mobile : le téléphone ne peut pas scanner son propre écran → liens d'abord, QR à la demande.
           await expect(tiles.getByRole('radio').first()).toHaveAccessibleName(/Revolut/)
-          await tiles.getByRole('radio', { name: /Virement QR/ }).click()
+          await tiles.getByRole('radio', { name: /Virement \(QR\)/ }).click()
           await expect(p.getByRole('img', { name: /QR virement SEPA/ })).toBeHidden()
           await p.getByRole('button', { name: 'Afficher le QR pour un collègue' }).click()
           await expect(p.getByRole('img', { name: /QR virement SEPA de .* vers Bob Martin/ })).toBeVisible()
@@ -466,16 +467,13 @@ test('commande groupée complète : vote → paniers → récap → dispatch →
         await expect(p.getByRole('link', { name: /^Payer .* avec Revolut/ })).toHaveAttribute('href', new RegExp(`^https://revolut\\.me/bobm\\?amount=${cents}&currency=EUR&note=OCC\\+`))
         await tiles.getByRole('radio', { name: /PayPal/ }).click()
         await expect(p.getByRole('link', { name: /^Payer .* avec PayPal/ })).toHaveAttribute('href', `https://paypal.me/bobmartin/${(cents / 100).toFixed(2)}EUR`)
-        const wero = tiles.getByRole('radio', { name: /Wero/ })
-        await expect(wero).toBeVisible()
-        await wero.click()
-        await expect(p.getByText('+32470123456')).toBeVisible()
-        await tiles.getByRole('radio', { name: /Virement QR/ }).click()
+        await expect(tiles.getByRole('radio', { name: /Wero|Bancontact/ })).toHaveCount(0)
+        await tiles.getByRole('radio', { name: /Virement \(QR\)/ }).click()
         await expect(p.getByText('BE71 0961 2345 6769')).toBeVisible()
       }
 
-      await alice.page.getByRole('radiogroup', { name: 'Moyen de remboursement' }).getByRole('radio', { name: /Wero/ }).click()
-      await alice.page.getByRole('button', { name: "J'ai payé avec Wero" }).click()
+      await alice.page.getByRole('radiogroup', { name: 'Moyen de remboursement' }).getByRole('radio', { name: /Revolut/ }).click()
+      await alice.page.getByRole('button', { name: "J'ai payé avec Revolut" }).click()
       await expect(alice.page.getByText('En attente de confirmation par le payeur.')).toBeVisible()
 
       await chloe.page.getByRole('radiogroup', { name: 'Moyen de remboursement' }).getByRole('radio', { name: /Espèces/ }).click()
@@ -488,7 +486,7 @@ test('commande groupée complète : vote → paniers → récap → dispatch →
       await expect(bp.getByText(/avancé l.argent/)).toBeVisible()
       await expect(bp.getByRole('list', { name: 'Moyens proposés' })).toContainText('Revolut')
       await expect(bp.getByRole('list', { name: 'Moyens proposés' })).toContainText('PayPal')
-      await expect(parts.filter({ hasText: 'Alice' })).toContainText('Wero')
+      await expect(parts.filter({ hasText: 'Alice' })).toContainText('Revolut')
       await expect(parts.filter({ hasText: 'Alice' })).toContainText('Déclaré')
       await expect(parts.filter({ hasText: 'Chloé' })).toContainText('Espèces')
       await parts.filter({ hasText: 'Alice' }).getByRole('button', { name: 'Confirmer' }).click()

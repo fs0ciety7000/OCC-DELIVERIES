@@ -34,11 +34,6 @@
   --color-deliveroo-ink: #00ccbc;
   /* weloveat : teal profond illisible sur fond sombre → teinte claire dérivée (aussi fond/bord du badge). */
   --color-weloveat-ink: #6fd3c9;
-  /* Wallets belges : aplats de marque + texte dédié (contraste AA vérifié). */
-  --color-wero: #ffe500;
-  --color-wero-fg: #1a1a1a;
-  --color-bancontact: #005498;
-  --color-bancontact-fg: #ffffff;
 
   /* Texte posé sur une couleur d'avatar (choisi selon la luminance). */
   --color-ink: #17151a;

@@ -43,7 +43,7 @@ vi.mock('@/lib/api', () => ({
     config: vi.fn(async () => ({ currency: 'EUR', defaultLocation: { lat: 50, lng: 3, label: 'Mons' }, providers: [{ id: 'ubereats', name: 'Uber Eats', color: '', enabled: true }] })),
     nearby: vi.fn(async () => [{ ...resto, distanceKm: 0.4 }, { ...resto2, distanceKm: 1.2 }]),
     summary: vi.fn(async () => summary),
-    paymentQR: vi.fn(async () => ({ amount: 1400, reference: 'OCC K7M2QX Bob', beneficiary: 'Alice', epc: 'BCD', iban: 'BE71096123456769', links: [], wero: { id: '+32470123456', hasQr: false }, bancontact: null, methods: ['qr', 'wero', 'cash', 'later'] })),
+    paymentQR: vi.fn(async () => ({ amount: 1400, reference: 'OCC K7M2QX Bob', beneficiary: 'Alice', epc: 'BCD', iban: 'BE71096123456769', links: [], methods: ['qr', 'cash', 'later'] })),
     collectQR: vi.fn(async () => ({ beneficiary: 'Alice', iban: 'BE71096123456769', items: [{ payment: 'pay2', debtor: bob, amount: 149, status: 'declared', method: 'wero', reference: 'OCC K7M2QX Bob', epc: 'BCD', links: [] }] })),
   },
   restaurantsApi: {

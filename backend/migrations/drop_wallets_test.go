@@ -1,6 +1,7 @@
 package migrations
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/pocketbase/pocketbase/core"
@@ -26,11 +27,7 @@ func TestDropWalletsMigration(t *testing.T) {
 	}
 	values := pay.Fields.GetByName("method").(*core.SelectField).Values
 	for _, v := range []string{"wero", "bancontact"} {
-		found := false
-		for _, x := range values {
-			found = found || x == v
-		}
-		if !found {
+		if !slices.Contains(values, v) {
 			t.Fatalf("payments.method must keep %q for old records: %v", v, values)
 		}
 	}

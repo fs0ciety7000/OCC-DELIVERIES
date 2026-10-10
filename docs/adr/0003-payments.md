@@ -140,3 +140,45 @@ portent Wero le lisent —, puis Revolut / PayPal.me à montant pour ceux qui le
 utilisent ; Wero / Bancontact Pay restent « identifiant + montant à saisir ».
 À réévaluer si SRTP arrive dans les apps belges ou si EPI publie un format de
 demande P2P ouvert aux tiers.
+
+## Mise à jour 3 — 2026-10-10 : retrait de Wero et Bancontact Pay
+
+### Décision
+Demande utilisateur : « On peut retirer les options Bancontact Pay et Wero
+directement pour éviter confusion. » Les deux wallets sont **retirés** de
+l'application (profil, tuiles, `PaymentQR`, guides, QR personnels).
+
+### Pourquoi
+* Ni Wero ni Bancontact Pay ne permettent à un tiers de pré-remplir un
+  **montant** (mises à jour 1 et 2) : la tuile n'offrait qu'un identifiant à
+  copier et un montant à saisir à la main, ou un QR personnel **statique**
+  source d'erreurs (« un QR Wero varie avec le montant »).
+* Le **QR virement EPC** fait le même travail en mieux : il est lu par les apps
+  bancaires belges (KBC, BNP Paribas Fortis, ING, Belfius, Argenta…) — celles
+  où vit justement Wero — avec montant **et** communication pré-remplis, en
+  virement instantané si la banque le propose. Les liens Revolut / PayPal.me à
+  montant couvrent les autres usages.
+* Deux tuiles « montant à saisir » à côté de tuiles « montant pré-rempli »
+  brouillaient le message ; la tuile virement s'intitule désormais
+  « Virement (QR) — Scanne le QR avec ton app bancaire (montant déjà rempli) ».
+
+### Ce qui change
+* `payout_profiles` : champs `wero_id`, `bancontact_phone`, `wero_qr`,
+  `bancontact_qr` **supprimés** (migration `1760000021`, idempotente) et les
+  images QR téléversées **effacées du stockage** (vignettes comprises) : ce
+  sont des données personnelles (numéros de mobile) qui ne servent plus.
+  Le `down` recrée les champs vides (les données ne sont pas restaurables).
+  Un ancien client qui envoie encore ces champs les voit ignorés.
+* `PaymentQR` perd `wero` / `bancontact` ; `methods` ne les propose plus ;
+  `GET /api/occ/payments/{id}/wallet-qr/{kind}` est supprimé.
+* `POST /payments/{id}/action` refuse `declare` avec `wero` / `bancontact`
+  (400 « Wero et Bancontact Pay ne sont plus proposés… »).
+* **Paiements existants** : `payments.method` garde les valeurs `wero` et
+  `bancontact` (rien n'est réécrit) ; les listes de paiements, l'historique,
+  les notifications et e-mails affichent toujours « Wero » / « Bancontact
+  Pay » pour ces anciens paiements, sans tuile. Le payeur peut toujours les
+  confirmer ou les réinitialiser.
+
+### À réévaluer
+Si EPI publie un format de demande Wero **à montant** ouvert aux tiers, ou si
+SEPA Request-to-Pay arrive dans les apps belges (mise à jour 2).

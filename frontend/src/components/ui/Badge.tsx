@@ -1,7 +1,7 @@
 import type { HTMLAttributes } from 'react'
 import { cn } from '@/lib/cn'
 
-export type BadgeVariant = 'neutral' | 'brand' | 'success' | 'warning' | 'danger' | 'info' | 'ubereats' | 'takeaway' | 'deliveroo' | 'weloveat' | 'wero' | 'bancontact'
+export type BadgeVariant = 'neutral' | 'brand' | 'success' | 'warning' | 'danger' | 'info' | 'ubereats' | 'takeaway' | 'deliveroo' | 'weloveat'
 
 const variants: Record<BadgeVariant, string> = {
   neutral: 'bg-fg/[0.07] text-muted border-border',
@@ -14,8 +14,6 @@ const variants: Record<BadgeVariant, string> = {
   takeaway: 'bg-takeaway/14 text-takeaway-ink border-takeaway/30',
   deliveroo: 'bg-deliveroo/14 text-deliveroo-ink border-deliveroo/30',
   weloveat: 'bg-weloveat-ink/14 text-weloveat-ink border-weloveat-ink/30',
-  wero: 'bg-wero text-wero-fg border-transparent',
-  bancontact: 'bg-bancontact text-bancontact-fg border-transparent',
 }
 
 export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {

@@ -198,20 +198,29 @@ func TestUsersColorAndVisibility(t *testing.T) {
 	e.expect(404, "PATCH", "/api/collections/users/records/"+bob.id(), alice.token, map[string]any{"name": "x"})
 }
 
-func TestWalletQRAuthz(t *testing.T) {
+// Wero / Bancontact Pay are gone (ADR 0003, update 3): the payout profile
+// ignores their old fields, PaymentQR no longer has them and the wallet QR
+// image endpoint does not exist anymore.
+func TestNoWalletPayoutData(t *testing.T) {
 	e := newEnv(t)
-	pid, _, pizza, _, alice, bob, carol := setupParty(t, e)
+	pid, _, pizza, _, alice, bob, _ := setupParty(t, e)
 	e.expect(200, "POST", path("/api/occ/parties/%s/transition", pid), alice.token, map[string]any{"to": "ordering", "restaurant": pizza})
 	tira := e.menuItem(pizza, "Tiramisu")
 	e.expect(200, "POST", "/api/collections/order_items/records", bob.token, map[string]any{"party": pid, "user": bob.id(), "menu_item": tira})
 	e.expect(200, "POST", path("/api/occ/parties/%s/transition", pid), alice.token, map[string]any{"to": "review"})
 
-	// alice is the payer with only a Bancontact QR (no id, no IBAN)
-	prof := e.expect(200, "POST", "/api/collections/payout_profiles/records", alice.token, map[string]any{"user": alice.id()}).m(t)
-	rec, _ := e.app.FindRecordById(colPayoutProfiles, prof["id"].(string))
-	e.attachFile(rec, "bancontact_qr", "bc.png", pngBytes(t))
+	// alice is the payer; an old client still sends wallet ids: ignored
+	prof := e.expect(200, "POST", "/api/collections/payout_profiles/records", alice.token, map[string]any{
+		"user": alice.id(), "wero_id": "0470123456", "bancontact_phone": "0470123456",
+	}).m(t)
+	if _, found := prof["wero_id"]; found {
+		t.Fatalf("wallet fields must not exist: %v", prof)
+	}
+	if _, found := prof["bancontact_phone"]; found {
+		t.Fatalf("wallet fields must not exist: %v", prof)
+	}
 	// other users cannot read the private profile
-	e.expect(404, "GET", "/api/collections/payout_profiles/records/"+rec.Id, bob.token, nil)
+	e.expect(404, "GET", "/api/collections/payout_profiles/records/"+prof["id"].(string), bob.token, nil)
 
 	var payr struct {
 		Payments []struct {
@@ -223,24 +232,41 @@ func TestWalletQRAuthz(t *testing.T) {
 
 	var qr map[string]any
 	e.expect(200, "GET", path("/api/occ/payments/%s/qr", payID), bob.token, nil).json(t, &qr)
-	if qr["epc"] != nil || qr["link"] != nil || qr["wero"] != nil {
+	for _, k := range []string{"wero", "bancontact"} {
+		if _, found := qr[k]; found {
+			t.Fatalf("PaymentQR must not expose %s: %v", k, qr)
+		}
+	}
+	if qr["epc"] != nil || len(qr["links"].([]any)) != 0 {
 		t.Fatalf("unexpected payout data: %v", qr)
 	}
-	bc := qr["bancontact"].(map[string]any)
-	if bc["phone"] != "" || bc["hasQr"] != true {
-		t.Fatalf("bancontact: %v", bc)
-	}
-	if m := qr["methods"].([]any); len(m) != 3 || m[0] != "bancontact" {
+	if m := qr["methods"].([]any); len(m) != 2 || m[0] != "cash" || m[1] != "later" {
 		t.Fatalf("methods: %v", m)
 	}
+	e.expect(404, "GET", path("/api/occ/payments/%s/wallet-qr/bancontact", payID), bob.token, nil)
 
-	r := e.expect(200, "GET", path("/api/occ/payments/%s/wallet-qr/bancontact", payID), bob.token, nil)
-	if r.header.Get("Content-Type") != "image/png" || !strings.HasPrefix(r.header.Get("Cache-Control"), "private") {
-		t.Fatalf("headers: %v", r.header)
+	// new declarations with a removed wallet are refused, in French
+	for _, m := range []string{"wero", "bancontact"} {
+		r := e.expect(400, "POST", path("/api/occ/payments/%s/action", payID), bob.token, map[string]any{"action": "declare", "method": m})
+		if !strings.Contains(string(r.body), "ne sont plus proposés") {
+			t.Fatalf("declare %s: %s", m, r.body)
+		}
 	}
-	e.expect(404, "GET", path("/api/occ/payments/%s/wallet-qr/wero", payID), bob.token, nil)
-	e.expect(403, "GET", path("/api/occ/payments/%s/wallet-qr/bancontact", payID), carol.token, nil)
-	e.expect(404, "GET", "/api/occ/payments/nope/wallet-qr/bancontact", bob.token, nil)
+	// a payment declared with Wero before the removal stays valid and readable
+	pay, err := e.app.FindRecordById(colPayments, payID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pay.Set("method", "wero")
+	pay.Set("status", "declared")
+	if err := e.app.Save(pay); err != nil {
+		t.Fatalf("legacy method must stay a valid value: %v", err)
+	}
+	got := e.expect(200, "GET", "/api/collections/payments/records/"+payID, bob.token, nil).m(t)
+	if got["method"] != "wero" {
+		t.Fatalf("legacy payment: %v", got)
+	}
+	e.expect(200, "POST", path("/api/occ/payments/%s/action", payID), alice.token, map[string]any{"action": "confirm"})
 }
 
 // Public endpoints, exercised through the PocketBase tests.ApiScenario runner.

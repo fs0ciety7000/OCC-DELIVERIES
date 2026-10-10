@@ -343,9 +343,9 @@ func TestPushPartyEvents(t *testing.T) {
 		ID string `json:"id"`
 	}
 	pay.ID = payRec.Id
-	pe.expect(200, "POST", path("/api/occ/payments/%s/action", pay.ID), carol.token, map[string]any{"action": "declare", "method": "wero"})
+	pe.expect(200, "POST", path("/api/occ/payments/%s/action", pay.ID), carol.token, map[string]any{"action": "declare", "method": "revolut"})
 	pe.h.push.wait()
-	if l := pe.rec.last(); !strings.HasSuffix(l.endpoint, "/bob") || l.payload.Body != "Carol a déclaré t'avoir remboursé "+carolOwes+" (Wero). Pense à confirmer." || l.payload.URL != "/party/"+pid {
+	if l := pe.rec.last(); !strings.HasSuffix(l.endpoint, "/bob") || l.payload.Body != "Carol a déclaré t'avoir remboursé "+carolOwes+" (Revolut). Pense à confirmer." || l.payload.URL != "/party/"+pid {
 		t.Fatalf("declared: %+v", l)
 	}
 	pe.rec.take()

@@ -4,9 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"image"
-	"image/color"
-	"image/png"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -17,7 +14,6 @@ import (
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
-	"github.com/pocketbase/pocketbase/tools/filesystem"
 
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/catalog"
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/domain"
@@ -275,29 +271,6 @@ func (e *env) menuItem(restaurantID, name string) string {
 		e.t.Fatalf("menu item %s: %v", name, err)
 	}
 	return r.Id
-}
-
-func pngBytes(t testing.TB) []byte {
-	t.Helper()
-	img := image.NewRGBA(image.Rect(0, 0, 2, 2))
-	img.Set(0, 0, color.Black)
-	var buf bytes.Buffer
-	if err := png.Encode(&buf, img); err != nil {
-		t.Fatal(err)
-	}
-	return buf.Bytes()
-}
-
-func (e *env) attachFile(rec *core.Record, field, name string, data []byte) {
-	e.t.Helper()
-	f, err := filesystem.NewFileFromBytes(data, name)
-	if err != nil {
-		e.t.Fatal(err)
-	}
-	rec.Set(field, f)
-	if err := e.app.Save(rec); err != nil {
-		e.t.Fatal(err)
-	}
 }
 
 func path(format string, args ...any) string { return fmt.Sprintf(format, args...) }

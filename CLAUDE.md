@@ -3,7 +3,7 @@
 Plateforme de **commandes groupées** entre collègues : on ouvre une commande
 (« party »), les collègues rejoignent, votent pour un restaurant, chacun compose
 son panier, on envoie vers Uber Eats / Takeaway (ou on exporte), on désigne le
-payeur et chacun rembourse sa part (Wero, Bancontact Pay, QR virement SEPA, espèces, plus tard).
+payeur et chacun rembourse sa part (QR virement SEPA lu par l'app bancaire, liens Revolut / PayPal.me avec montant, espèces, plus tard).
 
 Production : `https://eat.fs0ciety.org` (Coolify, Docker).
 
@@ -73,6 +73,13 @@ docker compose up --build         # http://localhost:8090
 Les apprentissages importants (pièges PocketBase, décisions d'UX) sont ajoutés
 ci-dessous, du plus récent au plus ancien.
 
+* 2026-10-10 — **Retrait de Wero et Bancontact Pay** (demande utilisateur « pour éviter la confusion » ; ADR 0003 maj 3,
+  migration `1760000021`). Aucun des deux ne permet à un tiers de pré-remplir un montant ; le QR virement EPC (lu par les
+  apps bancaires belges, celles où vit Wero) et les liens Revolut / PayPal.me à montant couvrent le besoin.
+  `payout_profiles.wero_id|bancontact_phone|wero_qr|bancontact_qr` **supprimés** et fichiers QR effacés (lister les noms
+  **avant** le `Save` de la collection : PocketBase n'efface pas les fichiers d'un champ retiré) ; `/wallet-qr/{kind}`
+  supprimé ; `declare` avec `wero`/`bancontact` → 400 FR. `payments.method` garde les deux valeurs (anciens paiements
+  affichés, notifications inchangées). Tuile « Virement (QR) ». Montée testée depuis un `pb_data` de prod (8045736).
 * 2026-10-10 — **Passkeys / WebAuthn** (migration `1760000018`, `app/passkeys.go`, `domain/passkey.go`, `lib/webauthn.ts`,
   `lib/passkeys.ts`). PocketBase v0.40.5 n'a pas de passkeys natives → `go-webauthn/webauthn` v0.18.2 derrière
   `/api/occ/passkeys*`, collection `passkeys` sans aucune rule, connexion via `apis.RecordAuthResponse(e, u, "passkey", nil)`

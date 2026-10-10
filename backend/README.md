@@ -12,7 +12,7 @@ go build -ldflags "-X main.version=1.2.3" -o occ .
 | dossier | rôle |
 |---|---|
 | `main.go`, `spa.go` | bootstrap : migrations, hooks/routes, superuser `OCC_ADMIN_*`, `meta.appURL`, SPA (`OCC_PUBLIC_DIR`, fallback `index.html`, jamais sur `/api/*`) |
-| `internal/domain` | logique pure sans PocketBase : prix des options, split des frais (plus grand reste), résumé, state machine, élection, code, IBAN, EPC, Wero/Bancontact, haversine |
+| `internal/domain` | logique pure sans PocketBase : prix des options, split des frais (plus grand reste), résumé, state machine, élection, code, IBAN, EPC, liens de paiement, haversine |
 | `internal/providers` | Uber Eats / Takeaway / Deliveroo / weloveat / export / téléphone → `Dispatch` |
 | `internal/menusync`, `cmd/menusync` | outil `menusync` : flux restaurants + menus (Deliveroo, weloveat, sites Takeaway, JSON-LD), fusion, import ; parseurs testés sur `internal/menusync/testdata` (aucun réseau en test) |
 | `internal/catalog` | import/upsert de restaurants par slug (admin + seed) |

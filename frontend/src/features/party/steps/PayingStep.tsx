@@ -194,7 +194,7 @@ function MyShare({ ctx, payment }: { ctx: PartyCtx; payment: Payment }) {
                 <MethodTiles methods={methods} value={method} onChange={setChosen} hints={hints} />
                 {method && qr.data && (
                   <motion.div key={method} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-                    <MethodDetails method={method} qr={qr.data} paymentId={payment.id} mobile={!desktop} />
+                    <MethodDetails method={method} qr={qr.data} mobile={!desktop} />
                   </motion.div>
                 )}
                 {method && (
@@ -244,7 +244,7 @@ function PayerMethods({ userId }: { userId: string }) {
           </>
         ) : (
           <p className="rounded-md border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
-            Aucun moyen renseigné : tes collègues ne peuvent te rembourser qu'en espèces. Ajoute ton IBAN, Revolut, PayPal ou Wero.
+            Aucun moyen renseigné : tes collègues ne peuvent te rembourser qu'en espèces. Ajoute ton IBAN (QR virement), Revolut ou PayPal.
           </p>
         )}
         <Link to="/profile?onglet=infos" className={buttonClass('secondary', 'sm')}>

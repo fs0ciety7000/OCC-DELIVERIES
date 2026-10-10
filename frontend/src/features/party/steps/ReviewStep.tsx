@@ -220,7 +220,7 @@ function PayerSheet({ ctx, summary, open, onClose }: { ctx: PartyCtx; summary: S
       open={open}
       onClose={onClose}
       title="Qui a avancé l'argent ?"
-      description="Chacun·e remboursera sa part à cette personne (QR virement, Wero, espèces…)."
+      description="Chacun·e remboursera sa part à cette personne (QR virement depuis son app bancaire, Revolut, PayPal, espèces…)."
       footer={
         <Button block size="lg" loading={setPayer.isPending} onClick={() => setPayer.mutate(selected, { onSuccess: onClose })}>
           Valider et passer aux remboursements

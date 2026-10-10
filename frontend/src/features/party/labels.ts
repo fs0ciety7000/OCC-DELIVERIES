@@ -1,8 +1,9 @@
 import type { BadgeVariant } from '@/components/ui'
 import type { DeclareMethod, Dispatch, PaymentLink, PaymentLinkKind, PaymentMethod, PaymentQR, PayoutProfile, Summary } from '@/lib/types'
 
+/** Libellés ; `wero` / `bancontact` ne servent plus qu'aux paiements déclarés avant leur retrait. */
 export const METHOD_LABELS: Record<PaymentMethod, string> = {
-  qr: 'Virement QR',
+  qr: 'Virement (QR)',
   revolut: 'Revolut',
   paypal: 'PayPal',
   link: 'Lien de paiement',
@@ -18,8 +19,8 @@ export const METHOD_BADGE: Record<PaymentMethod, BadgeVariant> = {
   revolut: 'info',
   paypal: 'info',
   link: 'info',
-  wero: 'wero',
-  bancontact: 'bancontact',
+  wero: 'neutral',
+  bancontact: 'neutral',
   cash: 'neutral',
   later: 'warning',
   self: 'brand',
@@ -38,7 +39,7 @@ export function linkFor(qr: PaymentQR | undefined, kind: PaymentLinkKind): Payme
 
 /**
  * Ordre recommandé par le serveur (QR virement avec montant, wallets à lien
- * pré-rempli, lien libre, Wero / Bancontact Pay, espèces, plus tard) ; repli
+ * pré-rempli, lien libre, espèces, plus tard) ; repli
  * raisonnable si `methods` est absent.
  */
 export function availableMethods(qr: PaymentQR | undefined): DeclareMethod[] {
@@ -46,8 +47,6 @@ export function availableMethods(qr: PaymentQR | undefined): DeclareMethod[] {
   const out: DeclareMethod[] = []
   if (qr?.epc) out.push('qr')
   for (const k of LINK_METHODS) if (linkFor(qr, k)) out.push(k)
-  if (qr?.wero) out.push('wero')
-  if (qr?.bancontact) out.push('bancontact')
   out.push('cash', 'later')
   return out
 }
@@ -64,9 +63,8 @@ export function orderForDevice(methods: DeclareMethod[], qr: PaymentQR | undefin
 
 /** Sous-titre de tuile : le montant est-il déjà rempli pour le débiteur ? */
 export function methodHint(method: DeclareMethod, qr: PaymentQR | undefined): string | undefined {
-  if (method === 'qr') return 'Montant inclus'
+  if (method === 'qr') return 'Scanne le QR avec ton app bancaire (montant déjà rempli)'
   if (isLinkMethod(method)) return linkFor(qr, method)?.amountPrefilled ? 'Montant pré-rempli' : 'Montant à saisir'
-  if (method === 'wero' || method === 'bancontact') return 'Montant à saisir'
   return undefined
 }
 
@@ -78,8 +76,6 @@ export function payoutMethods(p: PayoutProfile | null | undefined): PaymentMetho
   if (p.revolut_tag) out.push('revolut')
   if (p.paypal_me) out.push('paypal')
   if (p.payment_link) out.push('link')
-  if (p.wero_id || p.wero_qr) out.push('wero')
-  if (p.bancontact_phone || p.bancontact_qr) out.push('bancontact')
   return out
 }
 
@@ -91,10 +87,6 @@ export function declareLabel(method: DeclareMethod): string {
       return "J'ai payé avec Revolut"
     case 'paypal':
       return "J'ai payé avec PayPal"
-    case 'wero':
-      return "J'ai payé avec Wero"
-    case 'bancontact':
-      return "J'ai payé avec Bancontact Pay"
     case 'link':
       return "J'ai payé via le lien"
     case 'cash':

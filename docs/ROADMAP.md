@@ -5,7 +5,7 @@
 - [x] Backend PocketBase/Go : schéma, rules, state machine, API métier, seed démo
 - [x] Frontend : accueil, restaurants, menus, party (salon → vote → commande → récap → paiement), profil
 - [x] Envoi Uber Eats / Takeaway (deep link + récap), export CSV/TXT/JSON, script téléphone
-- [x] Remboursements : QR EPC SEPA, Wero, Bancontact Pay, lien de paiement, espèces, plus tard
+- [x] Remboursements : QR EPC SEPA, liens Revolut / PayPal.me avec montant, lien de paiement, espèces, plus tard (Wero / Bancontact Pay retirés : ADR 0003 mise à jour 3)
 - [x] Docker mono-conteneur, CI GitHub Actions, guide Coolify
 
 ## v0.1.1 — Administration & données réelles

@@ -192,21 +192,18 @@ ou `OCC_ADMINS` passent `admin` ; un compte créé plus tard avec un de ces e-ma
 | revolut_tag | text (≤ 32) | revtag Revolut, minuscules sans `@` (saisie `@jdoe`, `revolut.me/jdoe`… acceptée) |
 | paypal_me | text (≤ 40) | nom PayPal.me (saisie `jdoe`, `paypal.me/jdoe`, `paypal.com/paypalme/jdoe` acceptée) |
 | payment_link | url | autre lien de paiement (Lydia/Sumeria, Wise Business…), `https://` ajouté si absent |
-| wero_id | text | n° de mobile (E.164, ex. `+32470123456`) **ou** e-mail enregistré sur Wero |
-| bancontact_phone | text | n° de mobile (E.164) lié à Bancontact Pay |
-| wero_qr | file | image (png/jpg/webp, ≤ 1 Mo, `protected`) — QR « recevoir » généré dans l'app bancaire |
-| bancontact_qr | file | idem pour Bancontact Pay |
 
 Rules : toutes `user = @request.auth.id` (create : `@request.auth.id != "" && user = @request.auth.id`) ;
 create et update exigent en plus `@request.auth.is_guest = false` (migration `1760000016` : pas de profil pour un·e invité·e).
-Jamais exposé aux autres membres : QR EPC, identifiants Wero/Bancontact et images
-QR ne sortent que via `/api/occ/payments/{id}/qr` et `/wallet-qr/{kind}`, pour les
-membres de la party concernée (et via `/api/occ/parties/{id}/payments/qr` pour le payeur
-lui-même, qui n'y lit que ses propres coordonnées). Hook : `wero_id` / `bancontact_phone` normalisés
-(mobile → E.164 avec `+32` par défaut si commence par `0` ; e-mail en minuscules) et validés ;
-`revolut_tag` / `paypal_me` / `payment_link` normalisés (`domain/payout.go`) et un lien
+Jamais exposé aux autres membres : QR EPC et liens ne sortent que via
+`/api/occ/payments/{id}/qr`, pour les membres de la party concernée (et via
+`/api/occ/parties/{id}/payments/qr` pour le payeur lui-même, qui n'y lit que ses propres
+coordonnées). Hook : IBAN / BIC validés ; `revolut_tag` / `paypal_me` / `payment_link` normalisés (`domain/payout.go`) et un lien
 `revolut.me/…` ou `paypal.me/…` collé dans `payment_link` est déplacé dans le champ structuré
 (migration `1760000013` : même traitement pour les profils existants).
+Les anciens champs Wero / Bancontact Pay (`wero_id`, `bancontact_phone`, `wero_qr`, `bancontact_qr`)
+ont été **supprimés** par la migration `1760000021` (fichiers QR effacés du stockage) : un client qui
+les envoie encore les voit ignorés (ADR 0003, mise à jour 3).
 
 ### `restaurants` (lecture publique)
 | champ | type | notes |
@@ -640,7 +637,7 @@ désactivées (`/config` `passkeys: false`, routes **503**). Invité·e : pas de
 | debtor | R(users) | qui doit |
 | creditor | R(users) | le payeur |
 | amount | number int | cents |
-| method | select | `qr` (virement EPC), `revolut`, `paypal`, `link`, `wero`, `bancontact`, `cash`, `later`, `self` |
+| method | select | `qr` (virement EPC), `revolut`, `paypal`, `link`, `cash`, `later`, `self` ; `wero` / `bancontact` restent des valeurs valides pour les paiements déclarés **avant** leur retrait (lecture seule : toute nouvelle déclaration avec ces moyens → 400) |
 | status | select | `pending`, `declared`, `confirmed` |
 | reference | text | communication, ex. `OCC K7M2QX Alice` |
 | declared_at, confirmed_at | date | |
@@ -675,7 +672,7 @@ Rules : list/view `party.members.id ?= @request.auth.id || @request.auth.role = 
   | → closed / cancelled | membres | `party` | « Commande clôturée ✅ » / « Commande annulée » |
   | tous les membres prêts | hôte (sauf s'il est le dernier) | `party` | « Tout le monde est prêt ✅ » (une fois par phase) |
   | un membre rejoint | hôte | `party` | « Bob a rejoint la commande 👋 » (≤ 1 / 2 min / party, puis « Bob et 2 autres personnes ont rejoint ») |
-  | remboursement déclaré | payeur | `payments` | « Bob a déclaré t'avoir remboursé 12,40 € (Wero). Pense à confirmer. » |
+  | remboursement déclaré | payeur | `payments` | « Bob a déclaré t'avoir remboursé 12,40 € (Revolut). Pense à confirmer. » (libellés « Wero » / « Bancontact Pay » conservés pour les anciens paiements) |
   | remboursement confirmé | débiteur | `payments` | « Bob a confirmé ton remboursement de 12,40 €. » |
   | équipe : commande lancée (`TeamNotifier`) | membres de l'équipe sauf l'hôte | `party` | « Compta : la commande du jour est lancée — Rejoins « Midi du lundi ». » |
   | rappels / clôtures automatiques | voir *Heures limites* | `reminders` / `party` | « Plus que 2 minutes pour voter ⏳ » |
@@ -806,10 +803,9 @@ PocketBase `{ "status": 400, "message": "…", "data": {} }`, messages en franç
 | `POST /api/occ/push/test` | ✔ | | `{ "queued": true, "devices": n }` — notification « Notifications activées 🔔 » à **soi-même** ; **400** « Aucun appareil abonné… » |
 | `GET /api/occ/push/prefs` | ✔ | | `{ "prefs": NotifyPrefs, "devices": n, "enabled": bool, "mail": bool }` (`mail` = SMTP configuré) |
 | `PATCH /api/occ/push/prefs` | ✔ | `{ "party"?: bool, "payments"?: bool, "reminders"?: bool, "emails"?: bool }` | `{ "prefs": NotifyPrefs }` ; **400** si aucune clé |
-| `POST /api/occ/payments/{id}/action` | voir | `{ "action": "declare"\|"confirm"\|"reset", "method"?: "qr"\|"revolut"\|"paypal"\|"link"\|"wero"\|"bancontact"\|"cash"\|"later" }` | `{ "payment": Payment }` |
+| `POST /api/occ/payments/{id}/action` | voir | `{ "action": "declare"\|"confirm"\|"reset", "method"?: "qr"\|"revolut"\|"paypal"\|"link"\|"cash"\|"later" }` | `{ "payment": Payment }` — **400** « Wero et Bancontact Pay ne sont plus proposés… » pour `wero` / `bancontact` |
 | `GET /api/occ/payments/{id}/qr` | membre | | `PaymentQR` |
 | `GET /api/occ/parties/{id}/payments/qr` | **payeur** (`parties.payer`) | | `CollectQR` (ci-dessous) — « Encaisser » : QR à montant exact de chaque part, à présenter depuis le téléphone du payeur ; status `paying`/`closed` (sinon 400) ; **403** hôte non payeur, débiteur, non-membre |
-| `GET /api/occ/payments/{id}/wallet-qr/{kind}` | membre | `kind=wero\|bancontact` | image QR du payeur (stream, `Cache-Control: private`) ou 404 |
 | `POST /api/occ/guest` | — (sans session) | `{ "name": "Léa", "color"?: "#RRGGBB", "partyCode"?: "K7M2QX", "teamCode"?: "K7M2QXAB" }` (un seul code) | `{ token, record, party: {id,title}\|null, team: {id,name}\|null }` — crée un·e invité·e et le fait rejoindre (§3 *Invités*) ; **400** code absent / mal formé / commande fermée / équipe archivée / prénom vide, **404** code inconnu, **429** limite par IP |
 | `GET /api/occ/invites/{code}` | — | | aperçu public d'un lien : commande (6 car.) `{ kind: "party", code, title, host, status, memberCount, joinable }` ou équipe (8 car.) `{ kind: "team", code, title, emoji, color, memberCount, joinable }` ; 400 / 404 ; 429 (60/min/IP) |
 | `POST /api/occ/me/upgrade` | invité·e | `{ email, password, passwordConfirm?, name? }` | `{ token, record }` — « Créer mon compte » sur le même enregistrement (historique conservé) ; 400 si déjà un compte complet, e-mail invalide / pris, mot de passe < 8 |
@@ -875,7 +871,7 @@ fermées), `auth-with-oauth2`, `auth-methods`, update `users` avec `oldPassword`
 de passe / Google ; `""` si aucune).
 
 Règles `payments/{id}/action` :
-* `declare` — débiteur seulement. `method=qr|revolut|paypal|link|wero|bancontact|cash` → `status=declared` ; `method=later` → `status=pending`.
+* `declare` — débiteur seulement. `method=qr|revolut|paypal|link|cash` → `status=declared` ; `method=later` → `status=pending` ; `wero` / `bancontact` (retirés) → 400.
 * `confirm` — créancier (payeur) ou hôte → `status=confirmed`. Si tous confirmés → party `closed`.
 * `reset` — créancier ou hôte → `status=pending`.
 
@@ -939,7 +935,7 @@ plus grand reste (ordre stable par id) → `Σ total = grandTotal` **exactement*
   "items": [{ "menuItem": "…", "name": "Margherita", "optionsLabel": "Large", "note": "", "quantity": 2, "unitPrice": 1450, "total": 2900 }],
   "subtotal": 2900, "sharedFees": 133, "total": 3033, "grandTotal": 6099,
   "payer": { "id": "…", "name": "Bob", "avatar": "", "color": "#…" },
-  "payment": { "id": "…", "method": "wero", "status": "confirmed", "amount": 3033 } }
+  "payment": { "id": "…", "method": "qr", "status": "confirmed", "amount": 3033 } }
 ```
 `items` = **mes** lignes seulement ; `subtotal` / `sharedFees` / `total` / `grandTotal` = exactement ceux du
 `Summary` de la party (même code, `summaryFromRecords`) ; `restaurant` `null` tant qu'aucun n'est retenu ;
@@ -1020,9 +1016,7 @@ lignes valides en une transaction (snapshots `name` / `options_label` / `unit_pr
       "url": "https://paypal.me/bobm/12.40EUR" },
     { "kind": "link", "label": "lydia-app.com", "amountPrefilled": false,
       "url": "https://lydia-app.com/collect/…" } ],
-  "wero": { "id": "+32470123456", "hasQr": true },
-  "bancontact": { "phone": "+32470123456", "hasQr": false },
-  "methods": ["qr", "revolut", "paypal", "link", "wero", "bancontact", "cash", "later"] }
+  "methods": ["qr", "revolut", "paypal", "link", "cash", "later"] }
 ```
 `epc` = payload **EPC069-12** (QR virement SEPA, lu par les apps bancaires
 belges/européennes : montant **et** communication pré-remplis — le seul QR « à
@@ -1032,19 +1026,17 @@ montant » universel), `null` si le payeur n'a pas d'IBAN ; `iban` l'accompagne
 `true` seulement si le format du fournisseur est confirmé (ADR 0003) :
 Revolut `?amount=<centimes>&currency=EUR&note=<communication>`, PayPal.me
 `/<montant>EUR`, lien libre Wise Business `?amount=&currency=&description=` ;
-tout autre lien est renvoyé tel quel (`false`). `wero` / `bancontact` :
-`null` si le payeur n'a rien renseigné ; `hasQr` indique qu'une image est
-disponible via `/wallet-qr/{kind}`. `methods` = moyens réellement proposés
-(selon le profil du payeur), par ordre d'utilité : `qr`, `revolut`, `paypal`,
-`link`, `wero`, `bancontact`, `cash`, `later` (le front avance les liens
-pré-remplis devant `qr` sur mobile).
+tout autre lien est renvoyé tel quel (`false`). `methods` = moyens réellement
+proposés (selon le profil du payeur), par ordre d'utilité : `qr`, `revolut`,
+`paypal`, `link`, `cash`, `later` (le front avance les liens pré-remplis devant
+`qr` sur mobile).
 
-**Wero / Bancontact Pay** n'exposent aucun lien ni QR de demande de paiement
-P2P utilisable par un tiers (demandes créées dans l'app du bénéficiaire ;
-API réservées aux commerçants). L'UI affiche donc : identifiant du payeur,
-montant et communication à copier, mini-guide, et le QR personnel du payeur
-s'il l'a téléversé, **toujours** avec l'avertissement « QR sans montant :
-saisis 12,40 € dans l'app ». Voir ADR 0003.
+**Wero / Bancontact Pay ne sont plus proposés** (ADR 0003, mise à jour 3) :
+aucun format de demande P2P **à montant** n'est utilisable par un tiers ; le
+QR virement EPC, lu par les apps bancaires belges où vit justement Wero, fait
+le même travail avec le montant et la communication pré-remplis. Les clés
+`wero` / `bancontact` ont disparu de `PaymentQR` et l'endpoint
+`/payments/{id}/wallet-qr/{kind}` a été supprimé (404).
 
 ### `CollectQR` (`/parties/{id}/payments/qr`, payeur seulement)
 ```json

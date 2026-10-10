@@ -49,13 +49,6 @@ export interface PayoutProfile extends BaseRecord {
   paypal_me: string
   /** Autre lien de paiement (https, normalisé par le serveur). */
   payment_link: string
-  /** Mobile (E.164) ou e-mail enregistré sur Wero. */
-  wero_id: string
-  /** Mobile (E.164) lié à Bancontact Pay. */
-  bancontact_phone: string
-  /** Image du QR « recevoir » (fichier protégé). */
-  wero_qr: string
-  bancontact_qr: string
 }
 
 /* ------------------------------------------------------------ restaurants */
@@ -468,6 +461,10 @@ export interface OrderItemInput {
   client_key?: string
 }
 
+/**
+ * `wero` / `bancontact` : anciens moyens (retirés, ADR 0003 mise à jour 3),
+ * conservés pour afficher les paiements déclarés avant leur retrait.
+ */
 export type PaymentMethod = 'qr' | 'revolut' | 'paypal' | 'link' | 'wero' | 'bancontact' | 'cash' | 'later' | 'self'
 export type PaymentStatus = 'pending' | 'declared' | 'confirmed'
 
@@ -589,13 +586,9 @@ export interface PaymentQR {
   iban: string | null
   /** Liens de paiement du payeur pour CE paiement (montant pré-rempli quand le format le permet). */
   links: PaymentLink[]
-  wero: { id: string; hasQr: boolean } | null
-  bancontact: { phone: string; hasQr: boolean } | null
   /** Moyens réellement proposés, dans l'ordre d'affichage recommandé. */
   methods: DeclareMethod[]
 }
-
-export type WalletKind = 'wero' | 'bancontact'
 
 export type PaymentLinkKind = 'revolut' | 'paypal' | 'link'
 
@@ -630,7 +623,7 @@ export interface CollectQR {
 
 export type ExportFormat = 'csv' | 'txt' | 'json'
 export type PaymentAction = 'declare' | 'confirm' | 'reset'
-export type DeclareMethod = 'qr' | 'revolut' | 'paypal' | 'link' | 'wero' | 'bancontact' | 'cash' | 'later'
+export type DeclareMethod = 'qr' | 'revolut' | 'paypal' | 'link' | 'cash' | 'later'
 
 export interface TransitionBody {
   to: PartyStatus

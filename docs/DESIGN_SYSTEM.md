@@ -47,8 +47,6 @@ les tokens (jamais de hex en dur).
 | `--color-weloveat` | `#113B3A` | marque fournisseur (teal profond, couleur *primary* du thème Material de weloveat.be ; leur `manifest.json` n'a pas de `theme_color`) |
 | `--color-ubereats-ink` / `--color-takeaway-ink` / `--color-deliveroo-ink` | = marque | texte des badges fournisseurs (AA sur leur teinte à 14 %) |
 | `--color-weloveat-ink` | `#6FD3C9` | teinte claire dérivée (le teal profond est illisible sur fond sombre) ; sert aussi de fond/bord du badge `weloveat` (8,0:1) |
-| `--color-wero` / `--color-wero-fg` | `#FFE500` / `#1A1A1A` | wallet Wero — aplat + texte (contraste ≈ 15:1) |
-| `--color-bancontact` / `--color-bancontact-fg` | `#005498` / `#FFFFFF` | Bancontact Pay — aplat + texte (contraste ≈ 7,6:1) |
 | `--color-qr-bg` / `--color-qr-fg` | `#FFFFFF` / `#000000` | QR codes, identiques dans les deux thèmes |
 | `--color-ink` / `--color-paper` | `#17151A` / `#FFFFFF` | texte posé sur une couleur d'avatar (choisi selon la luminance) |
 | `--color-food-*` | crust, cheese, tomato, basil, chili, bun, patty, lettuce, rice, nori, salmon, broth, bowl, steel, gold, ink | illustrations culinaires SVG uniquement |
@@ -159,7 +157,7 @@ sautent à la valeur finale, cœur / coche à l'état final.
 |---|---|---|
 | `Button` | `primary` (dégradé braise + glow), `secondary` (surface + bordure), `ghost`, `danger`; tailles `sm` `md` `lg`, `icon` | état `loading` (spinner), `asChild` non requis |
 | `Card` | `default`, `interactive` (hover lift), `selected` (bordure braise) | |
-| `Badge` | `neutral`, `brand`, `success`, `warning`, `danger`, `info`, `ubereats`, `takeaway`, `deliveroo`, `weloveat`, `wero`, `bancontact` | pill 12 px ; `wero`/`bancontact` en aplat de marque (wordmark, pas de logo officiel) |
+| `Badge` | `neutral`, `brand`, `success`, `warning`, `danger`, `info`, `ubereats`, `takeaway`, `deliveroo`, `weloveat` | pill 12 px ; un ancien paiement Wero / Bancontact Pay s'affiche en `neutral` (variantes et tokens de marque retirés, ADR 0003 maj 3) |
 | `Avatar` / `AvatarStack` | tailles 24/32/40/56 ; anneau `ready` vert | initiales sur `user.color` si pas d'image |
 | `Input`, `Textarea`, `Field` | label + aide + erreur | |
 | `Sheet` | bottom sheet mobile / dialog centré desktop | focus trap, Échap |
@@ -170,8 +168,8 @@ sautent à la valeur finale, cœur / coche à l'état final.
 | `QuantityStepper` | − 1 + | |
 | `Countdown` | mm:ss | |
 | `Toast` | via `sonner`, thème sombre | |
-| `QRCodeCard` | QR généré (`value`) **ou** image de QR (`imageSrc`, QR « recevoir » Wero / Bancontact) + montant + bouton copier | `qrcode.react`, fond blanc obligatoire (lisibilité scanners), `fgColor="currentColor"` sur `--color-qr-fg` |
-| Tuiles de paiement (`MethodTiles`) | une tuile ≥ 80 px par moyen, dans l'ordre de `PaymentQR.methods` (utilité) : Virement QR, Revolut, PayPal, Lien, Wero, Bancontact Pay, Espèces, Plus tard. **Mobile** (< 1024 px) : les liens à montant pré-rempli passent devant le Virement QR (on ne scanne pas son propre écran) | `role="radiogroup"` ; sous-titre `muted` 12 px dans le nom accessible : « Montant inclus » (QR), « Montant pré-rempli » / « Montant à saisir » (liens), « Montant à saisir » (Wero/Bancontact). Revolut/PayPal : wordmark texte sur `fg/8` (pas de logo ni de couleur de marque). **Virement QR** : desktop = QR EPC 240 px « Ouvre ton app bancaire et scanne » ; mobile = encart `info` + bouton « Afficher le QR pour un collègue » (`aria-expanded`) ; IBAN, montant, communication toujours copiables. **Liens** : bouton `primary` `lg` pleine largeur « Payer 12,40 € avec Revolut » (lien externe) si `amountPrefilled`, sinon `secondary` « Ouvrir … » + encart `warning` « saisis 12,40 € ». **Wero/Bancontact** : identifiant + montant + communication copiables, guide en 3 étapes ; QR personnel du payeur **toujours** précédé de l'encart `warning` « QR sans montant : saisis 12,40 € dans l'app », replié (« Afficher son QR personnel (sans montant) ») si un identifiant existe. **Aucun faux deep link** (pas d'API P2P tierce) |
+| `QRCodeCard` | QR généré (`value`) + montant + bouton copier | `qrcode.react`, fond blanc obligatoire (lisibilité scanners), `fgColor="currentColor"` sur `--color-qr-fg` |
+| Tuiles de paiement (`MethodTiles`) | une tuile ≥ 80 px par moyen, dans l'ordre de `PaymentQR.methods` (utilité) : Virement (QR), Revolut, PayPal, Lien, Espèces, Plus tard (Wero / Bancontact Pay retirés : pas de montant pré-rempli possible). **Mobile** (< 1024 px) : les liens à montant pré-rempli passent devant le Virement (QR) (on ne scanne pas son propre écran) | `role="radiogroup"` ; sous-titre `muted` 12 px dans le nom accessible : « Scanne le QR avec ton app bancaire (montant déjà rempli) » (virement), « Montant pré-rempli » / « Montant à saisir » (liens). Revolut/PayPal : wordmark texte sur `fg/8` (pas de logo ni de couleur de marque). **Virement (QR)** : texte « Ton app bancaire (KBC, BNP Paribas Fortis…) lit ce QR… C'est la même app que celle où vit Wero » ; desktop = QR EPC 240 px « Ouvre ton app bancaire et scanne » ; mobile = encart `info` + bouton « Afficher le QR pour un collègue » (`aria-expanded`) ; IBAN, montant, communication toujours copiables. **Liens** : bouton `primary` `lg` pleine largeur « Payer 12,40 € avec Revolut » (lien externe) si `amountPrefilled`, sinon `secondary` « Ouvrir … » + encart `warning` « saisis 12,40 € ». **Aucun faux deep link** (pas d'API P2P tierce) |
 | Carte « Tes moyens de remboursement » (payeur) | | pastilles des moyens visibles par les collègues (`MethodMark` + libellé), ou encart `warning` « Aucun moyen renseigné… » ; lien `secondary` `sm` vers *Mes infos* |
 | `Segmented`, `Chip`, `CopyButton` | | radiogroup en pills ; filtre `aria-pressed` ; copie + toast |
 | Bandeau « Commande en cours » (`ResumeBanner`, `features/party/ActiveParties.tsx`) | `header` (pastille desktop ≥ 768 px dans l'en-tête : point live braise + titre tronqué 176 px + statut ≥ 1024 px + « Reprendre → » en `text-brand`, fond `brand/10`, bord `brand/30`, h 36 px) ; `dock` (mobile : `aside` « Commande en cours » fixé au-dessus de la tab bar, carte `elevated/95` floutée bord `brand/30`, vignette resto 40 px, sur-titre braise en capitales 11 px + titre + « Étape 3/5 · Commande », bouton `secondary sm` « Reprendre ») | toute la carte est un lien vers la party (nom accessible « Reprendre la commande « X » — statut ») ; ≥ 2 commandes → bouton qui ouvre une `Sheet` « Mes commandes en cours » (lignes 56 px : vignette, titre, badge statut, resto). Masqué dans la party, sur `/j/…`, l'auth, et sur l'accueil quand `ResumeHero` s'y affiche. Quand le dock est là, `.has-resume-dock` porte `--tabbar-h` à 128 px en mobile : barres collantes et bas de page remontent d'autant. Point live : `animate-ping`, coupé par `motion-reduce` |
@@ -206,7 +204,7 @@ sautent à la valeur finale, cœur / coche à l'état final.
    * *Récap* : totaux par personne, récap consolidé, choix d'envoi (Uber Eats,
      Takeaway, export, téléphone), choix du payeur.
    * *Paiement* : ma part + QR EPC (montant + communication) / liens Revolut, PayPal
-     avec montant / Wero, Bancontact Pay / espèces / plus tard ; vue payeur avec ses
+     avec montant / espèces / plus tard ; vue payeur avec ses
      moyens visibles, la liste des parts (moyen déclaré en badge) et confirmation.
 5. **Authentification** (`features/auth`, mise en page `AuthLayout` : titre display 32 px centré, carte,
    pied `muted`) — *Connexion* : lien `text-brand` « Mot de passe oublié ? » aligné à droite sous le mot de
