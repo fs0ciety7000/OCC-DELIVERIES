@@ -38,6 +38,8 @@ const (
 	KindVoteExtended    = "vote_extended"
 	KindNeedsHost       = "needs_host"
 	KindTest            = "test"
+	// KindPayoutRequest: a colleague asks you to fill in a reimbursement method (ADR 0003, update 4).
+	KindPayoutRequest = "payout_request"
 )
 
 // Urgency values (RFC 8030).
@@ -308,6 +310,21 @@ func PaymentConfirmed(p Party, by string, amount int) Message {
 	m.Title = "Remboursement confirmé ✅"
 	m.Body = by + " a confirmé ton remboursement de " + domain.FormatEUR(amount) + "."
 	m.Tag = "payment-" + p.ID
+	return m
+}
+
+// PayoutRequest asks a member to fill in a reimbursement method so they can
+// be designated payer; the link opens the quick-add sheet of the party.
+func PayoutRequest(p Party, from string) Message {
+	m := p.base(KindPayoutRequest, CategoryPayments)
+	if strings.TrimSpace(from) == "" {
+		from = "Un collègue"
+	}
+	m.Title = "Ajoute ton IBAN 💳"
+	m.Body = strings.TrimSpace(from) + " aimerait que tu puisses avancer " + p.name() + " : renseigne ton IBAN (ou Revolut / PayPal) pour être remboursé·e."
+	m.URL = p.url() + "?iban=1"
+	m.Tag = "payout-" + p.ID
+	m.TTL = 30 * time.Minute
 	return m
 }
 

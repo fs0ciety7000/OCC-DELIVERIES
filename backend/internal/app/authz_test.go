@@ -150,6 +150,7 @@ func TestPayerRecomputeLockedAfterConfirmation(t *testing.T) {
 			Amount int    `json:"amount"`
 		} `json:"payments"`
 	}
+	e.payout(alice)
 	e.expect(200, "POST", path("/api/occ/parties/%s/payer", pid), alice.token, map[string]any{"payer": alice.id()}).json(t, &payr)
 	sum := 0
 	var bobPay string
@@ -211,7 +212,7 @@ func TestNoWalletPayoutData(t *testing.T) {
 
 	// alice is the payer; an old client still sends wallet ids: ignored
 	prof := e.expect(200, "POST", "/api/collections/payout_profiles/records", alice.token, map[string]any{
-		"user": alice.id(), "wero_id": "0470123456", "bancontact_phone": "0470123456",
+		"user": alice.id(), "revolut_tag": "alice", "wero_id": "0470123456", "bancontact_phone": "0470123456",
 	}).m(t)
 	if _, found := prof["wero_id"]; found {
 		t.Fatalf("wallet fields must not exist: %v", prof)
@@ -228,6 +229,16 @@ func TestNoWalletPayoutData(t *testing.T) {
 		} `json:"payments"`
 	}
 	e.expect(200, "POST", path("/api/occ/parties/%s/payer", pid), alice.token, map[string]any{"payer": alice.id()}).json(t, &payr)
+	// the payer guard needs a method at designation time; the profile is
+	// emptied afterwards (a payer may clear it later): nothing to expose.
+	profRec, err := e.app.FindRecordById(colPayoutProfiles, prof["id"].(string))
+	if err != nil {
+		t.Fatal(err)
+	}
+	profRec.Set("revolut_tag", "")
+	if err := e.app.Save(profRec); err != nil {
+		t.Fatal(err)
+	}
 	payID := payr.Payments[0].ID
 
 	var qr map[string]any

@@ -120,7 +120,8 @@ func register(app core.App, cfg Config) *handlers {
 	if cfg.Sync.DefaultLabel == "" {
 		cfg.Sync.DefaultLabel = cfg.DefaultLabel
 	}
-	h := &handlers{cfg: cfg, sync: newSyncer(app, cfg.Sync), push: newPushService(app, cfg.Push), guests: newGuestState()}
+	h := &handlers{cfg: cfg, sync: newSyncer(app, cfg.Sync), push: newPushService(app, cfg.Push), guests: newGuestState(),
+		payoutAsk: domain.NewRateLimiter(1, payoutAskWindow)}
 	h.sync.bind()
 	h.push.bind()
 	SetTeamNotifier(h.push)
@@ -158,9 +159,10 @@ type handlers struct {
 	sync      *syncer
 	push      *pushService
 	deadlines *deadlineScheduler
-	guests    *guestState     // rate limits of the guest endpoints
-	orderMail *orderMailer    // « bon de commande » e-mail (ordermail.go)
-	passkeys  *passkeyService // WebAuthn sign-in (passkeys.go)
+	guests    *guestState         // rate limits of the guest endpoints
+	orderMail *orderMailer        // « bon de commande » e-mail (ordermail.go)
+	passkeys  *passkeyService     // WebAuthn sign-in (passkeys.go)
+	payoutAsk *domain.RateLimiter // « ajoute ton IBAN » requests (payerguard.go)
 }
 
 func (h *handlers) routes(r *router.Router[*core.RequestEvent]) {
@@ -178,6 +180,8 @@ func (h *handlers) routes(r *router.Router[*core.RequestEvent]) {
 	g.GET("/parties/{id}/summary", h.summary).Bind(user)
 	g.POST("/parties/{id}/dispatch", h.dispatch).Bind(user)
 	g.POST("/parties/{id}/payer", h.payer).Bind(user)
+	g.GET("/parties/{id}/payout-readiness", h.payoutReadiness).Bind(user)
+	g.POST("/parties/{id}/payout-request", h.payoutRequest).Bind(user)
 	g.GET("/parties/{id}/export", h.export).Bind(user)
 	g.GET("/parties/{id}/reorder", h.reorderPreview).Bind(user)
 	g.POST("/parties/{id}/reorder", h.reorderApply).Bind(user)

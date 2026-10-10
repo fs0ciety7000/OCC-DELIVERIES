@@ -226,6 +226,13 @@ func (e *env) user(name string) user {
 	return user{rec: r, token: tok}
 }
 
+// payout gives u a payout profile with a valid IBAN: the payer guard
+// (ADR 0003, update 4) refuses a payer who cannot be reimbursed.
+func (e *env) payout(u user) {
+	e.t.Helper()
+	e.expect(200, "POST", "/api/collections/payout_profiles/records", u.token, map[string]any{"user": u.id(), "iban": "BE71096123456769"})
+}
+
 func boolPtr(b bool) *bool { return &b }
 
 // testRestaurants imports two deterministic restaurants and returns their ids.

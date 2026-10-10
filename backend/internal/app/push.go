@@ -212,6 +212,7 @@ var inAppKinds = map[string]bool{
 	notify.KindReminderVote: true, notify.KindReminderOrder: true, notify.KindVoteExtended: true,
 	notify.KindNeedsHost: true, notify.KindAutoClosed: true, notify.KindAllReady: true,
 	notify.KindPaymentDeclared: true, notify.KindPaymentConfirm: true,
+	notify.KindPayoutRequest: true,
 }
 
 func (s *pushService) inApp(users []string, m notify.Message) {

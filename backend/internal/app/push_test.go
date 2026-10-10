@@ -323,6 +323,7 @@ func TestPushPartyEvents(t *testing.T) {
 
 	pe.expect(200, "POST", path("/api/occ/parties/%s/transition", pid), alice.token, map[string]any{"to": "review"})
 	pe.flush()
+	pe.payout(bob)
 	pe.expect(200, "POST", path("/api/occ/parties/%s/payer", pid), alice.token, map[string]any{"payer": bob.id()})
 	got := pe.flush()
 	// Carol's share: 7,00 € ± the delivery-fee cent, which goes to whichever member sorts first

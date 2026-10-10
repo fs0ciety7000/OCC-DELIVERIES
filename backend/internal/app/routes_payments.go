@@ -58,6 +58,10 @@ func (h *handlers) payer(e *core.RequestEvent) error {
 		if err != nil {
 			return err
 		}
+		// ADR 0003, update 4: the payer must be reimbursable (IBAN, Revolut, PayPal, link).
+		if err := checkPayer(tx, s, body.Payer, e.Auth.Id); err != nil {
+			return err
+		}
 		col, err := tx.FindCollectionByNameOrId(colPayments)
 		if err != nil {
 			return err

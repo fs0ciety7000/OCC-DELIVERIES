@@ -111,6 +111,8 @@ func TestOrderMailOnPaying(t *testing.T) {
 		t.Fatalf("mails before paying: %d", e.app.TestMailer.TotalSend())
 	}
 
+	e.payout(bob)
+	e.payout(alice)
 	e.expect(200, "POST", path("/api/occ/parties/%s/payer", pid), alice.token, map[string]any{"payer": bob.id()})
 	e.h.orderMail.wait()
 	s := e.summary(pid, alice)
@@ -227,6 +229,7 @@ func TestOrderMailGuestsAndSolo(t *testing.T) {
 		t.Fatal(err)
 	}
 	e.expect(200, "POST", path("/api/occ/parties/%s/transition", pid), alice.token, map[string]any{"to": "review"})
+	e.payout(alice)
 	e.expect(200, "POST", path("/api/occ/parties/%s/payer", pid), alice.token, map[string]any{"payer": alice.id()})
 	e.h.orderMail.wait()
 	msgs := e.app.TestMailer.Messages()
@@ -263,6 +266,7 @@ func TestOrderMailWithoutSMTP(t *testing.T) {
 		&alice: {{"item": "Tiramisu", "quantity": 1}},
 		&bob:   {{"item": "Tiramisu", "quantity": 1}},
 	})
+	e.payout(bob)
 	e.expect(200, "POST", path("/api/occ/parties/%s/payer", pid), alice.token, map[string]any{"payer": bob.id()})
 	e.h.orderMail.wait()
 	if n := e.app.TestMailer.TotalSend(); n != 0 {

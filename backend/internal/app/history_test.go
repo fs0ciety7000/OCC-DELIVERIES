@@ -79,6 +79,7 @@ func TestHistoryAndStats(t *testing.T) {
 	e.expect(200, "POST", "/api/collections/order_items/records", bob.token, map[string]any{"party": p1, "user": bob.id(), "menu_item": tira}) // 6,00
 	e.expect(200, "POST", path("/api/occ/parties/%s/transition", p1), alice.token, map[string]any{"to": "review"})
 	e.expect(200, "PATCH", "/api/collections/parties/records/"+p1, alice.token, map[string]any{"tip": 100})
+	e.payout(bob)
 	e.expect(200, "POST", path("/api/occ/parties/%s/payer", p1), alice.token, map[string]any{"payer": bob.id()})
 
 	// Party 2 : Carol seule (burger) — jamais visible des autres.

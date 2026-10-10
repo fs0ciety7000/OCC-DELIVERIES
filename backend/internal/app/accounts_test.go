@@ -307,6 +307,7 @@ func TestDeleteAccountKeepsHistory(t *testing.T) {
 		e.expect(200, "POST", "/api/collections/order_items/records", u.token, map[string]any{"party": pid, "user": u.id(), "menu_item": tira, "quantity": 2})
 	}
 	e.expect(200, "POST", path("/api/occ/parties/%s/transition", pid), alice.token, map[string]any{"to": "review"})
+	e.payout(alice)
 	e.expect(200, "POST", path("/api/occ/parties/%s/payer", pid), alice.token, map[string]any{"payer": alice.id()})
 	e.expect(200, "POST", "/api/collections/payout_profiles/records", bob.token, map[string]any{"user": bob.id(), "holder_name": "Bob"})
 
