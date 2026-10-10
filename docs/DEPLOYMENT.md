@@ -36,6 +36,7 @@ Enregistrement `A` (ou `CNAME`) `eat.fs0ciety.org` → IP du serveur Coolify.
 | `OCC_GOOGLE_CLIENT_ID` / `OCC_GOOGLE_CLIENT_SECRET` | *(facultatif, secrets : « Continuer avec Google », voir § 3 bis)* |
 | `OCC_SMTP_HOST` / `OCC_SMTP_PORT` / `OCC_SMTP_USERNAME` / `OCC_SMTP_PASSWORD` | *(facultatif, secrets : e-mails, voir § 3 ter)* |
 | `OCC_MAIL_FROM` / `OCC_MAIL_FROM_NAME` | `noreply@fs0ciety.org` / `OCC Deliveries` |
+| `OCC_WEBAUTHN_RP_ID` / `OCC_WEBAUTHN_ORIGINS` | *(facultatif : passkeys, déduits d'`OCC_PUBLIC_URL` → `eat.fs0ciety.org`, voir § 3 sexies)* |
 
 7. *Deploy*. Activer *Auto deploy* (webhook GitHub) pour déployer à chaque push sur `main`.
 
@@ -215,6 +216,25 @@ automatique désactivée par la migration `1760000015`).
 le HTTPS de Coolify est requis (service workers et push n'existent qu'en contexte sécurisé, ou `localhost`). Après un
 déploiement, la nouvelle version s'active au chargement suivant (anciennes coquilles supprimées). Icônes : régénérer
 avec `cd frontend && node scripts/generate-icons.mjs` (Chromium de Playwright, `cd e2e && npm ci`) si le logo change.
+
+## 3 sexies. Passkeys (connexion sans mot de passe)
+
+Rien à configurer si `OCC_PUBLIC_URL=https://eat.fs0ciety.org` : la *relying party* WebAuthn vaut alors
+**`eat.fs0ciety.org`** et la seule origine acceptée est `https://eat.fs0ciety.org`. Vérification :
+`curl -s https://eat.fs0ciety.org/api/occ/config` → `"passkeys": true` (sinon les journaux du conteneur disent
+pourquoi : « passkeys disabled: invalid WebAuthn configuration »). Chacun ajoute ses passkeys depuis Profil →
+Sécurité → Passkeys ; la page de connexion propose « Se connecter avec une passkey » et l'autoremplissage du champ
+e-mail.
+
+* `OCC_WEBAUTHN_RP_ID` : à ne définir que pour élargir au domaine parent (`fs0ciety.org`, si d'autres sous-domaines
+  doivent partager les passkeys). **Une passkey est liée à son RP ID : le changer (ou changer de domaine) rend
+  inutilisables toutes les passkeys existantes** — chacun devra se reconnecter autrement et en recréer une.
+* `OCC_WEBAUTHN_ORIGINS` : origines exactes supplémentaires, séparées par des virgules, toutes `https://` et dans
+  le domaine du RP (ex. `https://eat.fs0ciety.org,https://www.eat.fs0ciety.org`).
+* Les défis sont gardés en mémoire (10 min, usage unique) : un redémarrage pendant une connexion demande simplement
+  de réessayer. Une seule instance du conteneur (comme pour le reste de l'app).
+* En local, `http://localhost:8090` et `http://localhost:5173` fonctionnent sans configuration (RP `localhost`) ;
+  `127.0.0.1` ne fonctionne pas (les navigateurs refusent une adresse IP comme RP ID).
 
 ## 4. Gérer les restaurants
 
