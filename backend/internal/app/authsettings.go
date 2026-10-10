@@ -33,6 +33,9 @@ type GoogleConfig struct {
 // Enabled reports whether both values are set.
 func (g GoogleConfig) Enabled() bool { return g.ClientID != "" && g.ClientSecret != "" }
 
+// ContactEmail is the public contact address shown in the app and in e-mails.
+const ContactEmail = "contact@eat.fs0ciety.org"
+
 const (
 	defaultMailFromName = "OCC Deliveries"
 	googleProvider      = "google"

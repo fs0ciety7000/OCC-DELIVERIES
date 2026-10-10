@@ -74,7 +74,7 @@ func renderMail(c mailContent) string {
 		b.WriteString(`<p style="margin:18px 0 0;padding-top:14px;border-top:1px solid ` + mailBorder + `;font-size:13px;line-height:18px;color:` + mailMuted + `">` + c.Footnote + `</p>`)
 	}
 	b.WriteString(`</td></tr>`)
-	b.WriteString(`<tr><td style="padding:16px 4px 0;font-size:12px;line-height:16px;color:` + mailMuted + `">Commandes groupées entre collègues · <a href="{APP_URL}" style="color:` + mailMuted + `">{APP_URL}</a><br/>Développé par OCC Interactive, une division de CARDOR Media</td></tr>`)
+	b.WriteString(`<tr><td style="padding:16px 4px 0;font-size:12px;line-height:16px;color:` + mailMuted + `">Commandes groupées entre collègues · <a href="{APP_URL}" style="color:` + mailMuted + `">{APP_URL}</a><br/>Contact : <a href="mailto:` + ContactEmail + `" style="color:` + mailMuted + `">` + ContactEmail + `</a><br/>Développé par OCC Interactive, une division de CARDOR Media</td></tr>`)
 	b.WriteString(`</table></td></tr></table>`)
 	return b.String()
 }

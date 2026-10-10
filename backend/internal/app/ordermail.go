@@ -381,7 +381,7 @@ var orderMailTmpl = template.Must(template.New("order").Funcs(template.FuncMap{
 	"eur": eurHTML,
 }).Parse(strings.NewReplacer(
 	"[bg]", mailBg, "[surface]", mailSurface, "[border]", mailBorder, "[fg]", mailFg,
-	"[muted]", mailMuted, "[brand]", mailBrand, "[brand2]", mailBrand2, "[brandfg]", mailBrandFg,
+	"[muted]", mailMuted, "[contact]", ContactEmail, "[brand]", mailBrand, "[brand2]", mailBrand2, "[brandfg]", mailBrandFg,
 	"[ink]", mailInk, "[elevated]", mailElevated, "[soft]", mailBrandSoft,
 	"[font]", "Inter,Segoe UI,Helvetica,Arial,sans-serif",
 ).Replace(orderMailHTMLSource)))
@@ -457,7 +457,7 @@ const orderMailHTMLSource = `<div style="display:none;max-height:0;overflow:hidd
 {{end}}
 {{end}}
 </td></tr>
-<tr><td style="padding:16px 4px 0;font-size:12px;line-height:16px;color:[muted]">Tu reçois cet e-mail car tu as commandé dans cette party. Tu peux le désactiver dans ton profil (Notifications).<br/>Commandes groupées entre collègues · <a href="{{.D.AppURL}}" style="color:[muted]">{{.D.AppURL}}</a><br/>Développé par OCC Interactive, une division de CARDOR Media</td></tr>
+<tr><td style="padding:16px 4px 0;font-size:12px;line-height:16px;color:[muted]">Tu reçois cet e-mail car tu as commandé dans cette party. Tu peux le désactiver dans ton profil (Notifications).<br/>Commandes groupées entre collègues · <a href="{{.D.AppURL}}" style="color:[muted]">{{.D.AppURL}}</a><br/>Contact : <a href="mailto:[contact]" style="color:[muted]">[contact]</a><br/>Développé par OCC Interactive, une division de CARDOR Media</td></tr>
 </table></td></tr></table>`
 
 type orderMailView struct {
@@ -569,6 +569,7 @@ func renderOrderMailText(d orderMailData) string {
 	line("")
 	line("--")
 	line("OCC Deliveries — commandes groupées entre collègues · %s", d.AppURL)
+	line("Contact : %s", ContactEmail)
 	line("Tu peux désactiver cet e-mail dans ton profil (Notifications).")
 	return b.String()
 }

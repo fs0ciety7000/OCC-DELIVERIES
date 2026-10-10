@@ -1268,7 +1268,7 @@ proche à la même adresse. Voir `docs/DEPLOYMENT.md`.
 | `OCC_SMTP_PORT` | `587` | `465` = TLS implicite par défaut |
 | `OCC_SMTP_USERNAME` / `OCC_SMTP_PASSWORD` | — | identifiants SMTP (jamais journalisés ; stockés dans les réglages PocketBase de `pb_data`) |
 | `OCC_SMTP_TLS` | `true` si port 465, sinon `false` | `true` = TLS implicite ; `false` = STARTTLS si le serveur le propose |
-| `OCC_MAIL_FROM` | `OCC_SMTP_USERNAME` s'il contient `@` | expéditeur (ex. `noreply@fs0ciety.org`) |
+| `OCC_MAIL_FROM` | `OCC_SMTP_USERNAME` s'il contient `@` | expéditeur (ex. `noreply@eat.fs0ciety.org`) |
 | `OCC_MAIL_FROM_NAME` | `OCC Deliveries` | nom d'expéditeur |
 | `OCC_PUSH_ENABLED` | `true` | notifications Web Push (`false` = aucune notification, abonnement refusé) |
 | `OCC_VAPID_PUBLIC_KEY` / `OCC_VAPID_PRIVATE_KEY` | — | paire VAPID (`go run ./cmd/vapid`) ; absentes = paire générée une fois et gardée dans `server_secrets` (`pb_data`) ; **changer de clés invalide tous les abonnements** |

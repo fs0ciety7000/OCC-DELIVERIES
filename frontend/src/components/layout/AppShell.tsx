@@ -34,6 +34,9 @@ const NAV = [
   { to: '/restaurants', label: 'Restos', icon: UtensilsCrossed, end: false },
 ] as const
 
+/** Adresse de contact publique (aussi dans les e-mails : `ContactEmail` côté Go). */
+const CONTACT_EMAIL = 'contact@eat.fs0ciety.org'
+
 export function AppShell() {
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
@@ -180,6 +183,12 @@ export function AppShell() {
               · © {new Date().getFullYear()}
             </span>
           </div>
+          <p className="mt-1 text-center">
+            Contact :{' '}
+            <a href={`mailto:${CONTACT_EMAIL}`} className="rounded-sm font-semibold text-muted underline-offset-4 hover:text-fg hover:underline focus-visible:text-fg">
+              {CONTACT_EMAIL}
+            </a>
+          </p>
         </footer>
       </main>
 

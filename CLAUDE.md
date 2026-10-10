@@ -73,6 +73,10 @@ docker compose up --build         # http://localhost:8090
 Les apprentissages importants (pièges PocketBase, décisions d'UX) sont ajoutés
 ci-dessous, du plus récent au plus ancien.
 
+* 2026-10-10 — **E-mails par le serveur Stalwart** (`mail.fs0ciety.org`, compte `nicolas@fs0ciety.org`, Resend abandonné ;
+  `docs/DEPLOYMENT.md` § 3 ter). Code SMTP inchangé : port `465` = TLS implicite, sinon STARTTLS (mailyak/net/smtp,
+  `PLAIN` refusé sans TLS). Expéditeur `noreply@eat.fs0ciety.org` ; adresse de contact publique `contact@eat.fs0ciety.org`
+  (pied de page de l'app `CONTACT_EMAIL` dans `AppShell.tsx`, pied des e-mails `app.ContactEmail`).
 * 2026-10-10 — **Signature « OCC Interactive — une division de CARDOR Media »** (remplace OCC MONS Studios : pied de
   page, e-mails) avec les **emblèmes animés** de la charte CARDOR (dépôt `fs0ciety7000/mons-corp`,
   `src/lib/brand/emblem-motion.ts`) : Dragon (`public/brand/interactive.svg`) = « boot » glitch au premier affichage puis

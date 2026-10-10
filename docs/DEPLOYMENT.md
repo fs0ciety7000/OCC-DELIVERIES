@@ -35,7 +35,7 @@ Enregistrement `A` (ou `CNAME`) `eat.fs0ciety.org` → IP du serveur Coolify.
 | `OCC_PROVIDERS` | `ubereats,takeaway,deliveroo,weloveat` |
 | `OCC_GOOGLE_CLIENT_ID` / `OCC_GOOGLE_CLIENT_SECRET` | *(facultatif, secrets : « Continuer avec Google », voir § 3 bis)* |
 | `OCC_SMTP_HOST` / `OCC_SMTP_PORT` / `OCC_SMTP_USERNAME` / `OCC_SMTP_PASSWORD` | *(facultatif, secrets : e-mails, voir § 3 ter)* |
-| `OCC_MAIL_FROM` / `OCC_MAIL_FROM_NAME` | `noreply@fs0ciety.org` / `OCC Deliveries` |
+| `OCC_MAIL_FROM` / `OCC_MAIL_FROM_NAME` | `noreply@eat.fs0ciety.org` / `OCC Deliveries` |
 | `OCC_WEBAUTHN_RP_ID` / `OCC_WEBAUTHN_ORIGINS` | *(facultatif : passkeys, déduits d'`OCC_PUBLIC_URL` → `eat.fs0ciety.org`, voir § 3 sexies)* |
 
 7. *Deploy*. Activer *Auto deploy* (webhook GitHub) pour déployer à chaque push sur `main`.
@@ -99,60 +99,38 @@ d'`OCC_PUBLIC_URL`.
 
 | variable | exemple | notes |
 |---|---|---|
-| `OCC_SMTP_HOST` | `smtp-relay.brevo.com` | défini = SMTP activé au démarrage |
-| `OCC_SMTP_PORT` | `587` | `465` = TLS implicite |
-| `OCC_SMTP_USERNAME` | *(identifiant SMTP)* | |
-| `OCC_SMTP_PASSWORD` | *(clé SMTP — secret)* | jamais journalisé |
+| `OCC_SMTP_HOST` | `mail.fs0ciety.org` | défini = SMTP activé au démarrage |
+| `OCC_SMTP_PORT` | `465` | `465` = TLS implicite ; `587` = STARTTLS |
+| `OCC_SMTP_USERNAME` | `nicolas@fs0ciety.org` | |
+| `OCC_SMTP_PASSWORD` | *(mot de passe du compte — secret)* | jamais journalisé |
 | `OCC_SMTP_TLS` | *(vide)* | `true` force le TLS implicite (défaut : `true` sur 465, STARTTLS sinon) |
-| `OCC_MAIL_FROM` | `noreply@fs0ciety.org` | adresse d'un domaine **authentifié** (SPF/DKIM) chez le fournisseur |
+| `OCC_MAIL_FROM` | `noreply@eat.fs0ciety.org` | adresse que le compte SMTP a le droit d'utiliser comme expéditeur (SPF/DKIM) |
 | `OCC_MAIL_FROM_NAME` | `OCC Deliveries` | |
 
-Fournisseurs conseillés :
-* **Brevo** (ex-Sendinblue, gratuit 300 e-mails/jour) : *SMTP & API* → clé SMTP ; hôte
-  `smtp-relay.brevo.com`, port `587`, identifiant = login SMTP affiché. Authentifier `fs0ciety.org`
-  (enregistrements DKIM / DMARC fournis) pour envoyer en `noreply@fs0ciety.org`.
-* **Resend** (gratuit 3 000 e-mails/mois) : domaine `fs0ciety.org` vérifié ; hôte `smtp.resend.com`,
-  port `465` (TLS) ou `587`, identifiant `resend`, mot de passe = clé API.
-* **Gmail / Google Workspace** (dépannage, ~500 e-mails/jour) : activer la validation en deux étapes, créer
-  un **mot de passe d'application** ; hôte `smtp.gmail.com`, port `587`, identifiant = l'adresse Gmail,
-  `OCC_MAIL_FROM` = cette même adresse (ou un alias vérifié).
+### Configuration retenue : serveur Stalwart `mail.fs0ciety.org`
+Tous les sites fs0ciety.org envoient par le serveur mail auto-hébergé (Stalwart) avec le compte
+`nicolas@fs0ciety.org` ; Resend est abandonné. Adresse de contact affichée (pied de page de l'app, pied des
+e-mails) : `contact@eat.fs0ciety.org` (constantes `ContactEmail` côté Go et `CONTACT_EMAIL` dans
+`AppShell.tsx`).
 
-### Configuration retenue : Resend (domaine `fs0ciety.org` déjà configuré)
-Resend est déjà utilisé pour `fs0ciety.org` : le domaine y est vérifié (SPF/DKIM), il n'y a **rien à changer
-dans le DNS**. Il suffit d'une clé dédiée à OCC Deliveries.
+**Coolify** → app *OCC Deliveries* → *Environment variables* (c'est `OCC_SMTP_HOST` qui active l'envoi au
+démarrage : ne pas le définir sans le mot de passe) :
 
-1. **Vérifier le domaine** : <https://resend.com/domains> → `fs0ciety.org` doit être **Verified**.
-   Si c'est un sous-domaine qui est vérifié (ex. `send.fs0ciety.org` ou `mail.fs0ciety.org`), l'expéditeur
-   doit utiliser **ce** sous-domaine (`noreply@send.fs0ciety.org`), sinon Resend refuse l'envoi.
-2. **Créer une clé API dédiée** : <https://resend.com/api-keys> → *Create API key* →
-   nom `occ-deliveries-eat`, permission **Sending access**, domaine **`fs0ciety.org`** uniquement.
-   Copier la clé `re_…` (elle n'est affichée qu'une fois). Une clé par application = révocable sans
-   casser le reste de fs0ciety.org.
-3. **Coolify** → app *OCC Deliveries* → *Environment variables* — ajouter **toutes** les lignes d'un coup
-   (c'est `OCC_SMTP_HOST` qui active l'envoi au démarrage : ne pas le définir sans le mot de passe) :
+| variable | valeur |
+|---|---|
+| `OCC_SMTP_HOST` | `mail.fs0ciety.org` |
+| `OCC_SMTP_PORT` | `465` (TLS implicite ; `587` = STARTTLS si le 465 sortant est bloqué) |
+| `OCC_SMTP_USERNAME` | `nicolas@fs0ciety.org` |
+| `OCC_SMTP_PASSWORD` | mot de passe du compte — cocher **Is secret** |
+| `OCC_MAIL_FROM` | `noreply@eat.fs0ciety.org` |
+| `OCC_MAIL_FROM_NAME` | `OCC Deliveries` |
 
-   | variable | valeur |
-   |---|---|
-   | `OCC_SMTP_HOST` | `smtp.resend.com` |
-   | `OCC_SMTP_PORT` | `465` |
-   | `OCC_SMTP_USERNAME` | `resend` |
-   | `OCC_SMTP_PASSWORD` | la clé `re_…` — cocher **Is secret** |
-   | `OCC_MAIL_FROM` | `noreply@fs0ciety.org` (ou une adresse du (sous-)domaine vérifié) |
-   | `OCC_MAIL_FROM_NAME` | `OCC Deliveries` |
-
-   `OCC_SMTP_TLS` est inutile : le port `465` active le TLS implicite. Si le serveur Coolify bloque le 465
-   en sortie, utiliser `587` (STARTTLS) ; Resend accepte aussi `2465` (TLS) et `2587` (STARTTLS).
-4. **Redeploy** (les variables ne sont lues qu'au démarrage). Le journal du conteneur affiche
-   « SMTP configured from env » (sans secret) et `https://eat.fs0ciety.org/api/occ/config` renvoie
-   `"mailEnabled": true`.
-5. **Tester** : *Admin → Utilisateurs* → carte « E-mails » → **« Envoyer un e-mail de test »**, puis
-   « Mot de passe oublié ? » depuis la page de connexion. Chaque envoi est visible dans
-   <https://resend.com/emails> (statut *Delivered* / *Bounced*, en-têtes, aperçu).
-
-Limites de l'offre gratuite Resend : 100 e-mails/jour, 3 000/mois — très large pour l'usage (vérifications,
-réinitialisations, alertes de connexion). Dépannage : `535 Authentication failed` = clé erronée ou révoquée ;
-`domain is not verified` / `403` = `OCC_MAIL_FROM` hors du domaine vérifié ; délai d'attente = port sortant
-bloqué (essayer `587` ou `2587`).
+`OCC_SMTP_TLS` est inutile (le port fixe le mode). Le compte doit être autorisé à envoyer en
+`noreply@eat.fs0ciety.org` (alias ou droit d'expédition dans Stalwart), et le domaine `eat.fs0ciety.org`
+doit avoir SPF / DKIM / DMARC, sinon les messages finissent en indésirables. **Redeploy** (variables lues au
+démarrage) : le journal affiche « SMTP configured from env » (sans secret) et
+`https://eat.fs0ciety.org/api/occ/config` renvoie `"mailEnabled": true`. Dépannage : `535` = identifiants ;
+`553` / `relay denied` = expéditeur non autorisé pour le compte ; délai d'attente = port sortant bloqué.
 
 **Tester** : redéployer, puis *Admin → Utilisateurs* → carte « E-mails » (badge **Actifs**, expéditeur,
 serveur) → **« Envoyer un e-mail de test »** : il arrive à l'adresse de l'admin connecté. En cas d'erreur
