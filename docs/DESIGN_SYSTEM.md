@@ -498,3 +498,11 @@ Captures de référence : `docs/screenshots/<écran>-<mobile|desktop>-<dark|ligh
   envisager une classe `icon-brand` qui garde la braise vive (3:1 suffit pour une icône).
 * Mobile : le bouton « + » de la tab bar double le CTA du héros sur l'accueil.
 * Code de party affiché deux fois dans le salon (pastille d'en-tête + carte d'invitation).
+
+## Signature studio (pied de page)
+
+« Développé par **OCC Interactive** · une division de **CARDOR Media** · © année ». Emblèmes de la charte CARDOR
+(`cardormedia.com/marque`) via `components/brand/BrandEmblem` : Dragon (OCC Interactive, ratio 1,23, h-6) et roue du
+Car d'Or (CARDOR Media, size-4). Mouvement repris du site CARDOR : « boot » glitch au premier affichage, glitch du
+Dragon et tour de roue au survol / focus du lien ; jamais en boucle (principe « Silence »). Couleurs de marque en thème
+sombre, version mono (`currentColor`) en clair. Animations réduites : statique. Ne pas déformer, ni ajouter d'effet.

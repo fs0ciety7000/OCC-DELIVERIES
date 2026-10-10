@@ -2,6 +2,7 @@ import { Home, Plus, ShieldCheck, User, UtensilsCrossed } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
+import { BrandEmblem } from '@/components/brand/BrandEmblem'
 import { FoodLoader } from '@/components/food'
 import { Avatar, buttonClass, Logo, ThemeToggle } from '@/components/ui'
 import { ResumeBanner } from '@/features/party/ActiveParties'
@@ -155,10 +156,8 @@ export function AppShell() {
               rel="noopener noreferrer"
               className="group flex items-center gap-2.5 rounded-md underline-offset-4 focus-visible:text-fg"
             >
-              {/* Emblème « Le Dragon » (charte CARDOR Media, ratio 1,23) : couleurs de marque portées par les SVG. */}
-              <img src="/brand/occ-interactive.svg" alt="" width={30} height={24} className="hidden h-6 w-auto transition-transform group-hover:scale-105 motion-reduce:transition-none dark:block" />
-              {/* Version claire (charte, planche D) : l'Acid de l'emblème est illisible sur Paper. */}
-              <img src="/brand/occ-interactive-light.svg" alt="" width={30} height={24} className="h-6 w-auto transition-transform group-hover:scale-105 motion-reduce:transition-none dark:hidden" />
+              {/* Emblème « Le Dragon » de la charte CARDOR : glitch au survol, « boot » au premier affichage. */}
+              <BrandEmblem name="interactive" className="h-6 w-auto" />
               <span>
                 Développé par{' '}
                 <span className="font-semibold text-muted group-hover:text-fg group-hover:underline">
@@ -168,7 +167,14 @@ export function AppShell() {
             </a>
             <span>
               <span className="hidden sm:inline">· </span>une division de{' '}
-              <a href="https://cardormedia.com/" target="_blank" rel="noopener noreferrer" className="rounded-md font-semibold text-muted underline-offset-4 hover:text-fg hover:underline focus-visible:text-fg">
+              <a
+                href="https://cardormedia.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-md align-middle font-semibold text-muted underline-offset-4 hover:text-fg hover:underline focus-visible:text-fg"
+              >
+                {/* Roue du Car d'Or (monogramme) : un tour au survol. */}
+                <BrandEmblem name="cardor-monogram" className="size-4" />
                 CARDOR Media
               </a>{' '}
               · © {new Date().getFullYear()}

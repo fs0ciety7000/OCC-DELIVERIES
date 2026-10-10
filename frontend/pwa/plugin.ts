@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import type { Plugin } from 'vite'
 
 /** Fichiers de `public/` ajoutés à la coquille hors ligne. */
-const PUBLIC_PRECACHE = ['/favicon.svg', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/badge-72.png', '/brand/occ-interactive.svg']
+const PUBLIC_PRECACHE = ['/favicon.svg', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/badge-72.png', '/brand/interactive.svg', '/brand/cardor-monogram.svg']
 
 /**
  * Fichiers du build à précacher : JS, CSS et polices latines (les autres sous-ensembles

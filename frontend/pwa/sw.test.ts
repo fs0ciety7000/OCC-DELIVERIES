@@ -56,7 +56,7 @@ describe('règles de cache du service worker', () => {
 describe('plugin de build', () => {
   it('précache JS/CSS et polices latines seulement', () => {
     const list = precacheList(['index.html', 'assets/a-1.js', 'assets/a-1.js.map', 'assets/b.css', 'assets/f-latin-wght-normal-x.woff2', 'assets/f-vietnamese-wght-normal-y.woff2', 'outils/x.js'])
-    expect(list).toEqual(['/', '/assets/a-1.js', '/assets/b.css', '/assets/f-latin-wght-normal-x.woff2', '/favicon.svg', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/badge-72.png', '/brand/occ-interactive.svg'])
+    expect(list).toEqual(['/', '/assets/a-1.js', '/assets/b.css', '/assets/f-latin-wght-normal-x.woff2', '/favicon.svg', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/badge-72.png', '/brand/interactive.svg', '/brand/cardor-monogram.svg'])
   })
 
   it('assemble un service worker versionné', () => {
