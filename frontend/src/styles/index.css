@@ -209,3 +209,14 @@
     --tabbar-h: 0px;
   }
 }
+
+/* Emblèmes CARDOR (BrandEmblem) : couleurs de marque en sombre, version « mono » de la charte
+   (planche D : encre = currentColor, détails assombris, moyeu de la roue évidé) en clair. */
+[data-theme="light"] .brand-emblem {
+  --logo-t1: currentColor;
+  --logo-t2: color-mix(in oklab, currentColor 45%, black);
+  --logo-t3: currentColor;
+}
+[data-theme="light"] .brand-emblem[data-emblem="cardor-monogram"] {
+  --logo-t2: transparent;
+}

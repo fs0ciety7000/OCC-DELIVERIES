@@ -73,10 +73,6 @@ docker compose up --build         # http://localhost:8090
 Les apprentissages importants (pièges PocketBase, décisions d'UX) sont ajoutés
 ci-dessous, du plus récent au plus ancien.
 
-* 2026-10-10 — **Pied de page retiré** (demande de l'utilisateur) : plus de signature « CM Interactive · une division de
-  CARDOR Media », d'emblèmes animés (dragon, roue) ni de « Contact : contact@eat.fs0ciety.org » dans l'app (`AppShell.tsx`) ;
-  `components/brand/BrandEmblem`, `lib/brandEmblem.ts`, `public/brand/*.svg` et la CSS `.brand-emblem` supprimés. Les
-  e-mails gardent leur pied (signature + contact).
 * 2026-10-10 — **E-mails par le serveur Stalwart** (`mail.fs0ciety.org`, compte `nicolas@fs0ciety.org`, Resend abandonné ;
   `docs/DEPLOYMENT.md` § 3 ter). Code SMTP inchangé : port `465` = TLS implicite, sinon STARTTLS (mailyak/net/smtp,
   `PLAIN` refusé sans TLS). Expéditeur `noreply@eat.fs0ciety.org` ; adresse de contact publique `contact@eat.fs0ciety.org`
