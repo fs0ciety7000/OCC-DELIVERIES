@@ -15,11 +15,12 @@ import { spring } from '@/lib/motion'
 import { qk } from '@/lib/queryKeys'
 import type { DeclareMethod, Payment } from '@/lib/types'
 import type { PartyCtx } from '../context'
-import { usePaymentAction, usePayments, useSetPayer, useTransition } from '../hooks'
+import { usePaymentAction, usePayments, useTransition } from '../hooks'
 import { availableMethods, declareLabel, isLinkMethod, linkFor, METHOD_BADGE, METHOD_LABELS, methodHint, orderForDevice, payoutMethods } from '../labels'
 import { CollectPanel } from './CollectPanel'
 import { DispatchedBanner } from './DispatchedBanner'
 import { MethodDetails, MethodMark, MethodTiles, StatusBadge } from './PaymentMethods'
+import { PayerSheet } from './PayerSheet'
 
 export function PayingStep({ ctx }: { ctx: PartyCtx }) {
   const { party, me, isHost } = ctx
@@ -87,7 +88,7 @@ export function PayingStep({ ctx }: { ctx: PartyCtx }) {
       </div>
 
       <aside className="space-y-4">
-        {iAmPayer && <PayerMethods userId={me.id} />}
+        {iAmPayer && <PayerMethods userId={me.id} cash={party.collect_mode === 'cash'} />}
         {/* Le payeur confirme depuis « Encaisser » : pas de seconde liste avec les mêmes boutons. */}
         {!iAmPayer && <PaymentsList ctx={ctx} payments={owed} canManage={isHost} />}
         {isHost && (
@@ -115,7 +116,7 @@ export function PayingStep({ ctx }: { ctx: PartyCtx }) {
       >
         <p className="text-sm text-muted">La commande passera dans l'historique. Les parts non confirmées resteront visibles.</p>
       </Sheet>
-      <ChangePayerSheet ctx={ctx} open={payerOpen} onClose={() => setPayerOpen(false)} />
+      {isHost && <PayerSheet ctx={ctx} variant="change" open={payerOpen} onClose={() => setPayerOpen(false)} />}
     </div>
   )
 }
@@ -223,8 +224,20 @@ function MyShare({ ctx, payment }: { ctx: PartyCtx; payment: Payment }) {
   )
 }
 
-function PayerMethods({ userId }: { userId: string }) {
-  const profile = useQuery({ queryKey: qk.payout(userId), queryFn: () => payoutApi.mine(userId) })
+function PayerMethods({ userId, cash }: { userId: string; cash: boolean }) {
+  const profile = useQuery({ queryKey: qk.payout(userId), queryFn: () => payoutApi.mine(userId), enabled: !cash })
+  if (cash) {
+    return (
+      <Card>
+        <CardBody className="space-y-2">
+          <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
+            <MethodMark method="cash" /> Remboursement en espèces
+          </h2>
+          <p className="text-sm text-muted">Tu as choisi d'être remboursé·e en espèces : tes collègues déclarent leur paiement, tu confirmes chaque part reçue.</p>
+        </CardBody>
+      </Card>
+    )
+  }
   if (!profile.isSuccess) return null
   const methods = payoutMethods(profile.data)
   return (
@@ -315,33 +328,5 @@ function PaymentsList({ ctx, payments, canManage }: { ctx: PartyCtx; payments: P
         </ul>
       </CardBody>
     </Card>
-  )
-}
-
-function ChangePayerSheet({ ctx, open, onClose }: { ctx: PartyCtx; open: boolean; onClose: () => void }) {
-  const setPayer = useSetPayer(ctx.party.id)
-  return (
-    <Sheet open={open} onClose={onClose} title="Changer de payeur" description="Possible tant qu'aucun remboursement n'a été confirmé.">
-      <ul className="space-y-2">
-        {ctx.members.map((m) => {
-          const u = m.expand?.user ?? ctx.people.get(m.user) ?? { id: m.user, name: '' }
-          const current = ctx.party.payer === m.user
-          return (
-            <li key={m.id}>
-              <button
-                type="button"
-                disabled={current || setPayer.isPending}
-                onClick={() => setPayer.mutate(m.user, { onSuccess: onClose })}
-                className="flex min-h-14 w-full items-center gap-3 rounded-md border border-border bg-surface px-3 text-left hover:border-border-strong disabled:opacity-60"
-              >
-                <Avatar user={u} size={32} decorative />
-                <span className="flex-1 font-medium">{u.name}</span>
-                {current && <Badge variant="brand">Actuel</Badge>}
-              </button>
-            </li>
-          )
-        })}
-      </ul>
-    </Sheet>
   )
 }

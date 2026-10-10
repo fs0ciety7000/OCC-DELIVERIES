@@ -1,16 +1,18 @@
 import { FileDown, Phone, RotateCcw, Send, Wallet } from 'lucide-react'
 import { useState } from 'react'
-import { Avatar, Badge, Button, Card, CardBody, EmptyState, Field, Input, Money, Segmented, Sheet, Skeleton } from '@/components/ui'
+import { Badge, Button, Card, CardBody, EmptyState, Field, Input, Segmented, Skeleton } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { errorMessage } from '@/lib/errors'
 import { centsToInput, formatTime, parseMoneyToCents } from '@/lib/format'
 import { useConfig } from '@/lib/geo-context'
 import type { Dispatch, DispatchMethod, SplitMode, Summary } from '@/lib/types'
 import type { PartyCtx } from '../context'
-import { useDispatch, useFees, useSetPayer, useSummary, useTransition } from '../hooks'
+import { useDispatch, useFees, useSummary, useTransition } from '../hooks'
 import { DISPATCH_LABELS } from '../labels'
 import { DispatchedBanner } from './DispatchedBanner'
 import { DispatchSheet } from './DispatchSheet'
+import { PayerSheet } from './PayerSheet'
+import { PayoutNudge } from './PayoutNudge'
 import { ConsolidatedCard, ParticipantsList, TotalsCard } from './SummaryViews'
 
 export function ReviewStep({ ctx }: { ctx: PartyCtx }) {
@@ -38,6 +40,7 @@ export function ReviewStep({ ctx }: { ctx: PartyCtx }) {
     <div className="grid gap-6 pb-28 lg:grid-cols-[minmax(0,1fr)_380px]">
       <div className="min-w-0 space-y-6">
         {party.dispatch && <DispatchedBanner party={party} paused={dispatchSheetOpen} />}
+        <PayoutNudge ctx={ctx} />
         {!isHost && (
           <Card className="border-info/30 bg-info/5">
             <CardBody className="text-sm">
@@ -75,7 +78,7 @@ export function ReviewStep({ ctx }: { ctx: PartyCtx }) {
         </div>
       )}
 
-      <PayerSheet ctx={ctx} summary={s} open={payerOpen} onClose={() => setPayerOpen(false)} />
+      {isHost && <PayerSheet ctx={ctx} variant="validate" open={payerOpen} onClose={() => setPayerOpen(false)} />}
     </div>
   )
 }
@@ -205,56 +208,5 @@ function DispatchPanel({ ctx, onSheetChange }: { ctx: PartyCtx; onSheetChange?: 
         }}
       />
     </Card>
-  )
-}
-
-function PayerSheet({ ctx, summary, open, onClose }: { ctx: PartyCtx; summary: Summary; open: boolean; onClose: () => void }) {
-  const { party, me, members, people } = ctx
-  const setPayer = useSetPayer(party.id)
-  const [selected, setSelected] = useState<string>(party.payer || me.id)
-  const totals = new Map(summary.participants.map((p) => [p.user.id, p.total]))
-  const candidates = members.map((m) => m.expand?.user ?? people.get(m.user) ?? { id: m.user, name: '' })
-
-  return (
-    <Sheet
-      open={open}
-      onClose={onClose}
-      title="Qui a avancé l'argent ?"
-      description="Chacun·e remboursera sa part à cette personne (QR virement depuis son app bancaire, Revolut, PayPal, espèces…)."
-      footer={
-        <Button block size="lg" loading={setPayer.isPending} onClick={() => setPayer.mutate(selected, { onSuccess: onClose })}>
-          Valider et passer aux remboursements
-        </Button>
-      }
-    >
-      <div role="radiogroup" aria-label="Payeur" className="space-y-2">
-        {candidates.map((u) => {
-          const on = selected === u.id
-          return (
-            <button
-              key={u.id}
-              type="button"
-              role="radio"
-              aria-checked={on}
-              onClick={() => setSelected(u.id)}
-              className={cn(
-                'flex min-h-14 w-full items-center gap-3 rounded-md border bg-surface px-3 py-2 text-left transition-colors',
-                on ? 'border-brand/60 bg-brand/[0.06]' : 'border-border hover:border-border-strong',
-              )}
-            >
-              <Avatar user={u} size={40} decorative />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-semibold">{u.id === me.id ? `${u.name} (toi)` : u.name}</span>
-                <span className="block text-xs text-muted">Sa part : <Money cents={totals.get(u.id) ?? 0} /></span>
-              </span>
-              <span aria-hidden className={cn('grid size-5 place-items-center rounded-full border-2', on ? 'border-brand' : 'border-border-strong')}>
-                {on && <span className="size-2.5 rounded-full bg-brand" />}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-      {!summary.minOrderReached && <p className="mt-3 text-sm text-warning">Attention : le minimum de commande n'est pas atteint.</p>}
-    </Sheet>
   )
 }

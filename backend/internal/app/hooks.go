@@ -30,7 +30,7 @@ func randomColor() string {
 }
 
 // partyProtectedFields can only be changed through /api/occ/* endpoints.
-var partyProtectedFields = []string{"code", "host", "members", "status", "restaurant", "payer", "dispatch", "closed_at", "auto_events"}
+var partyProtectedFields = []string{"code", "host", "members", "status", "restaurant", "payer", "collect_mode", "dispatch", "closed_at", "auto_events"}
 
 // partyFeeFields are editable by the host only before payments exist.
 var partyFeeFields = []string{"delivery_fee", "service_fee", "tip", "split_mode"}
@@ -147,6 +147,7 @@ func onPartyCreate(e *core.RecordRequestEvent) error {
 	r.Set("status", domain.StatusLobby)
 	r.Set("restaurant", "")
 	r.Set("payer", "")
+	r.Set("collect_mode", "")
 	r.Set("dispatch", nil)
 	r.Set("closed_at", "")
 	if r.GetString("split_mode") == "" {

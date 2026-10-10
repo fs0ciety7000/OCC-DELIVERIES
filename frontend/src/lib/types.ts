@@ -308,6 +308,12 @@ export interface Party extends BaseRecord {
   service_fee: Cents
   tip: Cents
   payer: string
+  /**
+   * Comment le payeur veut être remboursé, choisi avec lui (`POST /payer`, ADR 0003 maj 4) :
+   * `transfer` (QR virement, Revolut, PayPal, lien — exige un moyen dans son profil) ou
+   * `cash` (espèces / plus tard uniquement). `''` tant que le payeur n'est pas désigné.
+   */
+  collect_mode?: CollectMode | ''
   dispatch: PartyDispatch | null
   closed_at: ISODate
   /** L'hôte a désactivé la clôture automatique aux heures limites (migration 1760000015). */
@@ -577,7 +583,27 @@ export interface Dispatch {
   instructions: string[]
 }
 
+/** Mode de remboursement choisi avec le payeur (`parties.collect_mode`). */
+export type CollectMode = 'transfer' | 'cash'
+
+/** Ce que les autres membres savent du profil de remboursement d'un membre : jamais l'IBAN ni les identifiants. */
+export interface PayoutStatus {
+  /** Au moins un moyen utilisable (IBAN valide, Revolut, PayPal.me ou autre lien) ; espèces exclues. */
+  ready: boolean
+  iban: boolean
+  links: PaymentLinkKind[]
+}
+
+/** `GET /api/occ/parties/{id}/payout-readiness` (membres). */
+export interface PayoutReadiness {
+  members: { user: string; guest: boolean; payout: PayoutStatus }[]
+  readyCount: number
+  total: number
+}
+
 export interface PaymentQR {
+  /** `cash` : ni QR ni lien, `methods` = espèces, plus tard. */
+  collectMode?: CollectMode
   amount: Cents
   reference: string
   beneficiary: string
@@ -616,6 +642,7 @@ export interface CollectItem {
 }
 
 export interface CollectQR {
+  collectMode?: CollectMode
   beneficiary: string
   iban: string | null
   items: CollectItem[]

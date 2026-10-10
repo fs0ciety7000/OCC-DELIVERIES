@@ -13,6 +13,8 @@ export const qk = {
   items: (id: string) => ['party', id, 'items'] as const,
   payments: (id: string) => ['party', id, 'payments'] as const,
   summary: (id: string) => ['party', id, 'summary'] as const,
+  /** Moyens de remboursement des membres (booléens) ; sous `party` : relu avec les toasts in-app. */
+  payoutReadiness: (id: string) => ['party', id, 'payout'] as const,
   paymentQR: (paymentId: string) => ['paymentQR', paymentId] as const,
   /** Sous `payments` : invalidé avec la liste des paiements. */
   paymentsCollect: (partyId: string) => ['party', partyId, 'payments', 'collect'] as const,

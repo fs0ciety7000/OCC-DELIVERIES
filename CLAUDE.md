@@ -73,6 +73,16 @@ docker compose up --build         # http://localhost:8090
 Les apprentissages importants (pièges PocketBase, décisions d'UX) sont ajoutés
 ci-dessous, du plus récent au plus ancien.
 
+* 2026-10-10 — **Garde du payeur et mode « espèces »** (ADR 0003 maj 4, migration `1760000022`, `domain/payerguard.go`,
+  `app/payerguard.go`, `steps/PayerSheet.tsx`). Demande : « blocage uniquement si on demande autre chose qu'espèces ».
+  `POST /payer {payer, collectMode}` : `transfer` (défaut) exige un moyen utilisable (IBAN mod-97, revtag, PayPal.me, lien)
+  dès qu'un·e autre a commandé, sinon **409** `data.payer.code = "payer_no_payout"` (message soi / autrui) ; `cash` ne
+  bloque jamais (débiteurs : espèces / plus tard seulement, déclaration virement → 400, « Encaisser » sans QR, e-mail
+  « en espèces »). `parties.collect_mode` protégé comme `payer` ; parties existantes → `transfer`. `GET /payout-readiness`
+  = booléens + types de moyens seulement (jamais l'IBAN). `POST /payout-request` → notif `payout_request`, 1 / 10 min
+  (mémoire), lien `?iban=1` = ajout rapide. Pièges : code machine via un `SafeErrorItem` dans
+  `apis.NewApiError(409, msg, map[string]error{"payer": …})` ; `payout-readiness` en `staleTime: 0` (profils privés sans
+  temps réel).
 * 2026-10-10 — **Retrait de Wero et Bancontact Pay** (demande utilisateur « pour éviter la confusion » ; ADR 0003 maj 3,
   migration `1760000021`). Aucun des deux ne permet à un tiers de pré-remplir un montant ; le QR virement EPC (lu par les
   apps bancaires belges, celles où vit Wero) et les liens Revolut / PayPal.me à montant couvrent le besoin.

@@ -63,7 +63,7 @@ func TestCheckPayer(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			err := CheckPayer(c.payer, c.debtors, c.payout, c.self, c.who)
+			err := CheckPayer(CollectTransfer, c.payer, c.debtors, c.payout, c.self, c.who)
 			if c.wantErr == "" {
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
@@ -74,5 +74,57 @@ func TestCheckPayer(t *testing.T) {
 				t.Fatalf("err = %v, want %q", err, c.wantErr)
 			}
 		})
+	}
+}
+
+func TestCheckPayerCashMode(t *testing.T) {
+	if err := CheckPayer(CollectCash, "a", []string{"a", "b"}, PayoutAvailability{}, true, "Alice"); err != nil {
+		t.Fatalf("cash mode never blocks: %v", err)
+	}
+}
+
+func TestNormalizeCollectMode(t *testing.T) {
+	for in, want := range map[string]string{"": "transfer", "transfer": "transfer", " cash ": "cash"} {
+		if got, err := NormalizeCollectMode(in); err != nil || got != want {
+			t.Fatalf("%q → %q, %v", in, got, err)
+		}
+	}
+	if _, err := NormalizeCollectMode("wero"); err == nil {
+		t.Fatal("invalid mode accepted")
+	}
+}
+
+func TestDeclareStatusFor(t *testing.T) {
+	cases := []struct {
+		mode, method, status string
+		errPart              string
+	}{
+		{CollectCash, MethodCash, PaymentDeclared, ""},
+		{CollectCash, MethodLater, PaymentPending, ""},
+		{CollectCash, MethodQR, "", "espèces"},
+		{CollectCash, MethodRevolut, "", "espèces"},
+		{CollectCash, MethodLink, "", "espèces"},
+		{CollectCash, MethodWero, "", "ne sont plus proposés"},
+		{CollectCash, "bitcoin", "", "invalide"},
+		{CollectTransfer, MethodQR, PaymentDeclared, ""},
+		{CollectTransfer, MethodCash, PaymentDeclared, ""},
+	}
+	for _, c := range cases {
+		st, err := DeclareStatusFor(c.mode, c.method)
+		if c.errPart != "" {
+			if err == nil || !strings.Contains(err.Error(), c.errPart) {
+				t.Fatalf("%s/%s: err = %v", c.mode, c.method, err)
+			}
+			continue
+		}
+		if err != nil || st != c.status {
+			t.Fatalf("%s/%s: %q, %v", c.mode, c.method, st, err)
+		}
+	}
+	if m := MethodsFor(CollectCash, PayoutAvailability{IBAN: true, Revolut: true}); strings.Join(m, ",") != "cash,later" {
+		t.Fatalf("cash methods: %v", m)
+	}
+	if m := MethodsFor(CollectTransfer, PayoutAvailability{IBAN: true}); strings.Join(m, ",") != "qr,cash,later" {
+		t.Fatalf("transfer methods: %v", m)
 	}
 }

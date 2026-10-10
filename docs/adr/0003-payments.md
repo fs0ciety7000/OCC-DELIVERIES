@@ -182,3 +182,52 @@ l'application (profil, tuiles, `PaymentQR`, guides, QR personnels).
 ### À réévaluer
 Si EPI publie un format de demande Wero **à montant** ouvert aux tiers, ou si
 SEPA Request-to-Pay arrive dans les apps belges (mise à jour 2).
+
+## Mise à jour 4 — 2026-10-10 : garde du payeur et mode « espèces »
+
+### Contexte
+Demande utilisateur : « avant que quelqu'un finalise la commande en étant le
+payeur, il faut qu'il ait au minimum un renseignement de paiement (IBAN
+prioritaire) », précisée aussitôt : « le blocage doit se faire uniquement si on
+demande par autre chose qu'espèces. Pas de blocage si espèces. » Jusqu'ici, un
+payeur sans profil passait en `paying` et ses collègues découvraient qu'ils ne
+pouvaient le rembourser qu'en espèces.
+
+### Décision
+* Le payeur est désigné **avec son mode de remboursement**
+  (`parties.collect_mode`, migration `1760000022`) :
+  * `transfer` (défaut) — QR virement EPC, Revolut, PayPal.me, autre lien.
+    Le serveur exige un moyen **utilisable** dans le profil du payeur
+    (`domain.PayoutAvailabilityOf` : IBAN valide mod-97, revtag / PayPal.me /
+    lien normalisables) dès qu'un·e autre membre a commandé ; sinon **409**
+    avec `data.payer.code = "payer_no_payout"` et un message différent si
+    l'hôte se désigne lui-même (« Ajoute ton IBAN… ») ou désigne un·e autre
+    (« Bob n'a encore renseigné aucun moyen de remboursement. ») ;
+  * `cash` — espèces (ou « plus tard ») uniquement : **jamais bloqué**, même
+    profil vide. Les débiteurs ne se voient proposer que « Espèces » / « Plus
+    tard » (`PaymentQR.methods`, sans QR ni lien) et une déclaration par
+    virement / lien est refusée (400) ; « Encaisser » affiche les montants
+    sans QR ; l'e-mail « bon de commande » dit « à rembourser en espèces à X ».
+* Même règle à chaque changement de payeur (`POST /payer` en `paying`, qui
+  recalcule les parts) ; `payer` et `collect_mode` restent protégés contre
+  l'écriture directe par la collection.
+* **Confidentialité** : l'hôte sait qui est éligible sans voir aucune donnée
+  bancaire — `GET /parties/{id}/payout-readiness` (membres) ne renvoie que
+  `{ ready, iban, links: ["revolut"…] }` par membre.
+* **Interface** : choix du payeur avec l'éligibilité de chacun (« IBAN ✓ »,
+  « Revolut ✓ », « Aucun moyen de remboursement »), choix « Virement / Revolut
+  / PayPal » ou « Espèces uniquement », « Valider la commande » désactivé avec
+  sa raison, action « Pas d'IBAN ? Valider en espèces » ; ajout rapide de
+  l'IBAN dans la party pour soi (mêmes validation et normalisation que le
+  profil) ; « Lui demander d'ajouter son IBAN » pour un·e collègue
+  (notification `payout_request`, catégorie `payments`, toast in-app, une fois
+  par 10 min, party et personne) ; alerte douce masquable pendant les paniers
+  et le récap, compteur « N membres sur M peuvent être remboursés par
+  virement » pour l'hôte.
+
+### Conséquences
+* Les parties déjà en `paying` / `closed` reçoivent `collect_mode = transfer`
+  (comportement inchangé).
+* Un payeur qui a commandé seul n'a besoin de rien (personne ne lui doit rien).
+* Les invité·es n'ont pas de profil : en `transfer` ils ne peuvent pas être
+  payeurs (sauf commande seule) ; en `cash`, si.

@@ -14,10 +14,15 @@ import (
 
 func (h *handlers) payer(e *core.RequestEvent) error {
 	var body struct {
-		Payer string `json:"payer"`
+		Payer       string `json:"payer"`
+		CollectMode string `json:"collectMode"`
 	}
 	if err := bindJSON(e, &body); err != nil {
 		return err
+	}
+	mode, err := domain.NormalizeCollectMode(body.CollectMode)
+	if err != nil {
+		return toAPIError(err)
 	}
 	party, err := partyForHost(e)
 	if err != nil {
@@ -58,8 +63,9 @@ func (h *handlers) payer(e *core.RequestEvent) error {
 		if err != nil {
 			return err
 		}
-		// ADR 0003, update 4: the payer must be reimbursable (IBAN, Revolut, PayPal, link).
-		if err := checkPayer(tx, s, body.Payer, e.Auth.Id); err != nil {
+		// ADR 0003, update 4: outside cash mode, the payer must be reimbursable
+		// (IBAN, Revolut, PayPal, link).
+		if err := checkPayer(tx, s, mode, body.Payer, e.Auth.Id); err != nil {
 			return err
 		}
 		col, err := tx.FindCollectionByNameOrId(colPayments)
@@ -95,6 +101,7 @@ func (h *handlers) payer(e *core.RequestEvent) error {
 		}
 
 		p.Set("payer", body.Payer)
+		p.Set("collect_mode", mode)
 		p.Set("status", domain.StatusPaying)
 		if err := tx.SaveWithContext(actorContext(e), p); err != nil {
 			return err
@@ -177,7 +184,7 @@ func (h *handlers) paymentAction(e *core.RequestEvent) error {
 			if pay.GetString("status") == domain.PaymentConfirmed {
 				return badRequest("Ce paiement est déjà confirmé.")
 			}
-			status, err := domain.DeclareStatus(body.Method)
+			status, err := domain.DeclareStatusFor(party.GetString("collect_mode"), body.Method)
 			if err != nil {
 				return toAPIError(err)
 			}
@@ -224,6 +231,8 @@ func (h *handlers) paymentAction(e *core.RequestEvent) error {
 }
 
 type paymentQR struct {
+	// CollectMode: "cash" → no EPC / links, methods = cash, later (ADR 0003, update 4).
+	CollectMode string               `json:"collectMode"`
 	Amount      int                  `json:"amount"`
 	Reference   string               `json:"reference"`
 	Beneficiary string               `json:"beneficiary"`
@@ -270,12 +279,18 @@ func loadPayout(app core.App, creditorID string) payoutData {
 }
 
 // qrFor builds the PaymentQR of one payment (amount in cents, reference).
-func (d payoutData) qrFor(amount int, reference string) paymentQR {
+// In cash mode nothing of the payout profile is used.
+func (d payoutData) qrFor(mode string, amount int, reference string) paymentQR {
 	out := paymentQR{
+		CollectMode: collectModeOf(mode),
 		Amount:      amount,
 		Reference:   reference,
 		Beneficiary: d.beneficiary,
 		Links:       []domain.PaymentLink{},
+	}
+	if out.CollectMode == domain.CollectCash {
+		out.Methods = domain.MethodsFor(domain.CollectCash, domain.PayoutAvailability{})
+		return out
 	}
 	if d.iban != "" {
 		epc, err := domain.BuildEPC(domain.EPCParams{
@@ -305,11 +320,11 @@ func (d payoutData) qrFor(amount int, reference string) paymentQR {
 }
 
 func (h *handlers) paymentQR(e *core.RequestEvent) error {
-	pay, _, err := paymentForMember(e)
+	pay, party, err := paymentForMember(e)
 	if err != nil {
 		return err
 	}
-	out := loadPayout(e.App, pay.GetString("creditor")).qrFor(pay.GetInt("amount"), pay.GetString("reference"))
+	out := loadPayout(e.App, pay.GetString("creditor")).qrFor(party.GetString("collect_mode"), pay.GetInt("amount"), pay.GetString("reference"))
 	return ok(e, out)
 }
 
@@ -326,6 +341,7 @@ type collectItem struct {
 }
 
 type collectQR struct {
+	CollectMode string        `json:"collectMode"`
 	Beneficiary string        `json:"beneficiary"`
 	IBAN        *string       `json:"iban"`
 	Items       []collectItem `json:"items"`
@@ -365,13 +381,14 @@ func (h *handlers) paymentsCollectQR(e *core.RequestEvent) error {
 	}
 
 	data := loadPayout(e.App, payerID)
-	out := collectQR{Beneficiary: data.beneficiary, Items: []collectItem{}}
+	mode := collectModeOf(party.GetString("collect_mode"))
+	out := collectQR{CollectMode: mode, Beneficiary: data.beneficiary, Items: []collectItem{}}
 	for _, p := range pays {
 		debtor := p.GetString("debtor")
 		if debtor == payerID || p.GetString("method") == domain.MethodSelf {
 			continue
 		}
-		q := data.qrFor(p.GetInt("amount"), p.GetString("reference"))
+		q := data.qrFor(mode, p.GetInt("amount"), p.GetString("reference"))
 		if out.IBAN == nil {
 			out.IBAN = q.IBAN
 		}
@@ -389,4 +406,13 @@ func (h *handlers) paymentsCollectQR(e *core.RequestEvent) error {
 		return strings.ToLower(out.Items[i].Debtor.Name) < strings.ToLower(out.Items[j].Debtor.Name)
 	})
 	return ok(e, out)
+}
+
+// collectModeOf reads parties.collect_mode ("" = transfer: parties
+// designated before the field existed, see migration 1760000022).
+func collectModeOf(stored string) string {
+	if stored == domain.CollectCash {
+		return domain.CollectCash
+	}
+	return domain.CollectTransfer
 }

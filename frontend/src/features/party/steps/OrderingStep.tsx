@@ -30,6 +30,7 @@ import type { PartyCtx } from '../context'
 import { useOrderItems, useReady, useTally, useTransition } from '../hooks'
 import { ReorderCard } from '../ReorderCard'
 import { cartStatsByUser } from '../logic'
+import { PayoutNudge } from './PayoutNudge'
 
 export function OrderingStep({ ctx }: { ctx: PartyCtx }) {
   const { party, me, isHost, members } = ctx
@@ -172,6 +173,7 @@ export function OrderingStep({ ctx }: { ctx: PartyCtx }) {
         <p className="text-xs text-subtle">Prix indicatifs — les totaux sont recalculés par le serveur.</p>
         {restaurant && <PartialMenuBanner restaurant={restaurant} />}
         {items.isSuccess && mine.length === 0 && <ReorderCard partyId={party.id} />}
+        <PayoutNudge ctx={ctx} />
         {menu.isPending ? (
           <MenuSkeleton />
         ) : menu.isError ? (

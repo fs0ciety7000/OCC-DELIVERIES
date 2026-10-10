@@ -36,6 +36,8 @@ import type {
   PaymentQR,
   CollectQR,
   PayoutProfile,
+  PayoutReadiness,
+  CollectMode,
   Restaurant,
   RestaurantImport,
   SelectedOption,
@@ -108,8 +110,15 @@ export const occ = {
   dispatch: (partyId: string, method: DispatchMethod) =>
     pb.send<{ party: Party; dispatch: Dispatch }>(`/api/occ/parties/${partyId}/dispatch`, json({ method })),
 
-  setPayer: (partyId: string, payer: string) =>
-    pb.send<{ party: Party; payments: Payment[] }>(`/api/occ/parties/${partyId}/payer`, json({ payer })),
+  /** `collectMode` : `transfer` (défaut, exige un moyen de remboursement → 409 `payer_no_payout`) ou `cash`. */
+  setPayer: (partyId: string, payer: string, collectMode: CollectMode = 'transfer') =>
+    pb.send<{ party: Party; payments: Payment[] }>(`/api/occ/parties/${partyId}/payer`, json({ payer, collectMode })),
+
+  /** Qui peut être remboursé par virement / lien (booléens uniquement). */
+  payoutReadiness: (partyId: string) => pb.send<PayoutReadiness>(`/api/occ/parties/${partyId}/payout-readiness`, { method: 'GET' }),
+
+  /** « Lui demander d'ajouter son IBAN » : push + toast in-app (1 fois / 10 min / collègue). */
+  payoutRequest: (partyId: string, user: string) => pb.send<{ sent: true }>(`/api/occ/parties/${partyId}/payout-request`, json({ user })),
 
   exportUrl: (partyId: string, format: ExportFormat) => pb.buildURL(`/api/occ/parties/${partyId}/export?format=${format}`),
 

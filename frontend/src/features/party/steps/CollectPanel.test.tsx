@@ -173,4 +173,13 @@ describe('CollectPanel (vue du payeur)', () => {
     expect(screen.queryByRole('button', { name: 'Présenter à tour de rôle' })).not.toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: 'Confirmer la réception' })).toHaveLength(2)
   })
+
+  it('mode espèces : montants et confirmation, ni QR ni invitation à compléter le profil', async () => {
+    collectQR.mockResolvedValue({ collectMode: 'cash', beneficiary: 'Bob', iban: null, items: data.items.map((it) => ({ ...it, epc: null, links: [] })) })
+    renderPanel()
+    expect(await screen.findByText(/Remboursement en espèces/)).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Compléter mon profil' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Présenter/ })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Confirmer la réception' })).toHaveLength(2)
+  })
 })

@@ -3,7 +3,7 @@ import { Check, LogOut } from 'lucide-react'
 import { useState, type ChangeEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
-import { Avatar, Button, Card, CardBody, Field, Input, Segmented, Skeleton } from '@/components/ui'
+import { Avatar, Badge, Button, Card, CardBody, Field, Input, Segmented, Skeleton } from '@/components/ui'
 import { MethodMark } from '@/features/party/steps/PaymentMethods'
 import { payoutApi, usersApi, type PayoutProfileInput } from '@/lib/api'
 import { logout, useAuth } from '@/lib/auth'
@@ -215,15 +215,15 @@ function PayoutForm({ userId, profile }: { userId: string; profile: PayoutProfil
         >
           <div className="space-y-1">
             <h2 className="font-display text-lg font-semibold">Recevoir des remboursements</h2>
-            <p className="text-sm text-muted">Quand tu avances la commande, tes collègues te remboursent avec ces infos. Elles restent privées : seul le QR de paiement est partagé, et uniquement avec les membres de la commande.</p>
+            <p className="text-sm text-muted">Quand tu avances la commande, tes collègues te remboursent avec ces infos (sans elles, uniquement en espèces). Elles restent privées : seul le QR de paiement est partagé, et uniquement avec les membres de la commande.</p>
           </div>
 
           <section className="space-y-3" aria-labelledby="h-sepa">
             <h3 id="h-sepa" className="flex items-center gap-2 font-semibold">
-              <MethodMark method="qr" /> Virement (QR SEPA)
+              <MethodMark method="qr" /> Virement (QR SEPA) <Badge variant="brand">Recommandé</Badge>
             </h3>
             <p className="text-sm text-muted">
-              Recommandé : tes collègues scannent un QR avec leur app bancaire (KBC, BNP Paribas Fortis, ING, Belfius, Argenta…) — <strong className="text-fg">montant et communication déjà remplis</strong>.
+              Tes collègues scannent un QR avec leur app bancaire (KBC, BNP Paribas Fortis, ING, Belfius, Argenta…) — <strong className="text-fg">montant et communication déjà remplis</strong>.
             </p>
             <Field label="Titulaire du compte" optional>
               {(p) => <Input {...p} value={v.holder_name} onChange={set('holder_name')} autoComplete="name" />}

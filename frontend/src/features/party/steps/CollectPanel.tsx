@@ -50,7 +50,8 @@ export function CollectPanel({ ctx, payments }: { ctx: PartyCtx; payments: Payme
   const [chosenKind, setChosenKind] = useState<CollectKind | null>(null)
   const [presenting, setPresenting] = useState<number | null>(null)
 
-  const kinds = collectKinds(collect.data)
+  const cash = ctx.party.collect_mode === 'cash' || collect.data?.collectMode === 'cash'
+  const kinds = cash ? [] : collectKinds(collect.data)
   const kind = chosenKind && kinds.includes(chosenKind) ? chosenKind : (kinds[0] ?? null)
   const byPayment = new Map((collect.data?.items ?? []).map((it) => [it.payment, it]))
   const rows: Row[] = payments
@@ -89,7 +90,9 @@ export function CollectPanel({ ctx, payments }: { ctx: PartyCtx; payments: Payme
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1 basis-56">
             <h2 className="font-display text-lg font-semibold">Encaisser</h2>
-            <p className="text-sm text-muted">Montre à chaque collègue son QR : le montant exact de sa part est déjà dedans.</p>
+            <p className="text-sm text-muted">
+              {cash ? 'Remboursement en espèces : confirme chaque part dès que tu l’as reçue.' : 'Montre à chaque collègue son QR : le montant exact de sa part est déjà dedans.'}
+            </p>
           </div>
           {kind && todo.length > 0 && (
             <Button
@@ -102,7 +105,7 @@ export function CollectPanel({ ctx, payments }: { ctx: PartyCtx; payments: Payme
           )}
         </div>
 
-        {collect.isPending ? (
+        {cash ? null : collect.isPending ? (
           <Skeleton className="h-10 rounded-md" />
         ) : collect.isError ? (
           <p className="rounded-md border border-danger/30 bg-danger/10 p-3 text-sm text-danger">

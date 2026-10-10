@@ -55,22 +55,20 @@ func payoutAvailability(app core.App, userID string) domain.PayoutAvailability {
 	return domain.PayoutAvailabilityOf(payoutFields(payoutProfile(app, userID)))
 }
 
-// checkPayer refuses a payer who cannot be reimbursed while colleagues owe
-// them something (s = summary of the party being validated).
-func checkPayer(app core.App, s domain.Summary, payer, actor string) error {
+// checkPayer refuses, outside cash mode, a payer who cannot be reimbursed
+// while colleagues owe them something (s = summary of the party).
+func checkPayer(app core.App, s domain.Summary, mode, payer, actor string) error {
 	debtors := make([]string, 0, len(s.Participants))
 	for _, p := range s.Participants {
 		if len(p.Items) > 0 {
 			debtors = append(debtors, p.User.ID)
 		}
 	}
-	if !domain.PayoutRequired(payer, debtors) {
+	name := userName(app, payer)
+	if domain.CheckPayer(mode, payer, debtors, payoutAvailability(app, payer), payer == actor, name) == nil {
 		return nil
 	}
-	if payoutAvailability(app, payer).CanReceive() {
-		return nil
-	}
-	return errPayerNoPayout(payer == actor, userName(app, payer))
+	return errPayerNoPayout(payer == actor, name)
 }
 
 // memberPayout is one line of GET /parties/{id}/payout-readiness.

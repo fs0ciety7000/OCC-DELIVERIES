@@ -418,6 +418,24 @@ test('commande groupée complète : vote → paniers → récap → dispatch →
     })
 
     await shot(members, '4-review')
+    await test.step('4c. Garde du payeur : Bob sans moyen de remboursement ne peut pas être validé par virement', async () => {
+      const ap = alice.page
+      // Alerte douce côté Bob (mobile) : pas encore d'IBAN.
+      await expect(bob.page.getByText(/Ajoute ton IBAN pour être remboursé·e par virement si tu avances la commande/)).toBeVisible()
+      await ap.getByRole('button', { name: 'Qui a payé ?' }).click()
+      const ps = dialog(ap, "Qui a avancé l'argent ?")
+      const bobRow = ps.getByRole('radio', { name: /Bob/ })
+      await expect(bobRow).toContainText('Aucun moyen de remboursement')
+      await bobRow.click()
+      await expect(ps.getByRole('radio', { name: /Virement \/ Revolut \/ PayPal/ })).toHaveAttribute('aria-checked', 'true')
+      await expect(ps.getByText("Bob n'a encore renseigné aucun moyen de remboursement.")).toBeVisible()
+      await expect(ps.getByRole('button', { name: 'Valider la commande' })).toBeDisabled()
+      await expect(ps.getByRole('button', { name: "Pas d'IBAN ? Valider en espèces" })).toBeVisible()
+      await expect(ps.getByRole('button', { name: "Lui demander d'ajouter son IBAN" })).toBeVisible()
+      await ap.keyboard.press('Escape')
+      await expect(ps).toBeHidden()
+    })
+
     await test.step('5. Bob renseigne son profil (IBAN, Revolut, PayPal), devient payeur ; Revolut + espèces → clôture', async () => {
       const bp = bob.page
       await bp.goto('/profile?onglet=infos') // onglet « Mes infos » (« Mes commandes » par défaut)
@@ -440,7 +458,9 @@ test('commande groupée complète : vote → paniers → récap → dispatch →
       const ps = dialog(ap, "Qui a avancé l'argent ?")
       await ps.getByRole('radio', { name: /Bob/ }).click()
       await expect(ps.getByRole('radio', { name: /Bob/ })).toHaveAttribute('aria-checked', 'true')
-      await ps.getByRole('button', { name: 'Valider et passer aux remboursements' }).click()
+      // Profil relu à l'ouverture : IBAN et Revolut reconnus, validation par virement possible.
+      await expect(ps.getByRole('radio', { name: /Bob/ })).toContainText('IBAN ✓')
+      await ps.getByRole('button', { name: 'Valider la commande' }).click()
 
       for (const debtor of [alice, chloe]) {
         const p = debtor.page

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useParams, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { Button, EmptyState, Skeleton } from '@/components/ui'
 import { useAuth } from '@/lib/auth'
@@ -20,6 +20,7 @@ import { VotingStep } from './steps/VotingStep'
 import { PartyDeadlines } from '@/features/deadlines/PartyDeadlines'
 import { distinctColors } from '@/lib/colors'
 import { TeamMissingMembers } from '@/features/teams/TeamMissingMembers'
+import { PayoutQuickAddSheet } from './steps/PayoutQuickAdd'
 
 const STATUS_TOASTS: Partial<Record<PartyStatus, string>> = {
   voting: 'Le vote est ouvert — à vos cœurs ! ❤️',
@@ -35,6 +36,9 @@ export function PartyPage() {
   const { user } = useAuth()
   const party = useParty(id)
   const members = useMembers(id)
+  // `?iban=1` : lien de la notification « Ajoute ton IBAN » → ajout rapide sans quitter la party.
+  const [search, setSearch] = useSearchParams()
+  const ibanOpen = search.get('iban') === '1'
   const lastStatus = useRef<PartyStatus | null>(null)
 
   const onPartyChange = useCallback((p: Party, action: string) => {
@@ -125,6 +129,21 @@ export function PartyPage() {
       <StepTransition status={ctx.party.status}>
         <StepView ctx={ctx} />
       </StepTransition>
+      <PayoutQuickAddSheet
+        me={ctx.me}
+        partyId={ctx.party.id}
+        open={ibanOpen}
+        onClose={() =>
+          setSearch(
+            (prev) => {
+              const next = new URLSearchParams(prev)
+              next.delete('iban')
+              return next
+            },
+            { replace: true },
+          )
+        }
+      />
     </div>
   )
 }

@@ -218,6 +218,8 @@ type orderMailData struct {
 
 	PayerID   string
 	PayerName string
+	// Cash: the payer asked to be reimbursed in cash (parties.collect_mode).
+	Cash bool
 
 	// recipient
 	Me      orderMailPerson
@@ -247,6 +249,7 @@ func orderMailBase(p, rest *core.Record, s domain.Summary, pays []*core.Record) 
 		DeliveryAddress: strings.TrimSpace(p.GetString("delivery_address")),
 		SplitEqual:      s.SplitMode != domain.SplitProportional,
 		PayerID:         p.GetString("payer"),
+		Cash:            p.GetString("collect_mode") == domain.CollectCash,
 		ItemsSubtotal:   s.ItemsSubtotal,
 		DeliveryFee:     s.DeliveryFee,
 		ServiceFee:      s.ServiceFee,
@@ -344,6 +347,9 @@ func (d orderMailData) preheader() string {
 	if d.IsPayer {
 		return "Tu as avancé " + domain.FormatEUR(d.Advanced) + " ; " + d.owedPhrase() + "."
 	}
+	if d.Cash {
+		return "Ta part : " + domain.FormatEUR(d.Owed) + " à rembourser en espèces à " + d.PayerName + "."
+	}
 	return "Ta part : " + domain.FormatEUR(d.Owed) + " à rembourser à " + d.PayerName + "."
 }
 
@@ -413,7 +419,7 @@ const orderMailHTMLSource = `<div style="display:none;max-height:0;overflow:hidd
 <p style="margin:0 0 6px;font-size:30px;line-height:36px;font-weight:800;letter-spacing:-0.02em;color:[fg]">{{eur .Advanced}}</p>
 <p style="margin:0;font-size:15px;line-height:22px;color:[fg]">{{.PayerLine}}</p>
 {{else}}
-<p style="margin:0 0 4px;font-size:14px;line-height:20px;color:[muted]">Montant à rembourser{{if .PayerName}} à <strong style="color:[fg]">{{.PayerName}}</strong>{{end}}</p>
+<p style="margin:0 0 4px;font-size:14px;line-height:20px;color:[muted]">Montant à rembourser{{if .Cash}} en espèces{{end}}{{if .PayerName}} à <strong style="color:[fg]">{{.PayerName}}</strong>{{end}}</p>
 <p style="margin:0;font-size:30px;line-height:36px;font-weight:800;letter-spacing:-0.02em;color:[fg]">{{eur .Owed}}</p>
 {{end}}
 </td></tr>
@@ -422,7 +428,7 @@ const orderMailHTMLSource = `<div style="display:none;max-height:0;overflow:hidd
 <table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 8px"><tr><td style="border-radius:14px;background:[brand];background-image:linear-gradient(135deg,[brand],[brand2])">
 <a href="{{.PartyURL}}" target="_blank" rel="noopener" style="display:inline-block;padding:14px 26px;font-size:16px;font-weight:700;color:[brandfg];text-decoration:none;border-radius:14px">{{if .IsPayer}}Suivre les remboursements{{else}}Rembourser {{if .PayerName}}{{.PayerName}}{{else}}ma part{{end}}{{end}}</a>
 </td></tr></table>
-<p style="margin:0 0 24px;font-size:13px;line-height:18px;color:[muted]">{{if .IsPayer}}Confirme chaque remboursement reçu dans l'app.{{else}}QR code virement (dans ton app bancaire), Revolut, PayPal… : tout est dans l'app, montant prérempli.{{end}}<br/><a href="{{.PartyURL}}" style="color:[ink];word-break:break-all">{{.PartyURL}}</a></p>
+<p style="margin:0 0 24px;font-size:13px;line-height:18px;color:[muted]">{{if .IsPayer}}Confirme chaque remboursement reçu dans l'app.{{else if .Cash}}Remboursement en espèces, de la main à la main : déclare-le dans l'app une fois fait.{{else}}QR code virement (dans ton app bancaire), Revolut, PayPal… : tout est dans l'app, montant prérempli.{{end}}<br/><a href="{{.PartyURL}}" style="color:[ink];word-break:break-all">{{.PartyURL}}</a></p>
 
 <h2 style="margin:0 0 10px;font-size:18px;line-height:24px;font-weight:750;color:[fg]">Commande complète</h2>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid [border];border-radius:14px">
@@ -511,8 +517,13 @@ func renderOrderMailText(d orderMailData) string {
 		if d.PayerName != "" {
 			to = " à " + d.PayerName
 		}
-		line("MONTANT À REMBOURSER%s : %s", strings.ToUpper(to), eur(d.Owed))
-		line("Rembourser (QR code virement, Revolut, PayPal… montant prérempli) : %s", d.PartyURL)
+		if d.Cash {
+			line("MONTANT À REMBOURSER EN ESPÈCES%s : %s", strings.ToUpper(to), eur(d.Owed))
+			line("Déclarer ton remboursement en espèces : %s", d.PartyURL)
+		} else {
+			line("MONTANT À REMBOURSER%s : %s", strings.ToUpper(to), eur(d.Owed))
+			line("Rembourser (QR code virement, Revolut, PayPal… montant prérempli) : %s", d.PartyURL)
+		}
 	}
 	line("")
 	line("== COMMANDE COMPLÈTE ==")

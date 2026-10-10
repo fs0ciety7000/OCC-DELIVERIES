@@ -201,6 +201,11 @@ Jamais exposé aux autres membres : QR EPC et liens ne sortent que via
 coordonnées). Hook : IBAN / BIC validés ; `revolut_tag` / `paypal_me` / `payment_link` normalisés (`domain/payout.go`) et un lien
 `revolut.me/…` ou `paypal.me/…` collé dans `payment_link` est déplacé dans le champ structuré
 (migration `1760000013` : même traitement pour les profils existants).
+**Ce que les autres membres en savent** (garde du payeur, ADR 0003 mise à jour 4) :
+`GET /api/occ/parties/{id}/payout-readiness` ne renvoie que des booléens et des types de moyens
+(`domain.PayoutAvailabilityOf` : IBAN valide mod-97, revtag / PayPal.me / lien normalisables,
+un lien revolut.me / paypal.me collé dans le champ libre compte comme ce moyen) — jamais l'IBAN,
+le titulaire ni les identifiants.
 Les anciens champs Wero / Bancontact Pay (`wero_id`, `bancontact_phone`, `wero_qr`, `bancontact_qr`)
 ont été **supprimés** par la migration `1760000021` (fichiers QR effacés du stockage) : un client qui
 les envoie encore les voit ignorés (ADR 0003, mise à jour 3).
@@ -528,6 +533,7 @@ erreurs journalisées) — à brancher sur le service Web Push. Un membre de l'�
 | service_fee | number int | éditable par l'hôte |
 | tip | number int | éditable par l'hôte |
 | payer | R(users) | celui qui a avancé l'argent |
+| collect_mode | select (`transfer`, `cash`) | **serveur** : comment le payeur veut être remboursé, choisi avec lui par `POST /payer` (ADR 0003, mise à jour 4) ; `''` tant que le payeur n'est pas désigné ; migration `1760000022` : `transfer` pour les parties qui avaient déjà un payeur |
 | dispatch | json | `{ "method": "...", "at": "ISO", "url": "..." }` |
 | closed_at | date | |
 | team | R(teams) | équipe pour laquelle la commande a été lancée (migration `1760000016`) ; immuable |
@@ -539,7 +545,7 @@ Rules :
   valeur JSON brute et ne matche jamais → toujours écrire `members.id ?= …`)
 * create : `@request.auth.id != "" && @request.auth.is_guest = false` (migration `1760000016`) → le hook force `host`, `members=[host]`, `code`, `status=lobby`.
 * update : `host = @request.auth.id` → le hook **refuse** toute modification de
-  `code, host, members, status, restaurant, payer, dispatch, closed_at, auto_events`
+  `code, host, members, status, restaurant, payer, collect_mode, dispatch, closed_at, auto_events`
   (passent par `/api/occ/*` ou le planificateur ; `auto_state` est caché donc ignoré). `candidates` modifiable seulement en `lobby`.
   `delivery_fee`, `service_fee`, `tip`, `split_mode` figés à partir de `paying` ;
   plus aucune modification en `closed` / `cancelled`.
@@ -674,11 +680,12 @@ Rules : list/view `party.members.id ?= @request.auth.id || @request.auth.role = 
   | un membre rejoint | hôte | `party` | « Bob a rejoint la commande 👋 » (≤ 1 / 2 min / party, puis « Bob et 2 autres personnes ont rejoint ») |
   | remboursement déclaré | payeur | `payments` | « Bob a déclaré t'avoir remboursé 12,40 € (Revolut). Pense à confirmer. » (libellés « Wero » / « Bancontact Pay » conservés pour les anciens paiements) |
   | remboursement confirmé | débiteur | `payments` | « Bob a confirmé ton remboursement de 12,40 €. » |
+  | « ajoute ton IBAN » (`POST /payout-request`, kind `payout_request`) | le membre visé | `payments` | « Ajoute ton IBAN 💳 — Alice aimerait que tu puisses avancer « Midi » : renseigne ton IBAN (ou Revolut / PayPal) pour être remboursé·e. » ; lien `/party/<id>?iban=1` (ouvre l'ajout rapide) ; 1 / 10 min / party / membre |
   | équipe : commande lancée (`TeamNotifier`) | membres de l'équipe sauf l'hôte | `party` | « Compta : la commande du jour est lancée — Rejoins « Midi du lundi ». » |
   | rappels / clôtures automatiques | voir *Heures limites* | `reminders` / `party` | « Plus que 2 minutes pour voter ⏳ » |
   | test | soi | toujours | « Notifications activées 🔔 » |
 * **Toasts in-app** : rappels, prolongation, « à toi de décider », clôture sans être prêt, « tout le monde est prêt »,
-  remboursements déclarés / confirmés sont aussi envoyés en temps réel sur le sujet personnalisé
+  remboursements déclarés / confirmés, demandes « ajoute ton IBAN » sont aussi envoyés en temps réel sur le sujet personnalisé
   **`occ/notifications`** aux onglets ouverts du destinataire (même charge utile ; le SPA s'y abonne dans le shell).
   Les changements de statut ont déjà leurs toasts (abonnement `parties`).
 
@@ -699,7 +706,8 @@ Rules : list/view `party.members.id ?= @request.auth.id || @request.auth.role = 
   vers `{appURL}/party/{id}` (QR / liens de paiement dans l'app) ; **commande complète** par personne (le destinataire
   surligné, « a payé »), sous-total, livraison, service, pourboire, total ; resto (nom, téléphone, adresse), adresse
   de livraison, envoi (`dispatch.method` → « envoyée via Uber Eats »). Montants = `buildSummary` + lignes `payments`,
-  centimes formatés au rendu (« 12,40 € »).
+  centimes formatés au rendu (« 12,40 € »). Mode `cash` (`parties.collect_mode`) : « Montant à rembourser **en
+  espèces** à <payeur> » et aucune mention de QR / liens.
 
 ### Heures limites automatiques (`domain/deadline.go`, `app/deadlines.go`)
 Job cron PocketBase `occDeadlines` **chaque minute** : parties `voting` avec `voting_ends_at` et `ordering` avec
@@ -765,7 +773,7 @@ paiements, heures limites…) sont désactivées hors ligne (« Indisponible hor
 | voting → ordering | gagnant = plus de **points** (classement, `domain.ComputeTally` : 1er choix = K points, K = nombre de candidats, puis K−1… au moins 1) ; égalité → plus de 1ers choix, puis plus de votants, puis meilleur `rating`, puis nom ; l'hôte peut imposer `restaurant` (doit être candidat) ; **ou automatique** à `voting_ends_at` (≥ 1 vote, voir *Heures limites*) |
 | ordering → review | ≥ 1 `order_item` ; snapshot `delivery_fee` depuis le restaurant ; **ou automatique** à `ordering_ends_at` |
 | review → ordering | réouverture (remet tous les `ready` à false) |
-| review → paying | **uniquement** via `POST /payer` |
+| review → paying | **uniquement** via `POST /payer` (hôte), avec le mode de remboursement : `transfer` exige que le payeur ait un moyen de remboursement utilisable (IBAN valide, revtag Revolut, PayPal.me ou autre lien) dès qu'un·e autre membre a commandé, sinon **409** `payer_no_payout` ; `cash` ne bloque jamais. Même règle pour un changement de payeur en `paying` |
 | paying → closed | automatique quand tous les `payments` sont `confirmed`, ou manuel par l'hôte |
 | * → cancelled | hôte, si status ∉ {closed} |
 
@@ -788,7 +796,9 @@ PocketBase `{ "status": 400, "message": "…", "data": {} }`, messages en franç
 | `POST /api/occ/parties/{id}/ready` | membre | `{ "ready": bool }` | `{ "member": PartyMember }` (status `ordering` uniquement) |
 | `GET /api/occ/parties/{id}/summary` | membre | | `Summary` (ci-dessous) |
 | `POST /api/occ/parties/{id}/dispatch` | hôte | `{ "method": "ubereats"\|"takeaway"\|"deliveroo"\|"weloveat"\|"export"\|"phone" }` (plateforme désactivée par `OCC_PROVIDERS` → 400) | `{ "party": Party, "dispatch": Dispatch }` (status review/paying) |
-| `POST /api/occ/parties/{id}/payer` | hôte | `{ "payer": userId }` | `{ "party": Party, "payments": Payment[] }` (review → paying ; en paying : recalcule si aucun paiement tiers confirmé) |
+| `POST /api/occ/parties/{id}/payer` | hôte | `{ "payer": userId, "collectMode"?: "transfer"\|"cash" }` (défaut `transfer`) | `{ "party": Party, "payments": Payment[] }` (review → paying ; en paying : recalcule si aucun paiement tiers confirmé — c'est aussi la façon de changer de mode) ; pose `parties.collect_mode` ; **409** si `transfer` et que le payeur n'a aucun moyen de remboursement alors qu'un·e autre membre a commandé : `{ "status": 409, "message": "…", "data": { "payer": { "code": "payer_no_payout", "message": "…" } } }` — message « Ajoute ton IBAN (ou Revolut / PayPal) dans ton profil avant de valider la commande. » si l'hôte se désigne lui-même, sinon « <Prénom> n'a encore renseigné aucun moyen de remboursement. » ; **400** mode inconnu |
+| `GET /api/occ/parties/{id}/payout-readiness` | membre | | `{ "members": [{ "user": id, "guest": bool, "payout": { "ready": bool, "iban": bool, "links": ["revolut"\|"paypal"\|"link"] } }], "readyCount": n, "total": n }` — qui peut être remboursé par virement / lien ; **booléens uniquement** (jamais l'IBAN ni les identifiants) ; 403 non-membre |
+| `POST /api/occ/parties/{id}/payout-request` | membre | `{ "user": userId }` | `{ "sent": true }` — « Lui demander d'ajouter son IBAN » : notification `payout_request` (push catégorie `payments` + toast in-app) ; **400** soi-même, non-membre, invité·e, déjà un moyen, party terminée ; **429** déjà demandé à cette personne pour cette party il y a moins de 10 min (limite en mémoire, tous demandeurs confondus) |
 | `GET /api/occ/parties/{id}/export` | membre | `format=csv\|txt\|json` | fichier (`Content-Disposition: attachment`) |
 | `GET /api/occ/parties/{id}/reorder` | membre | | `ReorderPreview` (ci-dessous) : ma dernière commande dans le restaurant de la party (`source: null` si aucune) |
 | `POST /api/occ/parties/{id}/reorder` | membre | | `{ "added": [{ name, quantity }], "skipped": [{ name, reason }] }` — status `ordering` (sinon 400) ; ajoute à **mon** panier les lignes encore valides de ma dernière commande ici (prix recalculés serveur, `ready` remis à false) ; **404** sans commande précédente |
@@ -803,7 +813,7 @@ PocketBase `{ "status": 400, "message": "…", "data": {} }`, messages en franç
 | `POST /api/occ/push/test` | ✔ | | `{ "queued": true, "devices": n }` — notification « Notifications activées 🔔 » à **soi-même** ; **400** « Aucun appareil abonné… » |
 | `GET /api/occ/push/prefs` | ✔ | | `{ "prefs": NotifyPrefs, "devices": n, "enabled": bool, "mail": bool }` (`mail` = SMTP configuré) |
 | `PATCH /api/occ/push/prefs` | ✔ | `{ "party"?: bool, "payments"?: bool, "reminders"?: bool, "emails"?: bool }` | `{ "prefs": NotifyPrefs }` ; **400** si aucune clé |
-| `POST /api/occ/payments/{id}/action` | voir | `{ "action": "declare"\|"confirm"\|"reset", "method"?: "qr"\|"revolut"\|"paypal"\|"link"\|"cash"\|"later" }` | `{ "payment": Payment }` — **400** « Wero et Bancontact Pay ne sont plus proposés… » pour `wero` / `bancontact` |
+| `POST /api/occ/payments/{id}/action` | voir | `{ "action": "declare"\|"confirm"\|"reset", "method"?: "qr"\|"revolut"\|"paypal"\|"link"\|"cash"\|"later" }` | `{ "payment": Payment }` — **400** « Wero et Bancontact Pay ne sont plus proposés… » pour `wero` / `bancontact` ; party en mode `cash` : **400** « Le payeur a demandé un remboursement en espèces… » pour `qr` / `revolut` / `paypal` / `link` |
 | `GET /api/occ/payments/{id}/qr` | membre | | `PaymentQR` |
 | `GET /api/occ/parties/{id}/payments/qr` | **payeur** (`parties.payer`) | | `CollectQR` (ci-dessous) — « Encaisser » : QR à montant exact de chaque part, à présenter depuis le téléphone du payeur ; status `paying`/`closed` (sinon 400) ; **403** hôte non payeur, débiteur, non-membre |
 | `POST /api/occ/guest` | — (sans session) | `{ "name": "Léa", "color"?: "#RRGGBB", "partyCode"?: "K7M2QX", "teamCode"?: "K7M2QXAB" }` (un seul code) | `{ token, record, party: {id,title}\|null, team: {id,name}\|null }` — crée un·e invité·e et le fait rejoindre (§3 *Invités*) ; **400** code absent / mal formé / commande fermée / équipe archivée / prénom vide, **404** code inconnu, **429** limite par IP |
@@ -1006,7 +1016,7 @@ lignes valides en une transaction (snapshots `name` / `options_label` / `unit_pr
 
 ### `PaymentQR`
 ```json
-{ "amount": 1240, "reference": "OCC K7M2QX Alice", "beneficiary": "Bob Martin",
+{ "collectMode": "transfer", "amount": 1240, "reference": "OCC K7M2QX Alice", "beneficiary": "Bob Martin",
   "epc": "BCD\n002\n1\nSCT\n\nBob Martin\nBE71096123456769\nEUR12.40\n\n\nOCC K7M2QX Alice",
   "iban": "BE71096123456769",
   "links": [
@@ -1029,7 +1039,8 @@ Revolut `?amount=<centimes>&currency=EUR&note=<communication>`, PayPal.me
 tout autre lien est renvoyé tel quel (`false`). `methods` = moyens réellement
 proposés (selon le profil du payeur), par ordre d'utilité : `qr`, `revolut`,
 `paypal`, `link`, `cash`, `later` (le front avance les liens pré-remplis devant
-`qr` sur mobile).
+`qr` sur mobile). `collectMode` = `parties.collect_mode` (`transfer` si vide) ; en **`cash`** :
+`epc` / `iban` `null`, `links` `[]`, `methods` = `["cash", "later"]` (le profil du payeur n'est pas lu).
 
 **Wero / Bancontact Pay ne sont plus proposés** (ADR 0003, mise à jour 3) :
 aucun format de demande P2P **à montant** n'est utilisable par un tiers ; le
@@ -1040,7 +1051,7 @@ le même travail avec le montant et la communication pré-remplis. Les clés
 
 ### `CollectQR` (`/parties/{id}/payments/qr`, payeur seulement)
 ```json
-{ "beneficiary": "Bob Martin", "iban": "BE71096123456769",
+{ "collectMode": "transfer", "beneficiary": "Bob Martin", "iban": "BE71096123456769",
   "items": [
     { "payment": "…", "debtor": { "id": "…", "name": "Alice", "avatar": "", "color": "#…" },
       "amount": 1240, "status": "pending", "method": "", "reference": "OCC K7M2QX Alice",
@@ -1050,12 +1061,13 @@ le même travail avec le montant et la communication pré-remplis. Les clés
 ```
 Une entrée par part **à encaisser** (la part du payeur, `method = self`, est exclue), triées par nom.
 `epc` / `links` = exactement ce que `/payments/{id}/qr` renvoie au débiteur (mêmes constructeurs
-Go, `loadPayout(...).qrFor(amount, reference)`), `iban` = celui du payeur (`null` sans IBAN valide).
+Go, `loadPayout(...).qrFor(mode, amount, reference)`), `iban` = celui du payeur (`null` sans IBAN valide).
 Côté UI (PayingStep, vue du payeur) : carte « Encaisser » — une carte par collègue (avatar, montant,
 statut, QR, « Confirmer la réception ») et mode **« Présenter »** plein écran (QR géant, montant, balayage
 / flèches pour passer au suivant, Wake Lock si disponible). Type de QR au choix : « Virement » (EPC,
 lu par l'app bancaire) ou le lien Revolut / PayPal.me **à montant** (lu par l'appareil photo, qui
-ouvre le lien) ; les liens sans montant ne sont jamais proposés en QR.
+ouvre le lien) ; les liens sans montant ne sont jamais proposés en QR. En mode `cash` : aucun QR
+(`epc` `null`, `links` `[]`), la carte affiche les montants et « Confirmer la réception ».
 
 ### `RestaurantImport`
 ```json

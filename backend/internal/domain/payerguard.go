@@ -2,11 +2,31 @@ package domain
 
 import "strings"
 
-// Payer guard (ADR 0003, update 4): a member can only be designated payer
-// when colleagues will be able to reimburse them with a usable method —
-// a valid IBAN (EPC transfer QR, preferred), a Revolut tag, a PayPal.me name
-// or another payment link. Cash and « later » never count: they need no
-// payout profile, so they cannot prove anything.
+// Payer guard (ADR 0003, update 4). With the payer, the host chooses how the
+// payer wants to be reimbursed (parties.collect_mode):
+//   - "transfer": EPC transfer QR, Revolut, PayPal.me or another link — the
+//     payer must then have a usable method: a valid IBAN (preferred), a
+//     Revolut tag, a PayPal.me name or another payment link;
+//   - "cash": cash (or « later ») only — never blocked, even with an empty
+//     payout profile; debtors cannot declare any other method.
+
+// Collect modes (parties.collect_mode).
+const (
+	CollectTransfer = "transfer"
+	CollectCash     = "cash"
+)
+
+// NormalizeCollectMode validates the requested mode; empty means transfer
+// (the historical behaviour).
+func NormalizeCollectMode(s string) (string, error) {
+	switch strings.TrimSpace(s) {
+	case "", CollectTransfer:
+		return CollectTransfer, nil
+	case CollectCash:
+		return CollectCash, nil
+	}
+	return "", Errf("Mode de remboursement invalide : %q (transfer ou cash).", s)
+}
 
 // CodePayerNoPayout is the machine-readable code of the refusal
 // (`data.payer.code` of the API error), read by the SPA.
@@ -102,10 +122,33 @@ func PayerNoPayoutMessage(self bool, name string) string {
 	return name + " n'a encore renseigné aucun moyen de remboursement."
 }
 
-// CheckPayer validates the payer designation: nil when allowed.
-func CheckPayer(payer string, debtors []string, payout PayoutAvailability, self bool, name string) error {
-	if !PayoutRequired(payer, debtors) || payout.CanReceive() {
+// CheckPayer validates the payer designation: nil when allowed (cash mode,
+// nothing to reimburse, or a usable method).
+func CheckPayer(mode, payer string, debtors []string, payout PayoutAvailability, self bool, name string) error {
+	if mode == CollectCash || !PayoutRequired(payer, debtors) || payout.CanReceive() {
 		return nil
 	}
 	return &Error{Msg: PayerNoPayoutMessage(self, name)}
+}
+
+// MethodsFor returns the reimbursement methods offered to debtors for the
+// party's collect mode: cash mode only offers cash and later.
+func MethodsFor(mode string, a PayoutAvailability) []string {
+	if mode == CollectCash {
+		return []string{MethodCash, MethodLater}
+	}
+	return AvailableMethods(a)
+}
+
+// DeclareStatusFor is DeclareStatus restricted by the collect mode: in cash
+// mode only cash and later can be declared.
+func DeclareStatusFor(mode, method string) (string, error) {
+	switch method {
+	case MethodQR, MethodRevolut, MethodPayPal, MethodLink:
+		if mode != CollectCash {
+			break
+		}
+		return "", Errf("Le payeur a demandé un remboursement en espèces : déclare « espèces » ou « plus tard ».")
+	}
+	return DeclareStatus(method)
 }

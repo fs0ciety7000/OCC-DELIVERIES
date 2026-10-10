@@ -4,8 +4,9 @@ import { occ, partiesApi, type PartyFeesInput } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
 import { readyAction } from '@/lib/offlineActions'
 import { pb } from '@/lib/pb'
+import { isPayerNoPayout } from './payout'
 import { qk } from '@/lib/queryKeys'
-import type { DeclareMethod, DispatchMethod, Party, PartyMember, PartyStatus, PaymentAction } from '@/lib/types'
+import type { CollectMode, DeclareMethod, DispatchMethod, Party, PartyMember, PartyStatus, PaymentAction } from '@/lib/types'
 
 export function useParty(id: string | undefined) {
   return useQuery({ queryKey: qk.partyDetail(id ?? ''), queryFn: () => partiesApi.get(id!), enabled: !!id })
@@ -131,11 +132,39 @@ export function useSetPayer(partyId: string) {
   const setParty = useSetParty()
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (payer: string) => occ.setPayer(partyId, payer),
+    mutationFn: (v: { payer: string; collectMode: CollectMode }) => occ.setPayer(partyId, v.payer, v.collectMode),
     onSuccess: (res) => {
       qc.setQueryData(qk.payments(partyId), res.payments)
       setParty(res.party)
     },
+    onError: (err) => {
+      // Course : le profil a changé entre-temps → on relit les moyens de chacun (l'écran se met à jour).
+      if (isPayerNoPayout(err)) void qc.invalidateQueries({ queryKey: qk.payoutReadiness(partyId) })
+      onError(err)
+    },
+  })
+}
+
+/**
+ * Moyens de remboursement des membres (booléens, jamais l'IBAN). Les profils sont
+ * privés (pas de temps réel) : relus au focus et régulièrement tant que l'écran est ouvert.
+ */
+export function usePayoutReadiness(partyId: string, enabled = true) {
+  return useQuery({
+    queryKey: qk.payoutReadiness(partyId),
+    queryFn: () => occ.payoutReadiness(partyId),
+    enabled: !!partyId && enabled,
+    // relu à chaque ouverture du choix du payeur (petit endpoint, profils sans temps réel)
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchInterval: enabled ? 30_000 : false,
+  })
+}
+
+export function usePayoutRequest(partyId: string) {
+  return useMutation({
+    mutationFn: (userId: string) => occ.payoutRequest(partyId, userId),
+    onSuccess: () => toast.success('Demande envoyée', { description: 'Une notification lui demande d’ajouter son IBAN.' }),
     onError,
   })
 }
