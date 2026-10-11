@@ -96,6 +96,12 @@ ci-dessous, du plus récent au plus ancien.
   - **MFA superuser** (`app/superusermfa.go`) : OTP e-mail activé au démarrage si SMTP ; PocketBase force MFA dès qu'OTP
     est actif. `/_/` et `/api/collections/_superusers` derrière Cloudflare Access. Binaire de l'image : `/pb/occ`.
   - E2E : requêtes `GET /api/occ/*` et `POST /api/realtime` annulées par une navigation ajoutées au bruit légitime.
+* 2026-10-10 — **E-mails par le serveur Stalwart** (`mail.fs0ciety.org`, compte `nicolas@fs0ciety.org`, Resend abandonné ;
+  `docs/DEPLOYMENT.md` § 3 ter). Code SMTP inchangé : port `465` = TLS implicite, sinon STARTTLS (mailyak/net/smtp,
+  `PLAIN` refusé sans TLS). Expéditeur `noreply@eat.fs0ciety.org` ; adresse de contact publique `contact@eat.fs0ciety.org`
+  (pied de page de l'app `CONTACT_EMAIL` dans `AppShell.tsx`, pied des e-mails `app.ContactEmail`).
+* 2026-10-10 — **Division renommée CM Interactive** (OCC → CM, demande de l'utilisateur) : pied de page de l'app
+  (`AppShell.tsx`), pied des e-mails (`mailtemplates.go`, `ordermail.go` + test) et `docs/DESIGN_SYSTEM.md`.
 * 2026-10-10 — **Signature « OCC Interactive — une division de CARDOR Media »** (remplace OCC MONS Studios : pied de
   page, e-mails) avec les **emblèmes animés** de la charte CARDOR (dépôt `fs0ciety7000/mons-corp`,
   `src/lib/brand/emblem-motion.ts`) : Dragon (`public/brand/interactive.svg`) = « boot » glitch au premier affichage puis
