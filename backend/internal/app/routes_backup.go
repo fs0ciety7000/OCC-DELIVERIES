@@ -43,7 +43,8 @@ type backupCheckView struct {
 type backupStatusView struct {
 	Configured       bool             `json:"configured"`
 	FromEnv          bool             `json:"fromEnv"`
-	Storage          string           `json:"storage"` // "s3" | "local"
+	DisabledByEnv    bool             `json:"disabledByEnv"` // OCC_BACKUP_DISABLED
+	Storage          string           `json:"storage"`       // "s3" | "local"
 	Bucket           string           `json:"bucket"`
 	Cron             string           `json:"cron"`
 	Timezone         string           `json:"timezone"`
@@ -97,7 +98,7 @@ func (h *handlers) backupStatus(app core.App) backupStatusView {
 	s := app.Settings()
 	b := h.backups
 	out := backupStatusView{
-		Configured: s.Backups.Cron != "", FromEnv: b.cfg.Enabled(), Storage: "local",
+		Configured: s.Backups.Cron != "", FromEnv: b.cfg.Enabled() && !b.cfg.Disabled, DisabledByEnv: b.cfg.Disabled, Storage: "local",
 		Cron: s.Backups.Cron, Timezone: "UTC", Keep: s.Backups.CronMaxKeep,
 		Health: string(domain.BackupDisabled), MaxAgeHours: int(domain.BackupMaxAge / time.Hour),
 		Backups: []backupFileView{},
@@ -153,6 +154,9 @@ const msgBackupBusy = "Une sauvegarde ou une vérification est déjà en cours. 
 
 func (h *handlers) adminBackupRun(e *core.RequestEvent) error {
 	if err := h.backups.startBackup(); err != nil {
+		if errors.Is(err, errBackupDisabled) {
+			return badRequest(msgBackupDisabled)
+		}
 		if errors.Is(err, errBackupBusy) {
 			return apis.NewApiError(http.StatusConflict, msgBackupBusy, nil)
 		}
@@ -164,6 +168,9 @@ func (h *handlers) adminBackupRun(e *core.RequestEvent) error {
 
 func (h *handlers) adminBackupVerify(e *core.RequestEvent) error {
 	if err := h.backups.startVerify(); err != nil {
+		if errors.Is(err, errBackupDisabled) {
+			return badRequest(msgBackupDisabled)
+		}
 		if errors.Is(err, errBackupBusy) {
 			return apis.NewApiError(http.StatusConflict, msgBackupBusy, nil)
 		}

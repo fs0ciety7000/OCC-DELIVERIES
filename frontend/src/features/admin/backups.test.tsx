@@ -19,7 +19,7 @@ const verifyOK: BackupCheck = {
 }
 
 const base: BackupStatus = {
-  configured: true, fromEnv: true, storage: 's3', bucket: 'occ-deliveries-backups', cron: '15 0 * * *', timezone: 'UTC', keep: 14,
+  configured: true, fromEnv: true, disabledByEnv: false, storage: 's3', bucket: 'occ-deliveries-backups', cron: '15 0 * * *', timezone: 'UTC', keep: 14,
   nextBackupAt: '2026-10-12T00:15:00Z', running: null, health: 'ok', maxAgeHours: 36,
   lastBackup: { key: verifyOK.backupKey, size: 101564, modified: '2026-10-11T00:15:00Z' },
   backups: [{ key: verifyOK.backupKey, size: 101564, modified: '2026-10-11T00:15:00Z' }],
@@ -89,6 +89,23 @@ describe('BackupsCard', () => {
     expect(screen.getByText(/OCC_BACKUP_S3_\*/)).toBeInTheDocument()
     expect(screen.getByText('Local (pb_data/backups)')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Sauvegarder maintenant' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Vérifier la restauration' })).toBeDisabled()
+  })
+})
+
+describe('BackupsCard — instance désactivée', () => {
+  it('annonce la désactivation et bloque les boutons', () => {
+    render(
+      <BackupsCard
+        status={{ ...base, disabledByEnv: true, fromEnv: false, configured: false, health: 'disabled', storage: 'local', bucket: '', nextBackupAt: null }}
+        onRun={vi.fn()}
+        onVerify={vi.fn()}
+      />,
+    )
+    expect(screen.getByText('Désactivées')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Sauvegardes désactivées sur cette instance')
+    expect(screen.queryByText(/ne sont pas configurées/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Sauvegarder maintenant' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Vérifier la restauration' })).toBeDisabled()
   })
 })

@@ -421,6 +421,10 @@ Rules : **toutes `nil`** (serveur seul, superusers dans `/_/`) ; les admins lise
   du processus s'il n'y en a aucune) → badge danger dans `/admin` et, si SMTP est configuré, e-mail aux admins actifs
   (rôle `admin`, ni suspendus ni supprimés) **une fois par 24 h** au plus (`domain.ShouldSendBackupAlert`, ligne `alert`).
   PocketBase prévient en plus les superusers de tout échec de sauvegarde planifiée.
+* **`OCC_BACKUP_DISABLED=1`** (copie restaurée, préproduction) : `Settings.Backups` vidé au démarrage (avant le
+  lancement du cron PocketBase), veille horaire et vérification après sauvegarde coupées, `OnSettingsUpdateRequest`
+  refuse un cron ou S3 (400 FR), `OnBackupCreate` refuse toute sauvegarde vers S3 ; `GET /admin/backups` →
+  `disabledByEnv: true`, `health: "disabled"`.
 * Une restauration exige la **même `OCC_DATA_KEY`** que la base sauvegardée (coordonnées de remboursement chiffrées) :
   voir `DEPLOYMENT.md` § « Restaurer une sauvegarde ».
 
@@ -932,8 +936,8 @@ PocketBase `{ "status": 400, "message": "…", "data": {} }`, messages en franç
 | `POST /api/occ/admin/sync/run` | admin | facultatif : `{ "sourceId": id }` | **202** `{ "run": SyncRun }` (status `running`, exécution en arrière-plan) ; sans corps : toutes les sources activées ; avec `sourceId` : **cette source seule** (même désactivée, exécution « ciblée », voir §3) ; **404** source inconnue ; **409** si une exécution tourne (ciblée ou non) ; 400 si `OCC_SYNC_ENABLED=false` |
 | `POST /api/occ/admin/sync/discover` | admin | `{ "query": string }` (≤ 300 car.) : lien takeaway.com / just-eat (`…/menu/<slug>`), nom libre, ou adresse directe d'un site | `SyncDiscoverResult` (ci-dessous) — 10 à 20 s ; **400** requête vide / illisible / lien Takeaway sans `/menu/` ou `OCC_SYNC_ENABLED=false` ; **409** si une découverte tourne déjà (une à la fois) |
 | `GET /api/occ/admin/backups` | admin | | `BackupStatus` (ci-dessous) — liste les archives du stockage (≤ 30, plus récentes d'abord), dernière vérification, santé ; jamais d'identifiant S3 |
-| `POST /api/occ/admin/backups/run` | admin | | **202** `{ "started": true, "running": "backup" }` — « Sauvegarder maintenant » en arrière-plan (nom `@auto_pb_backup_…`, rétention appliquée), puis vérification de la nouvelle archive ; **409** si une sauvegarde / restauration / vérification est en cours |
-| `POST /api/occ/admin/backups/verify` | admin | | **202** `{ "started": true, "running": "verify" }` — « Vérifier la restauration » de la dernière archive, en arrière-plan ; **409** si occupé |
+| `POST /api/occ/admin/backups/run` | admin | | **202** `{ "started": true, "running": "backup" }` — « Sauvegarder maintenant » en arrière-plan (nom `@auto_pb_backup_…`, rétention appliquée), puis vérification de la nouvelle archive ; **409** si une sauvegarde / restauration / vérification est en cours ; **400** si `OCC_BACKUP_DISABLED` |
+| `POST /api/occ/admin/backups/verify` | admin | | **202** `{ "started": true, "running": "verify" }` — « Vérifier la restauration » de la dernière archive, en arrière-plan ; **409** si occupé ; **400** si `OCC_BACKUP_DISABLED` |
 | `POST /api/occ/admin/sync/sources` | admin | `{ "url": "https://www.site.be/", "label"?: string }` | **201** `{ "source": SyncSource, "created": true }` ; **200** `{ source, created: false }` si une source `takeaway-site` / `jsonld` lit déjà ce site (même hôte sans `www.`, même chemin : idempotent) ; 400 URL invalide ou takeaway.com. Crée `takeaway-site`, activée, ville `mons`, priorité = première libre entre 10 et 39 (39 si tout est pris), libellé = `label` ou l'hôte |
 
 « admin » = utilisateur `role = "admin"` **ou** superuser (401 sans auth, 403 sinon).
@@ -1252,7 +1256,7 @@ déjà liée au restaurant n'est prioritaire (priorité calculée sur toutes les
 ### `BackupStatus` (`/admin/backups`)
 ```json
 { "configured": true, "fromEnv": true, "storage": "s3", "bucket": "occ-deliveries-backups",
-  "cron": "15 0 * * *", "timezone": "UTC", "keep": 14, "nextBackupAt": "2026-10-12T00:15:00Z",
+  "disabledByEnv": false, "cron": "15 0 * * *", "timezone": "UTC", "keep": 14, "nextBackupAt": "2026-10-12T00:15:00Z",
   "running": null, "health": "ok", "maxAgeHours": 36,
   "lastBackup": { "key": "@auto_pb_backup_occ_deliveries_20261011001500.zip", "size": 101564, "modified": "2026-10-11T00:15:00Z" },
   "backups": [ BackupFile ], "totalBackups": 14, "listError": "",
@@ -1377,3 +1381,4 @@ proche à la même adresse. Voir `docs/DEPLOYMENT.md`.
 | `OCC_BACKUP_S3_FORCE_PATH_STYLE` | `true` | adresses `endpoint/bucket/clé` (requis par R2) |
 | `OCC_BACKUP_CRON` | `15 0 * * *` | planification des sauvegardes, cron 5 champs en **UTC** (00:15 UTC = 02:15 Bruxelles en été, 01:15 en hiver) ; invalide = défaut |
 | `OCC_BACKUP_KEEP` | `14` | nombre de sauvegardes automatiques gardées (1–1000) |
+| `OCC_BACKUP_DISABLED` | `false` | `1` / `true` = **interrupteur de sécurité** pour une copie restaurée ou une préproduction : au démarrage, la planification et la config S3 des sauvegardes (restaurées avec `pb_data`, donc pointant vers le bucket de production) sont **effacées**, aucune vérification ni alerte ne tourne, `POST /admin/backups/run` et `/verify` → **400**, `/_/` refuse de réactiver cron ou S3 (400) et toute sauvegarde vers S3 est refusée. Prioritaire sur `OCC_BACKUP_S3_*` ; à ne **jamais** définir en production |

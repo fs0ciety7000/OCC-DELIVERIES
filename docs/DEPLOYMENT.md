@@ -505,6 +505,7 @@ automatique. Détails techniques : `ARCHITECTURE.md` § *Sauvegardes automatique
 | `OCC_BACKUP_S3_FORCE_PATH_STYLE` | `true` (défaut) |
 | `OCC_BACKUP_CRON` | `15 0 * * *` (défaut) — **UTC** : 02:15 à Bruxelles en été, 01:15 en hiver, avant la synchronisation de 03:30 |
 | `OCC_BACKUP_KEEP` | `14` (défaut) — 14 sauvegardes automatiques gardées |
+| `OCC_BACKUP_DISABLED` | **absente en production** — `1` sur toute copie (préproduction, exercice de restauration) |
 
 Les quatre premières variables sont requises ensemble ; au démarrage elles sont copiées dans les réglages PocketBase
 (*Settings → Backups*). Sans elles, ce qui a été réglé dans `/_/` reste tel quel. Retirer les variables **ne
@@ -571,16 +572,18 @@ serveur** : clés limitées au bucket, pas d'accès public.
    ```
    (`<image>` : l'image de l'application, visible dans Coolify ou `docker ps -a`.)
    Ne pas copier de `data.db-wal` / `data.db-shm` d'un autre serveur : l'archive n'en contient pas.
-7. **Variables** : vérifier dans Coolify `OCC_DATA_KEY` (la même qu'à la sauvegarde), `OCC_PUBLIC_URL`, `OCC_BACKUP_*`,
-   puis *Start* / *Redeploy*. Les migrations plus récentes que l'archive s'appliquent au démarrage.
+7. **Variables** : vérifier dans Coolify `OCC_DATA_KEY` (la même qu'à la sauvegarde), `OCC_PUBLIC_URL`, `OCC_BACKUP_*`
+   — et que `OCC_BACKUP_DISABLED` est **absente** sur la production — puis *Start* / *Redeploy*. Les migrations plus récentes que l'archive s'appliquent au démarrage.
 8. **Vérifier** : `curl https://eat.fs0ciety.org/api/occ/health` ; se connecter avec un compte connu ; ouvrir une
    commande récente et un profil de remboursement (IBAN lisible = bonne `OCC_DATA_KEY`) ; *Admin → Sauvegardes →
    Vérifier la restauration*, puis *Sauvegarder maintenant*.
 
 **Exercice de restauration ailleurs (copie de test, préproduction)** : l'archive contient les réglages de sauvegarde
-(cron + bucket R2). Une copie démarrée ailleurs **enverrait ses propres sauvegardes dans le bucket de production** et sa
-rétention pourrait y supprimer des archives : dans `/_/` → *Settings → Backups*, **vider le cron et désactiver S3**
-immédiatement après le premier démarrage (ou couper l'accès réseau de la copie).
+(cron + bucket R2). Une copie démarrée sans précaution **enverrait ses propres sauvegardes dans le bucket de production**
+et sa rétention pourrait y supprimer des archives. **Définir `OCC_BACKUP_DISABLED=1` sur toute copie AVANT son premier
+démarrage** (et ne pas lui donner les `OCC_BACKUP_S3_*`) : au démarrage, la planification et la config S3 restaurées
+sont effacées, aucune sauvegarde ni vérification ne tourne, `/_/` refuse de les réactiver, et la carte *Sauvegardes*
+affiche « Sauvegardes désactivées sur cette instance ».
 
 Exercice réalisé le 2026-10-11 : sauvegarde réelle vers R2 (archive de 99 Ko), vérification automatique ✓,
 téléchargement depuis R2, nouveau serveur sur le `pb_data` restauré, connexion d'un utilisateur et commande

@@ -446,3 +446,95 @@ func TestBackupChecksRulesAreServerOnly(t *testing.T) {
 	e.expect(403, "GET", "/api/collections/backup_checks/records", boss.token, nil)
 	e.expect(403, "POST", "/api/collections/backup_checks/records", boss.token, map[string]any{"kind": "verify", "ok": true})
 }
+
+func TestBackupDisabledFromEnv(t *testing.T) {
+	for _, tc := range []struct {
+		v    string
+		want bool
+	}{{"", false}, {"0", false}, {"false", false}, {"1", true}, {"true", true}, {"oui", false}} {
+		bc := backupConfigFromEnv(func(k string) string {
+			return map[string]string{"OCC_BACKUP_DISABLED": tc.v, "OCC_BACKUP_S3_ENDPOINT": "https://x", "OCC_BACKUP_S3_BUCKET": "b",
+				"OCC_BACKUP_S3_ACCESS_KEY": "a", "OCC_BACKUP_S3_SECRET": "s"}[k]
+		})
+		if bc.Disabled != tc.want {
+			t.Fatalf("%q: %v", tc.v, bc.Disabled)
+		}
+	}
+	// the switch wins over the S3 variables and clears the restored settings
+	s := &core.Settings{}
+	s.Backups = core.BackupsConfig{Cron: DefaultBackupCron, CronMaxKeep: 14, S3: core.S3Config{Enabled: true, Bucket: "prod", Endpoint: "https://x", Region: "auto", AccessKey: "a", Secret: "s"}}
+	bc := BackupConfig{Disabled: true, Endpoint: "https://x", Bucket: "b", AccessKey: "a", Secret: "s", Cron: DefaultBackupCron, Keep: 14}
+	if !applyBackupSettings(s, bc) || s.Backups != (core.BackupsConfig{}) {
+		t.Fatalf("%+v", s.Backups)
+	}
+	if applyBackupSettings(s, bc) {
+		t.Fatal("second call must be a no-op")
+	}
+}
+
+// A restored copy started with OCC_BACKUP_DISABLED=1 never writes to (nor
+// prunes) the production bucket configured in the restored settings.
+func TestBackupDisabledRestoredCopy(t *testing.T) {
+	prod := newFakeS3(t, "occ-deliveries-backups")
+	prod.put("@auto_pb_backup_occ_deliveries_20261010001500.zip", []byte("archive de prod"), time.Now().Add(-24*time.Hour))
+	cfg := testConfig
+	cfg.Backup = BackupConfig{Disabled: true}
+	e, h := newBackupEnv(t, cfg, func(ta *tests.TestApp) {
+		// settings as restored from the production pb_data
+		s := ta.Settings()
+		s.Backups = core.BackupsConfig{Cron: DefaultBackupCron, CronMaxKeep: 1, S3: core.S3Config{
+			Enabled: true, Bucket: "occ-deliveries-backups", Region: "auto", Endpoint: prod.srv.URL,
+			AccessKey: "prod-access", Secret: "prod-secret", ForcePathStyle: true,
+		}}
+		if err := ta.Save(s); err != nil {
+			t.Fatal(err)
+		}
+	})
+	boss := e.admin("Boss")
+
+	if b := e.app.Settings().Backups; b != (core.BackupsConfig{}) {
+		t.Fatalf("restored backup settings must be cleared: %+v", b)
+	}
+	for _, j := range e.app.Cron().Jobs() {
+		if j.Id() == "__pbAutoBackup__" {
+			t.Fatal("PocketBase backup job must be removed")
+		}
+	}
+	st := e.expect(200, "GET", "/api/occ/admin/backups", boss.token, nil).m(t)
+	if st["disabledByEnv"] != true || st["health"] != "disabled" || st["configured"] != false || st["fromEnv"] != false || st["storage"] != "local" {
+		t.Fatalf("status: %v", st)
+	}
+	for _, u := range []string{"/api/occ/admin/backups/run", "/api/occ/admin/backups/verify"} {
+		r := e.expect(400, "POST", u, boss.token, nil)
+		if !strings.Contains(string(r.body), "désactivées sur cette instance") {
+			t.Fatalf("%s: %s", u, r.body)
+		}
+	}
+	h.backups.watch()
+
+	// /_/ cannot re-enable them
+	su := e.superuser()
+	r := e.expect(400, "PATCH", "/api/settings", su, map[string]any{"backups": map[string]any{"cron": "0 1 * * *", "cronMaxKeep": 3}})
+	if !strings.Contains(string(r.body), "OCC_BACKUP_DISABLED") {
+		t.Fatal(string(r.body))
+	}
+	e.expect(200, "PATCH", "/api/settings", su, map[string]any{"meta": map[string]any{"appName": "OCC copie"}})
+
+	// even if S3 comes back by another path, no backup is sent to it
+	s := e.app.Settings()
+	s.Backups.S3 = core.S3Config{Enabled: true, Bucket: "occ-deliveries-backups", Region: "auto", Endpoint: prod.srv.URL, AccessKey: "a", Secret: "s", ForcePathStyle: true}
+	if err := e.app.CreateBackup(t.Context(), "pb_backup_copie.zip"); err == nil {
+		t.Fatal("backup to S3 must be refused")
+	}
+	h.backups.wait()
+	if keys := prod.keys(); len(keys) != 1 || keys[0] != "@auto_pb_backup_occ_deliveries_20261010001500.zip" {
+		t.Fatalf("production bucket touched: %v", keys)
+	}
+	prod.mu.Lock()
+	defer prod.mu.Unlock()
+	for _, req := range prod.requests {
+		if !strings.HasPrefix(req, "GET ") && !strings.HasPrefix(req, "HEAD ") {
+			t.Fatalf("write request to the production bucket: %s", req)
+		}
+	}
+}

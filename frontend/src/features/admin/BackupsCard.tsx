@@ -100,6 +100,7 @@ function Verification({ check }: { check: BackupCheck | null }) {
 /** Carte « Sauvegardes » (présentation pure, testée). */
 export function BackupsCard({ status: s, onRun, onVerify, starting = null, now }: BackupsCardProps) {
   const running = s.running ?? starting
+  const off = s.disabledByEnv
   const lastRun = s.lastBackupRun
   return (
     <Card>
@@ -109,8 +110,8 @@ export function BackupsCard({ status: s, onRun, onVerify, starting = null, now }
             <DatabaseBackup className="size-5 text-brand" aria-hidden />
             Sauvegardes
           </h2>
-          <Badge variant={HEALTH_VARIANT[s.health]} dot>
-            {HEALTH_LABEL[s.health]}
+          <Badge variant={off ? 'neutral' : HEALTH_VARIANT[s.health]} dot>
+            {off ? 'Désactivées' : HEALTH_LABEL[s.health]}
           </Badge>
         </div>
 
@@ -123,7 +124,13 @@ export function BackupsCard({ status: s, onRun, onVerify, starting = null, now }
             </span>
           </p>
         )}
-        {s.health === 'disabled' && (
+        {off && (
+          <p role="status" className="rounded-md border border-border bg-fg/[0.04] p-3 text-sm">
+            <span className="font-semibold">Sauvegardes désactivées sur cette instance</span> (OCC_BACKUP_DISABLED) : copie restaurée
+            ou préproduction, aucune sauvegarde n'est envoyée vers le stockage de production.
+          </p>
+        )}
+        {!off && s.health === 'disabled' && (
           <p className="text-sm text-muted">
             Les sauvegardes automatiques ne sont pas configurées : définir les variables OCC_BACKUP_S3_* (Cloudflare R2) puis redéployer.
           </p>
@@ -171,10 +178,10 @@ export function BackupsCard({ status: s, onRun, onVerify, starting = null, now }
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button onClick={onRun} loading={running === 'backup'} disabled={running !== null}>
+          <Button onClick={onRun} loading={running === 'backup'} disabled={off || running !== null}>
             {running === 'backup' ? 'Sauvegarde en cours…' : 'Sauvegarder maintenant'}
           </Button>
-          <Button variant="secondary" onClick={onVerify} loading={running === 'verify'} disabled={running !== null || !s.lastBackup}>
+          <Button variant="secondary" onClick={onVerify} loading={running === 'verify'} disabled={off || running !== null || !s.lastBackup}>
             {running === 'verify' ? 'Vérification en cours…' : 'Vérifier la restauration'}
           </Button>
         </div>

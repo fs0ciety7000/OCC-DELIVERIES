@@ -1130,6 +1130,8 @@ export interface BackupStatus {
   configured: boolean
   /** Configuration lue dans OCC_BACKUP_S3_*. */
   fromEnv: boolean
+  /** `OCC_BACKUP_DISABLED` : copie restaurée / préproduction, aucune sauvegarde ni vérification (run/verify → 400). */
+  disabledByEnv: boolean
   storage: 's3' | 'local'
   bucket: string
   /** Cron 5 champs, évalué en **UTC**. */

@@ -90,7 +90,13 @@ var backupCountedTables = []struct{ name, label string }{
 	{colPayments, "paiements"},
 }
 
-var errBackupBusy = errors.New("backup busy")
+var (
+	errBackupBusy     = errors.New("backup busy")
+	errBackupDisabled = errors.New("backups disabled (OCC_BACKUP_DISABLED)")
+)
+
+// msgBackupDisabled is shown when OCC_BACKUP_DISABLED is set.
+const msgBackupDisabled = "Sauvegardes désactivées sur cette instance (OCC_BACKUP_DISABLED) : aucune sauvegarde ni vérification n'y est lancée."
 
 // BackupConfig is the backups configuration (OCC_BACKUP_*).
 type BackupConfig struct {
@@ -102,6 +108,11 @@ type BackupConfig struct {
 	ForcePathStyle bool   // OCC_BACKUP_S3_FORCE_PATH_STYLE (default true)
 	Cron           string // OCC_BACKUP_CRON, UTC (default DefaultBackupCron)
 	Keep           int    // OCC_BACKUP_KEEP (default 14)
+	// Disabled (OCC_BACKUP_DISABLED=1): restored copy / staging. At startup
+	// the backup schedule and S3 settings are cleared (they come with the
+	// restored pb_data and point to the production bucket), nothing runs and
+	// /_/ cannot re-enable them. Takes precedence over OCC_BACKUP_S3_*.
+	Disabled bool
 	// Now is the clock (tests); default time.Now.
 	Now func() time.Time
 }
@@ -128,6 +139,9 @@ func backupConfigFromEnv(lookup func(string) string) BackupConfig {
 		Cron:           get("OCC_BACKUP_CRON"),
 		Keep:           defaultBackupKeep,
 	}
+	if v, err := strconv.ParseBool(get("OCC_BACKUP_DISABLED")); err == nil {
+		bc.Disabled = v
+	}
 	if bc.Endpoint != "" && !strings.Contains(bc.Endpoint, "://") {
 		bc.Endpoint = "https://" + bc.Endpoint
 	}
@@ -150,8 +164,15 @@ func backupConfigFromEnv(lookup func(string) string) BackupConfig {
 
 // applyBackupSettings copies the env configuration into the PocketBase
 // backup settings. Returns whether something changed; nothing is touched
-// unless every S3 value is set.
+// unless every S3 value is set. Disabled clears the backup settings.
 func applyBackupSettings(s *core.Settings, bc BackupConfig) bool {
+	if bc.Disabled {
+		if s.Backups == (core.BackupsConfig{}) {
+			return false
+		}
+		s.Backups = core.BackupsConfig{}
+		return true
+	}
 	if !bc.Enabled() {
 		return false
 	}
@@ -193,7 +214,20 @@ func newBackupService(app core.App, cfg BackupConfig) *backupService {
 func (b *backupService) now() time.Time { return b.cfg.Now() }
 
 func (b *backupService) bind() {
+	if b.cfg.Disabled {
+		// a superuser cannot re-enable the schedule / S3 from /_/: the restored
+		// settings point to the production bucket (and its retention).
+		b.app.OnSettingsUpdateRequest().BindFunc(func(e *core.SettingsUpdateRequestEvent) error {
+			if e.NewSettings.Backups.Cron != "" || e.NewSettings.Backups.S3.Enabled {
+				return badRequest(msgBackupDisabled)
+			}
+			return e.Next()
+		})
+	}
 	b.app.OnBackupCreate().BindFunc(func(e *core.BackupEvent) error {
+		if b.cfg.Disabled && e.App.Settings().Backups.S3.Enabled {
+			return errors.New("backups to S3 are disabled on this instance (OCC_BACKUP_DISABLED)")
+		}
 		start := b.now()
 		err := e.Next()
 		manual := b.isManual(e.Name)
@@ -202,7 +236,7 @@ func (b *backupService) bind() {
 			trigger = backupTriggerManual // our button, or a backup made in /_/
 		}
 		b.recordBackup(e.App, e.Name, trigger, b.now().Sub(start), err)
-		if err == nil && !manual {
+		if err == nil && !manual && !b.cfg.Disabled {
 			// scheduled (or /_/) backup: verify it in the background
 			b.wg.Add(1)
 			go func() {
@@ -224,6 +258,18 @@ func (b *backupService) bind() {
 
 // applySettings runs at startup (OnServe).
 func (b *backupService) applySettings(app core.App) error {
+	if b.cfg.Disabled {
+		s := app.Settings()
+		if applyBackupSettings(s, b.cfg) {
+			if err := app.Save(s); err != nil {
+				return err
+			}
+			app.Logger().Warn("automatic backups DISABLED on this instance (OCC_BACKUP_DISABLED): backup schedule and S3 settings cleared")
+		} else {
+			app.Logger().Info("automatic backups disabled on this instance (OCC_BACKUP_DISABLED)")
+		}
+		return nil
+	}
 	if b.cfg.partial() {
 		app.Logger().Warn("automatic backups ignored: set OCC_BACKUP_S3_ENDPOINT, _BUCKET, _ACCESS_KEY and _SECRET")
 	}
@@ -285,6 +331,9 @@ func backupName(app core.App, t time.Time) string {
 // startBackup launches « Sauvegarder maintenant »: backup, retention, then
 // verification of the new archive. errBackupBusy when something runs.
 func (b *backupService) startBackup() error {
+	if b.cfg.Disabled {
+		return errBackupDisabled
+	}
 	if b.app.Store().Has(core.StoreKeyActiveBackup) || !b.acquire(backupRunBackup) {
 		return errBackupBusy
 	}
@@ -322,6 +371,9 @@ func (b *backupService) startBackup() error {
 
 // startVerify launches « Vérifier la restauration » in the background.
 func (b *backupService) startVerify() error {
+	if b.cfg.Disabled {
+		return errBackupDisabled
+	}
 	if !b.acquire(backupRunVerify) {
 		return errBackupBusy
 	}
@@ -737,7 +789,7 @@ func (b *backupService) health(latest *domain.BackupObject) domain.BackupHealth 
 // watch runs hourly: verifies the latest backup if nobody did, and sends
 // the « no backup for 36 h » alert (once per day).
 func (b *backupService) watch() {
-	if !backupsConfigured(b.app) {
+	if b.cfg.Disabled || !backupsConfigured(b.app) {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
