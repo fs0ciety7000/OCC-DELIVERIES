@@ -291,6 +291,32 @@ les superusers : après le mot de passe, `/_/` demande un **code à 6 chiffres**
   `OCC_SUPERUSER_MFA=false` → *Redeploy*, se connecter, corriger, remettre `true`.
 * Scripts qui demandent un jeton superuser (import `menusync`, § 8) : voir le flux en trois appels au § 8.
 
+## 3 nonies. Sécurité HTTP : vraie IP derrière Cloudflare, CSP, limites de connexion
+Rien à configurer pour la production actuelle (Cloudflare proxy → Traefik de Coolify → conteneur) :
+
+* **IP réelle** — le serveur ne croit `X-Forwarded-For` que du proxy qui le joint directement (Traefik, réseau Docker
+  privé : défaut `OCC_TRUSTED_PROXIES` = loopback + réseaux privés), puis `CF-Connecting-IP` **seulement** si ce saut est
+  une IP Cloudflare (plages embarquées, à jour au 2026-10-11 ; `OCC_TRUST_CLOUDFLARE=true` par défaut). Quelqu'un qui
+  contourne Cloudflare en visant l'IP du serveur est vu avec sa propre IP, en-têtes forgés ignorés. Le réglage PocketBase
+  *Settings → Trusted proxy* est forcé au démarrage sur `X-Occ-Client-Ip` (en-tête interne, réécrit à chaque requête) :
+  ne pas le modifier dans `/_/` (il serait rétabli au redémarrage). Vérifier : *Logs* `/_/` → une requête doit montrer
+  l'IP publique du visiteur (pas une `10.x` / `172.x`).
+  * Port 8090 publié directement (Compose avec `ports:`) et joignable depuis un réseau privé : restreindre
+    `OCC_TRUSTED_PROXIES` à l'IP exacte du proxy, ou `none` sans proxy.
+  * Si Cloudflare publie de nouvelles plages (https://www.cloudflare.com/ips/), mettre à jour `domain/security.go`
+    (en attendant, les visiteurs passant par une nouvelle plage partagent l'IP de l'edge pour les limites).
+* **Limites de connexion** (persistantes, survivent aux redéploiements) : 20 échecs / 15 min par IP, 8 tentatives /
+  15 min par identifiant (remis à zéro à la connexion réussie), e-mails « mot de passe oublié » / vérification 10 / 15 min
+  par IP et 3 / 15 min par compte → **429** « Trop de tentatives, réessaie dans N minutes. ». S'applique aussi à `/_/`.
+  Un blocage dure au plus 15 minutes (une nouvelle tentative est rendue toutes les 45 s / 112 s) ; un redéploiement
+  ne le lève pas (c'est voulu). Le compte reste joignable par Google ou passkey.
+* **CSP** — politique stricte (aucun script inline ni externe, voir ARCHITECTURE « Sécurité HTTP »). Les violations
+  sont signalées à `/api/occ/csp-report` et visibles dans *Logs* `/_/` (message « CSP violation »). **Soupape** : si une
+  page casse après un déploiement, définir `OCC_CSP_REPORT_ONLY=1` et redéployer (rien n'est plus bloqué, tout est
+  signalé), corriger, puis retirer la variable. HSTS (`max-age=31536000; includeSubDomains`) est envoyé dès
+  qu'`OCC_PUBLIC_URL` est en `https` (hors localhost) : `eat.fs0ciety.org` et ses éventuels sous-domaines restent
+  HTTPS-only pendant un an dans les navigateurs.
+
 ## 4. Gérer les restaurants
 
 **Panneau d'administration : `https://eat.fs0ciety.org/admin`** (en plus de l'admin

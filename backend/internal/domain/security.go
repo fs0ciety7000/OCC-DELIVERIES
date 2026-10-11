@@ -231,7 +231,7 @@ const AdminCSP = "frame-ancestors 'self'"
 // PermissionsPolicy denies the powerful features the app does not use;
 // geolocation (« près de moi »), Web Share, Wake Lock (« Présenter »),
 // clipboard and WebAuthn stay available to our own origin (default).
-const PermissionsPolicy = "accelerometer=(), bluetooth=(), browsing-topics=(), camera=(), display-capture=(), " +
+const PermissionsPolicy = "accelerometer=(), browsing-topics=(), camera=(), display-capture=(), " +
 	"geolocation=(self), gyroscope=(), hid=(), magnetometer=(), microphone=(), midi=(), payment=(), serial=(), usb=()"
 
 // HSTS is the Strict-Transport-Security value of HTTPS deployments.

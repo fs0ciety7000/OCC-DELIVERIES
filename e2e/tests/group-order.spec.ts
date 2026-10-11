@@ -48,6 +48,9 @@ const GLOBAL_ALLOW: RegExp[] = [
   /^\[requestfailed\] GET \S+\/api\/realtime net::ERR_ABORTED$/,
   // « Mes commandes en cours » (bandeau du shell, sur chaque page) annulée par une navigation immédiate.
   /^\[requestfailed\] GET \S+\/api\/collections\/parties\/records\?\S* net::ERR_ABORTED$/,
+  // Lectures du shell (restos proches, équipes, résumés…) et abonnement temps réel annulés par une navigation.
+  /^\[requestfailed\] GET \S+\/api\/occ\/\S+ net::ERR_ABORTED$/,
+  /^\[requestfailed\] POST \S+\/api\/realtime net::ERR_ABORTED$/,
   /^\[requestfailed\] GET https:\/\/(?!127\.0\.0\.1|localhost)[^/\s]+\/\S*\.(?:jpe?g|png|webp|gif)(?:\?\S*)? net::ERR_ABORTED$/,
 ]
 

@@ -73,6 +73,29 @@ docker compose up --build         # http://localhost:8090
 Les apprentissages importants (pièges PocketBase, décisions d'UX) sont ajoutés
 ci-dessous, du plus récent au plus ancien.
 
+* 2026-10-11 — **Sécurité : sauvegardes R2, en-têtes, limites persistantes, IBAN chiffrés, MFA superuser.**
+  - **Sauvegardes** (migration `1760000026`, `app/backup.go`, carte admin « Sauvegardes ») : sauvegardes PocketBase vers
+    R2 `occ-deliveries-backups` (clés S3 limitées à ce bucket) depuis `OCC_BACKUP_S3_*`, cron UTC `15 0 * * *`,
+    rétention 14 ; vérification de la dernière archive (téléchargée, `data.db` en `mode=ro`, `integrity_check`, tables,
+    comptages) après chaque sauvegarde ; > 36 h sans archive → alerte. `OCC_BACKUP_DISABLED=1` sur toute copie restaurée
+    (vide `Settings.Backups` avant le cron, bloque `/_/` et les sauvegardes S3 : la rétention PocketBase supprime des
+    archives même après un échec). Pièges : l'archive contient `_params` (clés R2, SMTP, OAuth) ; `@` → `%40` avec
+    `curl --aws-sigv4`. Exercice réel R2 vert.
+  - **En-têtes** (`domain/security.go`, `app/security.go`) : CSP stricte sans script inline (`/theme-init.js`,
+    `export-menu.js`), `/api/*` `default-src 'none'`, `/_/` seulement `frame-ancestors`, pas de CSP sur `/api/files/*`
+    (PocketBase n'y pose sa CSP sandbox que s'il n'y en a pas), HSTS en https, soupape `OCC_CSP_REPORT_ONLY=1`,
+    rapports `/api/occ/csp-report`. Chromium avertit pour `bluetooth` dans Permissions-Policy.
+  - **Limites persistantes** (migration `1760000023`, GCRA `occ_rate_limits`, clés hachées, un `INSERT … ON CONFLICT …
+    RETURNING`) ; connexion 20 échecs / 15 min / IP, 8 / identifiant, e-mails 3 / compte (204 muet). Piège : `RealIP()`
+    de PocketBase croit les en-têtes configurés de n'importe qui → IP résolue saut par saut (`ProxyTrust`,
+    `CF-Connecting-IP` seulement depuis une IP Cloudflare) puis `X-Occ-Client-Ip`, seul en-tête de confiance.
+  - **IBAN chiffrés** (migration `1760000024`, `internal/secretbox`, `app/payoutcrypto.go`, ADR 0003 maj 5) :
+    `holder_name|iban|bic` en AES-256-GCM sous `OCC_DATA_KEY` (`enc:v1:<kid>:…`, AAD colonne + titulaire), déchiffrés
+    pour le titulaire (`OnRecordEnrich`) et côté serveur via `openPayout` ; scellés dans `OnRecord*Execute` après
+    validation. Rotation `OCC_DATA_KEY_OLD` + `/pb/occ payouts-reencrypt`. Sans clé : clair + avertissement.
+  - **MFA superuser** (`app/superusermfa.go`) : OTP e-mail activé au démarrage si SMTP ; PocketBase force MFA dès qu'OTP
+    est actif. `/_/` et `/api/collections/_superusers` derrière Cloudflare Access. Binaire de l'image : `/pb/occ`.
+  - E2E : requêtes `GET /api/occ/*` et `POST /api/realtime` annulées par une navigation ajoutées au bruit légitime.
 * 2026-10-10 — **Signature « OCC Interactive — une division de CARDOR Media »** (remplace OCC MONS Studios : pied de
   page, e-mails) avec les **emblèmes animés** de la charte CARDOR (dépôt `fs0ciety7000/mons-corp`,
   `src/lib/brand/emblem-motion.ts`) : Dragon (`public/brand/interactive.svg`) = « boot » glitch au premier affichage puis

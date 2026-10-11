@@ -47,7 +47,8 @@ backend/
     geo.go                   haversine
     contact.go               téléphones (E.164, affichage) et adresses (« Rue X 12, 7000 Mons ») des restaurants
     team.go                  équipes (codes 8 car., noms, heure/jours habituels, rôles) et invités (prénom, e-mail réservé, inactivité)
-    ratelimit.go             limiteur en mémoire à fenêtre glissante (création d'invités par IP)
+    ratelimit.go             limites de débit : GCRA pur (`domain.Limit.Step`), message 429 « réessaie dans N minutes »
+    security.go              IP client derrière proxy / Cloudflare (`ProxyTrust`), CSP, Permissions-Policy, hachage des scripts inline
     deadline.go              heures limites : rappels / clôtures automatiques (planification pure, idempotente)
   internal/notify/           notifications Web Push : messages français + liens, préférences, envoi (pool de workers, VAPID) + tests
   internal/providers/        adaptateurs Uber Eats / Takeaway / Deliveroo / weloveat / manuel + tests
@@ -160,9 +161,9 @@ ou `OCC_ADMINS` passent `admin` ; un compte créé plus tard avec un de ces e-ma
 * **Jeton** — `record.NewStaticAuthToken(30 j)` (`domain.GuestTokenDays`). `auth-refresh` d'un·e invité·e renvoie un
   **nouveau** jeton statique de 30 jours (fenêtre glissante tant qu'il ou elle utilise l'app) ; sans activité, le
   jeton expire.
-* **Limite de débit** — en mémoire par IP (`domain.RateLimiter`, fenêtre glissante) : **10 créations / heure**
-  (les tentatives à code invalide comptent : pas de force brute), aperçu `GET /api/occ/invites/{code}` 60 / minute.
-  Dépassement → **429** « Trop de tentatives… ». (Mémoire du processus : remise à zéro au redémarrage.)
+* **Limite de débit** — persistante par IP (table `occ_rate_limits`, voir « Sécurité HTTP et limites de débit ») :
+  **10 créations / heure** (les tentatives à code invalide comptent : pas de force brute), aperçu
+  `GET /api/occ/invites/{code}` 60 / minute. Dépassement → **429** « Trop de tentatives… » + `Retry-After`.
 * **Ce qu'un·e invité·e peut faire** : voir la commande, voter, commander, se déclarer prêt·e, payer sa part (QR EPC,
   liens), rejoindre une équipe et en un geste ses commandes, changer son prénom / sa couleur, supprimer son compte.
 * **Interdits (rule + hook / garde)** : créer une commande (`parties.createRule … && @request.auth.is_guest = false`
@@ -834,6 +835,59 @@ réseau, action refusée par le serveur (4xx) abandonnée avec un toast. Les act
 paiements, heures limites…) sont désactivées hors ligne (« Indisponible hors ligne »). TanStack Query :
 `networkMode: 'offlineFirst'` (requêtes), `'always'` (mutations, la file décide).
 
+### Sécurité HTTP et limites de débit (`app/security.go`, `app/ratelimit.go`, `app/auththrottle.go`, migration `1760000023`)
+* **IP client** (`domain.ProxyTrust.ClientIP`) — en-têtes crus saut par saut, depuis la droite : le pair TCP n'est
+  dépassé que s'il est un **proxy de confiance** (`OCC_TRUSTED_PROXIES`, défaut : loopback + réseaux privés = Traefik de
+  Coolify) ; on lit alors l'entrée de droite de `X-Forwarded-For` ; si ce saut est une **IP Cloudflare** (plages publiées,
+  embarquées, `OCC_TRUST_CLOUDFLARE`), `CF-Connecting-IP` donne le client. Un client qui joint l'origine sans Cloudflare
+  (ou le serveur directement) ne peut donc pas usurper une IP avec ces en-têtes. Le résultat est écrit dans
+  `X-Occ-Client-Ip` (toute valeur reçue est écrasée) et c'est le **seul** en-tête de confiance des réglages PocketBase
+  (`trustedProxy.headers`, réappliqué au démarrage) : `RealIP()` (journaux, limiteur intégré, alertes de connexion) et nos
+  limites voient la même IP.
+* **Limites de débit persistantes** — table SQL simple `occ_rate_limits(key, tat, ok)` (pas une collection : aucune API,
+  aucune rule), une ligne par clé = nom du limiteur + SHA-256 tronqué de l'IP / identité (jamais la valeur brute).
+  Algorithme **GCRA** (`domain.Limit`) : rafale de N, puis une tentative toutes les fenêtre/N ; une seule requête atomique
+  `INSERT … ON CONFLICT DO UPDATE … RETURNING` ; refus → **429** + `Retry-After` (secondes). Survit aux redémarrages ;
+  purge cron `occRateLimitCleanup` (`*/15 * * * *`). Erreur base → requête laissée passer (journalisée).
+
+  | limite | clé | valeur |
+  |---|---|---|
+  | création d'invité (`POST /guest`) | IP | 10 / h |
+  | aperçu d'invitation (`GET /invites/{code}`) | IP | 60 / min |
+  | passkey (`POST /passkeys/login/begin`) | IP | 30 / min |
+  | « ajoute ton IBAN » (`POST /parties/{id}/payout-request`) | party + destinataire | 1 / 10 min |
+  | rapports CSP | IP | 20 / min (au-delà : ignorés, 204) |
+  | `auth-with-password`, `auth-with-otp` (toutes collections auth, `_superusers` compris) | IP | 20 / 15 min — vérifiée **avant** la lecture du corps ; une connexion réussie **rend** la tentative (bureau derrière une IP) |
+  | `auth-with-password` | collection + identité (minuscules, espaces retirés) | 8 / 15 min — **remise à zéro** à la connexion réussie (MFA en attente comprise) |
+  | `auth-with-otp` | enregistrement | 8 / 15 min |
+  | `request-password-reset`, `request-verification`, `request-otp`, `request-email-change` | IP | 10 / 15 min |
+  | `request-password-reset`, `request-verification` | compte | 3 / 15 min — au-delà **204 sans e-mail** (pas d'énumération) |
+  | `request-email-change` | compte | 3 / 15 min (429) |
+
+  Message des limites de connexion : **« Trop de tentatives, réessaie dans N minutes. »** (`domain.TooManyAttemptsMessage`).
+* **En-têtes** (middleware après celui de PocketBase) — partout : `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (géolocalisation `self` pour « près de moi » ;
+  caméra, micro, paiement, USB… refusés ; Web Share, Wake Lock, presse-papiers, WebAuthn par défaut `self`),
+  `X-XSS-Protection: 0`, `Strict-Transport-Security: max-age=31536000; includeSubDomains` si `OCC_PUBLIC_URL` est en
+  `https` hors localhost (jamais pour une requête `localhost`). `Cross-Origin-Opener-Policy: same-origin` de PocketBase
+  conservé (popup OAuth Google + realtime : inchangés).
+  * **SPA** (`/*`) : CSP ci-dessous, `X-Frame-Options: DENY`, `Cross-Origin-Resource-Policy: same-site` ;
+    `/sw.js` : même CSP avec `connect-src … https:` (le service worker met en cache les couvertures distantes) ;
+  * **API** (`/api/*`) : `default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`, `DENY`,
+    CORP `same-site` ; **fichiers** `/api/files/*` : CSP *sandbox* de PocketBase (posée seulement si absente) ;
+  * **admin PocketBase** (`/_/`) : pas de CSP stricte (besoins propres), seulement `frame-ancestors 'self'` +
+    `X-Frame-Options: SAMEORIGIN`.
+  * CSP de la SPA (prod) :
+    `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self'; connect-src 'self' https://nominatim.openstreetmap.org; worker-src 'self'; manifest-src 'self'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests; report-uri /api/occ/csp-report`
+    — aucun script inline : le thème est appliqué par `/theme-init.js` (script classique bloquant dans `<head>`, précaché),
+    la page `/outils/export-menu.html` charge `/outils/export-menu.js`. Si un script inline réapparaît dans `index.html`,
+    son empreinte `sha256-…` est ajoutée automatiquement au démarrage (lecture de `OCC_PUBLIC_DIR/index.html`).
+    `style-src 'unsafe-inline'` : attributs `style` / `<style>` de motion et sonner. `img-src https:` : `cover_url` des
+    restaurants. Nominatim : géocodage du formulaire admin. Le favori « Exporter vers OCC » s'exécute sur la page du
+    site tiers (notre CSP ne s'y applique pas) et n'appelle pas notre API.
+  * `OCC_CSP_REPORT_ONLY=1` → `Content-Security-Policy-Report-Only` (soupape : rien n'est bloqué, tout est signalé à
+    `/api/occ/csp-report` ; `upgrade-insecure-requests` omis, ignoré dans ce mode).
+
 ## 4. Cycle de vie d'une party (state machine)
 
 ```
@@ -863,6 +917,7 @@ PocketBase `{ "status": 400, "message": "…", "data": {} }`, messages en franç
 | méthode & route | auth | corps / query | réponse |
 |---|---|---|---|
 | `GET /api/occ/health` | — | | `{ "status": "ok", "version": "x.y.z" }` |
+| `POST /api/occ/csp-report` | — | rapport CSP (`application/csp-report` ou `application/reports+json`, ≤ 16 Ko) | **204** toujours — violation journalisée (*Logs* `/_/`, « CSP violation ») ; 20 / min / IP, le reste ignoré |
 | `GET /api/occ/config` | — | | `{ "currency":"EUR", "defaultLocation":{lat,lng,label}, "providers":[{id,name,color,enabled}], "minMenuItems": 10, "mailEnabled": true, "passkeys": true }` (`minMenuItems` = seuil des cartes incomplètes, 0 = aucun ; `mailEnabled` = SMTP configuré : vérification, mot de passe oublié, changement d'adresse disponibles ; `passkeys` = connexion par passkey configurée) |
 | `GET /api/occ/restaurants/nearby` | — | `lat,lng,radiusKm(=5),q,cuisine` | `{ "items": [Restaurant & { "distanceKm": number }] }` triés par distance ; les positions approximatives (`geo_approx`) après les autres ; restaurants actifs uniquement, **sans les cartes incomplètes** (`items_count < minMenuItems` quand le seuil > 0) |
 | `GET /api/occ/search` | — (collègues : ✔) | `q` (≤ 200 car.), `limit` (par groupe, 1–20, défaut 6), `lat`, `lng` (facultatifs, distances) | `SearchResult` (ci-dessous) — restos et plats publics (mêmes règles de visibilité que `/nearby`) ; `people` toujours `[]` sans connexion ; **400** requête trop longue |
@@ -876,7 +931,7 @@ PocketBase `{ "status": 400, "message": "…", "data": {} }`, messages en franç
 | `POST /api/occ/parties/{id}/dispatch` | hôte | `{ "method": "ubereats"\|"takeaway"\|"deliveroo"\|"weloveat"\|"export"\|"phone" }` (plateforme désactivée par `OCC_PROVIDERS` → 400) | `{ "party": Party, "dispatch": Dispatch }` (status review/paying) |
 | `POST /api/occ/parties/{id}/payer` | hôte | `{ "payer": userId, "collectMode"?: "transfer"\|"cash" }` (défaut `transfer`) | `{ "party": Party, "payments": Payment[] }` (review → paying ; en paying : recalcule si aucun paiement tiers confirmé — c'est aussi la façon de changer de mode) ; pose `parties.collect_mode` ; **409** si `transfer` et que le payeur n'a aucun moyen de remboursement alors qu'un·e autre membre a commandé : `{ "status": 409, "message": "…", "data": { "payer": { "code": "payer_no_payout", "message": "…" } } }` — message « Ajoute ton IBAN (ou Revolut / PayPal) dans ton profil avant de valider la commande. » si l'hôte se désigne lui-même, sinon « <Prénom> n'a encore renseigné aucun moyen de remboursement. » ; **400** mode inconnu |
 | `GET /api/occ/parties/{id}/payout-readiness` | membre | | `{ "members": [{ "user": id, "guest": bool, "payout": { "ready": bool, "iban": bool, "links": ["revolut"\|"paypal"\|"link"] } }], "readyCount": n, "total": n }` — qui peut être remboursé par virement / lien ; **booléens uniquement** (jamais l'IBAN ni les identifiants) ; 403 non-membre |
-| `POST /api/occ/parties/{id}/payout-request` | membre | `{ "user": userId }` | `{ "sent": true }` — « Lui demander d'ajouter son IBAN » : notification `payout_request` (push catégorie `payments` + toast in-app) ; **400** soi-même, non-membre, invité·e, déjà un moyen, party terminée ; **429** déjà demandé à cette personne pour cette party il y a moins de 10 min (limite en mémoire, tous demandeurs confondus) |
+| `POST /api/occ/parties/{id}/payout-request` | membre | `{ "user": userId }` | `{ "sent": true }` — « Lui demander d'ajouter son IBAN » : notification `payout_request` (push catégorie `payments` + toast in-app) ; **400** soi-même, non-membre, invité·e, déjà un moyen, party terminée ; **429** déjà demandé à cette personne pour cette party il y a moins de 10 min (limite persistante, tous demandeurs confondus ; `Retry-After`) |
 | `GET /api/occ/parties/{id}/export` | membre | `format=csv\|txt\|json` | fichier (`Content-Disposition: attachment`) |
 | `GET /api/occ/parties/{id}/reorder` | membre | | `ReorderPreview` (ci-dessous) : ma dernière commande dans le restaurant de la party (`source: null` si aucune) |
 | `POST /api/occ/parties/{id}/reorder` | membre | | `{ "added": [{ name, quantity }], "skipped": [{ name, reason }] }` — status `ordering` (sinon 400) ; ajoute à **mon** panier les lignes encore valides de ma dernière commande ici (prix recalculés serveur, `ready` remis à false) ; **404** sans commande précédente |
@@ -1382,3 +1437,6 @@ proche à la même adresse. Voir `docs/DEPLOYMENT.md`.
 | `OCC_BACKUP_CRON` | `15 0 * * *` | planification des sauvegardes, cron 5 champs en **UTC** (00:15 UTC = 02:15 Bruxelles en été, 01:15 en hiver) ; invalide = défaut |
 | `OCC_BACKUP_KEEP` | `14` | nombre de sauvegardes automatiques gardées (1–1000) |
 | `OCC_BACKUP_DISABLED` | `false` | `1` / `true` = **interrupteur de sécurité** pour une copie restaurée ou une préproduction : au démarrage, la planification et la config S3 des sauvegardes (restaurées avec `pb_data`, donc pointant vers le bucket de production) sont **effacées**, aucune vérification ni alerte ne tourne, `POST /admin/backups/run` et `/verify` → **400**, `/_/` refuse de réactiver cron ou S3 (400) et toute sauvegarde vers S3 est refusée. Prioritaire sur `OCC_BACKUP_S3_*` ; à ne **jamais** définir en production |
+| `OCC_CSP_REPORT_ONLY` | `false` | `1` / `true` = CSP en *Report-Only* (soupape de sécurité : violations seulement journalisées via `/api/occ/csp-report`) |
+| `OCC_TRUSTED_PROXIES` | loopback + réseaux privés (`127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, ::1, fc00::/7`) | proxys inverses qui joignent directement le serveur (plages CIDR ou IP, virgules) : seul leur `X-Forwarded-For` est cru ; `none` = aucun (serveur exposé directement). Invalide = démarrage refusé |
+| `OCC_TRUST_CLOUDFLARE` | `true` | lit `CF-Connecting-IP` quand le saut vu par le proxy est une IP Cloudflare (plages embarquées) ; `false` = jamais |
