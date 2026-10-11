@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/pocketbase/pocketbase/apis"
@@ -14,7 +15,7 @@ import (
 )
 
 // /api/occ/admin/backups* (admin): state of the automatic backups, manual
-// backup, restore verification. Never returns a credential.
+// backup, restore verification, restore. Never returns a credential.
 
 const maxBackupsListed = 30
 
@@ -66,6 +67,7 @@ func (h *handlers) backupRoutes(admin *router.RouterGroup[*core.RequestEvent]) {
 	admin.GET("/backups", h.adminBackups)
 	admin.POST("/backups/run", h.adminBackupRun)
 	admin.POST("/backups/verify", h.adminBackupVerify)
+	admin.POST("/backups/restore", h.adminBackupRestore)
 }
 
 func checkView(r *core.Record) *backupCheckView {
@@ -177,4 +179,60 @@ func (h *handlers) adminBackupVerify(e *core.RequestEvent) error {
 		return err
 	}
 	return e.JSON(http.StatusAccepted, map[string]any{"started": true, "running": backupRunVerify})
+}
+
+const (
+	msgRestoreKey     = "Indique la sauvegarde à restaurer (key)."
+	msgRestoreConfirm = "Confirme la restauration : confirm doit valoir « RESTAURER »."
+	msgRestoreUnknown = "Sauvegarde introuvable dans le stockage."
+)
+
+// adminBackupRestore replaces the whole database with an archive of the backup
+// storage: { "key": "@auto_pb_backup_….zip", "confirm": "RESTAURER" }. The
+// process restarts when it is done (requests fail for a few seconds).
+func (h *handlers) adminBackupRestore(e *core.RequestEvent) error {
+	var body struct {
+		Key     string `json:"key"`
+		Confirm string `json:"confirm"`
+	}
+	if err := e.BindBody(&body); err != nil {
+		return badRequest(msgRestoreKey)
+	}
+	key := strings.TrimSpace(body.Key)
+	if key == "" || strings.ContainsAny(key, "/\\") || !strings.HasSuffix(strings.ToLower(key), ".zip") {
+		return badRequest(msgRestoreKey)
+	}
+	if body.Confirm != "RESTAURER" {
+		return badRequest(msgRestoreConfirm)
+	}
+	if h.backups.cfg.Disabled {
+		return badRequest(msgBackupDisabled)
+	}
+	ctx, cancel := context.WithTimeout(e.Request.Context(), 20*time.Second)
+	objs, err := listBackups(ctx, e.App)
+	cancel()
+	if err != nil {
+		return apis.NewApiError(http.StatusBadGateway, "Stockage des sauvegardes injoignable : "+safeErr(err), nil)
+	}
+	found := false
+	for _, o := range objs {
+		if o.Key == key {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return apis.NewNotFoundError(msgRestoreUnknown, nil)
+	}
+	if err := h.backups.startRestore(key); err != nil {
+		if errors.Is(err, errBackupDisabled) {
+			return badRequest(msgBackupDisabled)
+		}
+		if errors.Is(err, errBackupBusy) {
+			return apis.NewApiError(http.StatusConflict, msgBackupBusy, nil)
+		}
+		return err
+	}
+	e.App.Logger().Warn("backup restore requested", "by", e.Auth.Id, "key", key)
+	return e.JSON(http.StatusAccepted, map[string]any{"started": true, "running": backupRunRestore, "key": key})
 }

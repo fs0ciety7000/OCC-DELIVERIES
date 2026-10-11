@@ -1139,7 +1139,7 @@ export interface BackupStatus {
   timezone: 'UTC'
   keep: number
   nextBackupAt: ISODate | null
-  running: 'backup' | 'verify' | null
+  running: 'backup' | 'verify' | 'restore' | null
   /** `stale` : aucune sauvegarde depuis `maxAgeHours` (badge danger, e-mail aux admins 1×/jour). */
   health: BackupHealth
   maxAgeHours: number

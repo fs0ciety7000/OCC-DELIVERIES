@@ -66,8 +66,9 @@ const (
 	backupTriggerManual = "manual"
 	backupTriggerBackup = "backup" // verification right after a backup
 
-	backupRunBackup = "backup"
-	backupRunVerify = "verify"
+	backupRunBackup  = "backup"
+	backupRunVerify  = "verify"
+	backupRunRestore = "restore"
 
 	maxBackupDownload = int64(8 << 30) // archive and extracted data.db
 	maxBackupChecks   = 300            // rows kept in backup_checks
@@ -202,13 +203,17 @@ type backupService struct {
 	manualName string // name of the manual backup in progress
 	manualSeen bool   // the OnBackupCreate hook recorded it
 	wg         sync.WaitGroup
+
+	// restoreFn replaces pb_data with an archive then restarts the process
+	// (core.App.RestoreBackup); replaced in tests, where a restart would exec.
+	restoreFn func(ctx context.Context, name string) error
 }
 
 func newBackupService(app core.App, cfg BackupConfig) *backupService {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
-	return &backupService{app: app, cfg: cfg, started: cfg.Now()}
+	return &backupService{app: app, cfg: cfg, started: cfg.Now(), restoreFn: app.RestoreBackup}
 }
 
 func (b *backupService) now() time.Time { return b.cfg.Now() }
@@ -385,6 +390,29 @@ func (b *backupService) startVerify() error {
 		defer cancel()
 		if _, err := b.verifyLocked(ctx, backupTriggerManual); err != nil {
 			b.app.Logger().Warn("backup verification failed", "error", err)
+		}
+	}()
+	return nil
+}
+
+// startRestore replaces pb_data with the archive `name` (from the backup
+// storage) in the background; PocketBase restarts the process when it is done,
+// so the lock is never released on success. errBackupBusy when something runs.
+func (b *backupService) startRestore(name string) error {
+	if b.cfg.Disabled {
+		return errBackupDisabled
+	}
+	if b.app.Store().Has(core.StoreKeyActiveBackup) || !b.acquire(backupRunRestore) {
+		return errBackupBusy
+	}
+	b.wg.Add(1)
+	go func() {
+		defer b.wg.Done()
+		ctx, cancel := context.WithTimeout(context.Background(), backupOpTimeout)
+		defer cancel()
+		if err := b.restoreFn(ctx, name); err != nil {
+			b.app.Logger().Error("backup restore failed", "name", name, "error", err)
+			b.release()
 		}
 	}()
 	return nil

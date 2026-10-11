@@ -73,6 +73,10 @@ docker compose up --build         # http://localhost:8090
 Les apprentissages importants (pièges PocketBase, décisions d'UX) sont ajoutés
 ci-dessous, du plus récent au plus ancien.
 
+* 2026-10-11 — **Restauration par l'API admin** (`POST /api/occ/admin/backups/restore`, ARCHITECTURE § routes) pour le hub
+  `services.fs0ciety.org` et les scripts `scripts/backups` du dépôt coolify : les superusers ont la MFA, l'automatisation passe
+  donc par un compte `admin`. Restauration en arrière-plan (`restoreFn` = `app.RestoreBackup`, remplacé dans les tests car le
+  redémarrage fait un `exec`), verrou `restore` gardé jusqu'au redémarrage, relâché en cas d'échec.
 * 2026-10-11 — **Sécurité : sauvegardes R2, en-têtes, limites persistantes, IBAN chiffrés, MFA superuser.**
   - **Sauvegardes** (migration `1760000026`, `app/backup.go`, carte admin « Sauvegardes ») : sauvegardes PocketBase vers
     R2 `occ-deliveries-backups` (clés S3 limitées à ce bucket) depuis `OCC_BACKUP_S3_*`, cron UTC `15 0 * * *`,

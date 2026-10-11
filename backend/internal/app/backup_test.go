@@ -3,7 +3,9 @@ package app
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"database/sql"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -537,4 +539,55 @@ func TestBackupDisabledRestoredCopy(t *testing.T) {
 			t.Fatalf("write request to the production bucket: %s", req)
 		}
 	}
+}
+
+func TestBackupRestoreRoute(t *testing.T) {
+	cfg := testConfig
+	cfg.Backup = BackupConfig{}
+	e, h := newBackupEnv(t, cfg, nil)
+	boss, alice := e.admin("Boss"), e.user("Alice")
+	restored := make(chan string, 2)
+	h.backups.restoreFn = func(_ context.Context, name string) error {
+		restored <- name
+		return nil
+	}
+
+	if err := e.app.CreateBackup(t.Context(), "pb_backup_manual.zip"); err != nil {
+		t.Fatal(err)
+	}
+	h.backups.wait()
+	ok := map[string]any{"key": "pb_backup_manual.zip", "confirm": "RESTAURER"}
+
+	e.expect(401, "POST", "/api/occ/admin/backups/restore", "", ok)
+	e.expect(403, "POST", "/api/occ/admin/backups/restore", alice.token, ok)
+	e.expect(400, "POST", "/api/occ/admin/backups/restore", boss.token, map[string]any{"confirm": "RESTAURER"})
+	e.expect(400, "POST", "/api/occ/admin/backups/restore", boss.token, map[string]any{"key": "../data.db", "confirm": "RESTAURER"})
+	e.expect(400, "POST", "/api/occ/admin/backups/restore", boss.token, map[string]any{"key": "pb_backup_manual.zip"})
+	e.expect(404, "POST", "/api/occ/admin/backups/restore", boss.token, map[string]any{"key": "absent.zip", "confirm": "RESTAURER"})
+
+	// busy → 409, nothing restored
+	if !h.backups.acquire(backupRunVerify) {
+		t.Fatal("acquire")
+	}
+	e.expect(409, "POST", "/api/occ/admin/backups/restore", boss.token, ok)
+	h.backups.release()
+
+	r := e.expect(202, "POST", "/api/occ/admin/backups/restore", boss.token, ok).m(t)
+	if r["running"] != "restore" || r["key"] != "pb_backup_manual.zip" {
+		t.Fatal(r)
+	}
+	h.backups.wait()
+	if got := <-restored; got != "pb_backup_manual.zip" {
+		t.Fatal(got)
+	}
+	// success: PocketBase restarts the process, the lock stays taken meanwhile
+	if op := h.backups.runningOp(); op != "restore" {
+		t.Fatalf("running: %q", op)
+	}
+	h.backups.release()
+
+	// a failed restore releases the lock
+	h.backups.restoreFn = func(context.Context, string) error { return errors.New("boom") }
+	e.expect(202, "POST", "/api/occ/admin/backups/restore", boss.token, ok)
+	waitBackupIdle(t, h)
 }
