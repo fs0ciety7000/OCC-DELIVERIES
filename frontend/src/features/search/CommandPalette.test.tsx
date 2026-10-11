@@ -164,8 +164,9 @@ describe('palette de recherche', () => {
     expect(screen.queryByRole('heading', { name: 'Ramona Petit' })).not.toBeInTheDocument()
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     await userEvent.keyboard('{Escape}')
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(trigger).toHaveFocus()
+    // La sortie est animée (AnimatePresence) : la boîte reste montée le temps de l'animation.
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await waitFor(() => expect(trigger).toHaveFocus())
   })
 
   it('« Lancer une commande » délègue au shell', async () => {
@@ -173,7 +174,7 @@ describe('palette de recherche', () => {
     act(() => openSearch())
     await userEvent.click(await screen.findByRole('option', { name: /Lancer une commande/ }))
     expect(onLaunch).toHaveBeenCalledOnce()
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
   it('état vide : aucun résultat + suggestions cliquables', async () => {

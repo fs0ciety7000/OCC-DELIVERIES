@@ -1,6 +1,6 @@
 import { ArrowLeft, Clock, CornerDownLeft, History, Plus, Search, ShieldCheck, Sparkles, Store, Users, UtensilsCrossed, X, type LucideIcon } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate } from 'react-router'
 import { Avatar, Badge, Button, Chip, Money, Skeleton, Spinner, type BadgeVariant } from '@/components/ui'
@@ -191,15 +191,27 @@ function PaletteDialog({ initial, onLaunch }: { initial: string; onLaunch: () =>
     }
   }
 
+  // Retour de la fiche collègue : le bouton focalisé disparaît avec elle ; le focus revient au champ
+  // dès le commit (pas à l'image suivante), sinon un 2e Échap rapide tombe hors de la palette.
+  const backFromPerson = useRef(false)
+  const closePerson = () => {
+    backFromPerson.current = true
+    setPerson(null)
+  }
+  useLayoutEffect(() => {
+    if (!person && backFromPerson.current) {
+      backFromPerson.current = false
+      inputRef.current?.focus()
+    }
+  }, [person])
+
   // Échap (fiche collègue → résultats → fermeture) et piège à focus
   const onDialogKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Escape') {
       e.preventDefault()
       e.stopPropagation()
-      if (person) {
-        setPerson(null)
-        requestAnimationFrame(() => inputRef.current?.focus())
-      } else closeSearch()
+      if (person) closePerson()
+      else closeSearch()
       return
     }
     if (e.key !== 'Tab' || !panelRef.current) return
@@ -300,7 +312,7 @@ function PaletteDialog({ initial, onLaunch }: { initial: string; onLaunch: () =>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2 md:px-3">
           {person ? (
-            <PersonCard person={person} terms={terms} onBack={() => setPerson(null)} onNavigate={closeSearch} />
+            <PersonCard person={person} terms={terms} onBack={closePerson} onNavigate={closeSearch} />
           ) : (
             <>
               {!searching && (
