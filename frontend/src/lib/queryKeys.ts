@@ -41,5 +41,6 @@ export const qk = {
     syncRun: (id: string) => ['admin', 'sync', 'run', id] as const,
     syncSources: ['admin', 'sync', 'sources'] as const,
     settings: ['admin', 'settings'] as const,
+    backups: ['admin', 'backups'] as const,
   },
 }

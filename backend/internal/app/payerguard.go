@@ -103,7 +103,7 @@ func (h *handlers) payoutReadiness(e *core.RequestEvent) error {
 			return err
 		}
 		for _, r := range recs {
-			profiles[r.GetString("user")] = r
+			profiles[r.GetString("user")] = openPayout(e.App, r) // IBAN checked mod-97 in plaintext
 		}
 	}
 	guests := map[string]bool{}
@@ -158,8 +158,8 @@ func (h *handlers) payoutRequest(e *core.RequestEvent) error {
 	if payoutAvailability(e.App, body.User).CanReceive() {
 		return badRequest(name + " a déjà renseigné un moyen de remboursement.")
 	}
-	if !h.payoutAsk.Allow(party.Id+":"+body.User, h.push.now()) {
-		return apis.NewTooManyRequestsError("Déjà demandé à "+name+" il y a moins de 10 minutes.", nil)
+	if ok, retry := h.payoutAsk.allow(e.App, party.Id+":"+body.User, h.push.now()); !ok {
+		return tooManyRequests(e, retry, "Déjà demandé à "+name+" il y a moins de 10 minutes.")
 	}
 	h.push.send([]string{body.User}, notify.PayoutRequest(partyInfo(party), userName(e.App, e.Auth.Id)))
 	return ok(e, map[string]any{"sent": true})

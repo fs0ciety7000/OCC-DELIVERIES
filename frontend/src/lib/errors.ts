@@ -11,10 +11,16 @@ export function errorMessage(err: unknown, fallback = 'Oups, quelque chose a coi
     if (err.status === 401) return msg || 'Connecte-toi pour continuer.'
     if (err.status === 403) return msg || "Tu n'as pas les droits pour faire ça."
     if (err.status === 404) return msg || 'Introuvable.'
+    if (err.status === 429) return msg || 'Trop de tentatives, réessaie dans quelques minutes.'
     return msg || fallback
   }
   if (err instanceof Error && err.message) return err.message
   return fallback
+}
+
+/** Limite de tentatives atteinte (429) : le serveur dit dans combien de minutes réessayer. */
+export function isRateLimited(err: unknown): boolean {
+  return err instanceof ClientResponseError && err.status === 429
 }
 
 export function isNotFound(err: unknown): boolean {

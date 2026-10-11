@@ -88,7 +88,7 @@ type passkeyService struct {
 	rp       domain.RelyingParty
 	err      error // invalid configuration → routes answer 503
 	sessions *domain.ChallengeStore[passkeySession]
-	login    *domain.RateLimiter
+	login    rateLimiter
 	now      func() time.Time
 }
 
@@ -101,7 +101,7 @@ func newPasskeyService(app core.App, cfg Config) *passkeyService {
 		rp:       rp,
 		err:      err,
 		sessions: domain.NewChallengeStore[passkeySession](passkeySessionTTL, passkeySessionsMax),
-		login:    domain.NewRateLimiter(passkeyLoginPerMin, time.Minute),
+		login:    newRateLimiter("passkey-login", passkeyLoginPerMin, time.Minute),
 		now:      time.Now,
 	}
 }
@@ -457,8 +457,8 @@ func (h *handlers) passkeyLoginBegin(e *core.RequestEvent) error {
 	if err != nil {
 		return err
 	}
-	if !h.passkeys.login.Allow(e.RealIP(), h.passkeys.now()) {
-		return errTooManyRequests()
+	if err := limitIP(e, h.passkeys.login, h.passkeys.now()); err != nil {
+		return err
 	}
 	var body struct {
 		Conditional bool `json:"conditional"`

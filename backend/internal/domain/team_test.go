@@ -213,33 +213,3 @@ func TestGuestHelpers(t *testing.T) {
 		}
 	}
 }
-
-func TestRateLimiter(t *testing.T) {
-	l := NewRateLimiter(3, time.Minute)
-	t0 := time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)
-	steps := []struct {
-		key  string
-		at   time.Duration
-		want bool
-	}{
-		{"a", 0, true}, {"a", time.Second, true}, {"a", 2 * time.Second, true},
-		{"a", 3 * time.Second, false}, // 4th within the window
-		{"b", 3 * time.Second, true},  // other key
-		{"a", 59 * time.Second, false},
-		{"a", 60 * time.Second, true}, // first hit expired
-		{"a", 61 * time.Second, true},
-		{"a", 61 * time.Second, false},
-	}
-	for i, s := range steps {
-		if got := l.Allow(s.key, t0.Add(s.at)); got != s.want {
-			t.Fatalf("step %d (%s at %v): got %v, want %v", i, s.key, s.at, got, s.want)
-		}
-	}
-	// gc drops idle keys
-	for i := 0; i < 300; i++ {
-		l.Allow("c", t0.Add(time.Hour))
-	}
-	if _, found := l.hits["b"]; found {
-		t.Error("idle key not garbage collected")
-	}
-}

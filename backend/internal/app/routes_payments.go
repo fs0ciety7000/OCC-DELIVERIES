@@ -242,12 +242,14 @@ type paymentQR struct {
 	Methods     []string             `json:"methods"`
 }
 
+// payoutProfile loads the user's payout profile with the bank fields in
+// plaintext (never send it as is to anyone but its owner).
 func payoutProfile(app core.App, userID string) *core.Record {
 	p, err := app.FindFirstRecordByData(colPayoutProfiles, "user", userID)
 	if err != nil {
 		return nil
 	}
-	return p
+	return openPayout(app, p) // plaintext copy (payoutcrypto.go)
 }
 
 // payoutData is the creditor's payout profile, loaded once and turned into

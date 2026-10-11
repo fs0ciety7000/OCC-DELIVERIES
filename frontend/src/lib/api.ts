@@ -2,6 +2,7 @@ import type { RecordModel } from 'pocketbase'
 import { pb } from './pb'
 import type {
   AdminSettings,
+  BackupStatus,
   AdminStats,
   AdminUserList,
   AdminUser,
@@ -263,6 +264,14 @@ export const adminApi = {
       body: JSON.stringify({ minMenuItems }),
       headers: { 'Content-Type': 'application/json' },
     }),
+
+  /* --- sauvegardes automatiques --- */
+
+  backups: () => pb.send<BackupStatus>('/api/occ/admin/backups', { method: 'GET' }),
+  /** « Sauvegarder maintenant » (202, en arrière-plan ; vérification de restauration ensuite). */
+  runBackup: () => pb.send<{ started: boolean; running: 'backup' }>('/api/occ/admin/backups/run', json({})),
+  /** « Vérifier la restauration » de la dernière sauvegarde (202, en arrière-plan). */
+  verifyBackup: () => pb.send<{ started: boolean; running: 'verify' }>('/api/occ/admin/backups/verify', json({})),
 
   /* --- catalogue (collections, rules « role = admin ») --- */
 

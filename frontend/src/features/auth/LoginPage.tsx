@@ -6,10 +6,11 @@ import { toast } from 'sonner'
 import { Button, Field, Input } from '@/components/ui'
 import { usersApi } from '@/lib/api'
 import { useAuth } from '@/lib/auth'
-import { errorMessage } from '@/lib/errors'
+import { errorMessage, isRateLimited } from '@/lib/errors'
 import { AuthLayout } from './AuthLayout'
 import { safeNext } from './safeNext'
 import { OAuthButtons } from './OAuthButtons'
+import { RateLimitNotice } from './RateLimitNotice'
 import { usePasskeyLogin } from './usePasskeyLogin'
 
 export function LoginPage() {
@@ -20,6 +21,7 @@ export function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [limited, setLimited] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   const done = () => {
@@ -48,13 +50,16 @@ export function LoginPage() {
         onSubmit={async (e) => {
           e.preventDefault()
           setError(null)
+          setLimited(null)
           setBusy(true)
           try {
             await usersApi.login(email.trim(), password)
             done()
           } catch (err) {
-            // 400 = identifiants refusés (message PocketBase en anglais) ; 403 = compte suspendu (message serveur)
-            setError(err instanceof ClientResponseError && err.status === 400 ? 'E-mail ou mot de passe incorrect.' : errorMessage(err, 'E-mail ou mot de passe incorrect.'))
+            // 400 = identifiants refusés (message PocketBase en anglais) ; 403 = compte suspendu (message serveur) ;
+            // 429 = trop de tentatives (par adresse IP ou par compte) : « réessaie dans N minutes »
+            if (isRateLimited(err)) setLimited(errorMessage(err))
+            else setError(err instanceof ClientResponseError && err.status === 400 ? 'E-mail ou mot de passe incorrect.' : errorMessage(err, 'E-mail ou mot de passe incorrect.'))
           } finally {
             setBusy(false)
           }
@@ -73,6 +78,7 @@ export function LoginPage() {
             </Link>
           </p>
         </div>
+        {limited && <RateLimitNotice message={limited} />}
         <Button type="submit" block size="lg" loading={busy}>
           Se connecter
         </Button>

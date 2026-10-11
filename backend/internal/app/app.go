@@ -17,6 +17,7 @@ import (
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/domain"
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/providers"
 	"github.com/fs0ciety7000/occ-deliveries/backend/internal/search"
+	"github.com/fs0ciety7000/occ-deliveries/backend/internal/secretbox"
 )
 
 // Collection names.
@@ -53,6 +54,20 @@ type Config struct {
 	Push PushConfig
 	// WebAuthn is the passkeys relying party (OCC_WEBAUTHN_*, passkeys.go).
 	WebAuthn WebAuthnConfig
+	// Security: HTTP security headers, CSP and client IP resolution behind
+	// proxies (OCC_CSP_REPORT_ONLY, OCC_TRUSTED_PROXIES, OCC_TRUST_CLOUDFLARE;
+	// security.go).
+	Security SecurityConfig
+	// Backup drives the automatic backups to S3 / R2 (OCC_BACKUP_*, backup.go).
+	Backup BackupConfig
+	// DataKeys encrypt payout data at rest (OCC_DATA_KEY, OCC_DATA_KEY_OLD;
+	// payoutcrypto.go). nil / no current key = plaintext.
+	DataKeys *secretbox.Keyring
+	// DataKeyErr: OCC_DATA_KEY* set but invalid → startup refused.
+	DataKeyErr error
+	// SuperuserMFA: password + e-mailed code for /_/ (OCC_SUPERUSER_MFA,
+	// superusermfa.go), applied only when SMTP is configured.
+	SuperuserMFA bool
 }
 
 // ConfigFromEnv reads the OCC_* environment variables.
@@ -68,6 +83,10 @@ func ConfigFromEnv(version string) Config {
 	authConfigFromEnv(&cfg)
 	cfg.Push = pushConfigFromEnv(cfg.Mail.From, cfg.PublicURL)
 	cfg.WebAuthn = webAuthnConfigFromEnv()
+	cfg.Security = securityConfigFromEnv(os.Getenv, cfg.PublicURL)
+	cfg.Backup = backupConfigFromEnv(os.Getenv)
+	cfg.DataKeys, cfg.DataKeyErr = dataKeysFromEnv(os.Getenv)
+	cfg.SuperuserMFA = superuserMFAFromEnv(os.Getenv)
 	cfg.AdminEmails = parseEmails(os.Getenv("OCC_ADMIN_EMAIL") + "," + os.Getenv("OCC_ADMINS"))
 	for _, p := range strings.Split(envOr("OCC_PROVIDERS", "ubereats,takeaway,deliveroo,weloveat"), ",") {
 		p = strings.ToLower(strings.TrimSpace(p))
@@ -121,7 +140,7 @@ func register(app core.App, cfg Config) *handlers {
 		cfg.Sync.DefaultLabel = cfg.DefaultLabel
 	}
 	h := &handlers{cfg: cfg, sync: newSyncer(app, cfg.Sync), push: newPushService(app, cfg.Push), guests: newGuestState(),
-		payoutAsk: domain.NewRateLimiter(1, payoutAskWindow)}
+		payoutAsk: newRateLimiter("payout-ask", 1, payoutAskWindow)}
 	h.sync.bind()
 	h.push.bind()
 	SetTeamNotifier(h.push)
@@ -138,13 +157,28 @@ func register(app core.App, cfg Config) *handlers {
 	bindTeamHooks(app) // after bindHooks: runs inside onPartyCreate
 	bindGuestHooks(app)
 	h.passkeys = newPasskeyService(app, cfg)
+	h.backups = newBackupService(app, cfg.Backup)
+	h.backups.bind()
 	bindPasskeyHooks(app)
+	bindPayoutCrypto(app, cfg.DataKeys)
 	search.Bind(app)
+	bindSecurity(app, cfg.Security) // headers, CSP, client IP (security.go)
+	bindAuthThrottle(app)           // password / OTP / e-mail brute force (auththrottle.go)
+	bindRateLimitCleanup(app)
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
 		if err := applyAuthSettings(se.App, cfg); err != nil {
 			return err
 		}
 		if err := promoteAdmins(se.App, cfg.AdminEmails); err != nil {
+			return err
+		}
+		if err := h.backups.applySettings(se.App); err != nil {
+			return err
+		}
+		if err := checkPayoutEncryption(se.App, cfg); err != nil {
+			return err
+		}
+		if err := applySuperuserMFA(se.App, cfg); err != nil {
 			return err
 		}
 		se.Router.Bind(bannedGuard())
@@ -159,10 +193,11 @@ type handlers struct {
 	sync      *syncer
 	push      *pushService
 	deadlines *deadlineScheduler
-	guests    *guestState         // rate limits of the guest endpoints
-	orderMail *orderMailer        // « bon de commande » e-mail (ordermail.go)
-	passkeys  *passkeyService     // WebAuthn sign-in (passkeys.go)
-	payoutAsk *domain.RateLimiter // « ajoute ton IBAN » requests (payerguard.go)
+	guests    *guestState     // rate limits of the guest endpoints
+	orderMail *orderMailer    // « bon de commande » e-mail (ordermail.go)
+	passkeys  *passkeyService // WebAuthn sign-in (passkeys.go)
+	backups   *backupService  // automatic backups + restore verification (backup.go)
+	payoutAsk rateLimiter     // « ajoute ton IBAN » requests (payerguard.go)
 }
 
 func (h *handlers) routes(r *router.Router[*core.RequestEvent]) {
@@ -223,6 +258,7 @@ func (h *handlers) routes(r *router.Router[*core.RequestEvent]) {
 	admin.POST("/sync/sources", h.adminSyncAddSource)
 	admin.GET("/settings", h.adminSettings)
 	admin.PATCH("/settings", h.adminSetSettings)
+	h.backupRoutes(admin)
 }
 
 // ---------------------------------------------------------------- helpers

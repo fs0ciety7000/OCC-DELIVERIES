@@ -5,11 +5,12 @@ import { Link, useParams, useSearchParams } from 'react-router'
 import { Button, buttonClass, Field, Input, Spinner } from '@/components/ui'
 import { usersApi } from '@/lib/api'
 import { logout, useAuth } from '@/lib/auth'
-import { errorMessage, hasFieldError } from '@/lib/errors'
+import { errorMessage, hasFieldError, isRateLimited } from '@/lib/errors'
 import { useConfig } from '@/lib/geo-context'
 import { AuthLayout } from './AuthLayout'
 import { pairError, type PasswordPair } from './password'
 import { PasswordFields } from './PasswordFields'
+import { RateLimitNotice } from './RateLimitNotice'
 
 /* Pages ouvertes depuis les e-mails (liens /auth/…/{TOKEN}) et « Mot de passe oublié ». */
 
@@ -48,6 +49,7 @@ export function ForgotPasswordPage() {
   const [busy, setBusy] = useState(false)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [limited, setLimited] = useState<string | null>(null)
   const mailOff = config.data && !config.data.mailEnabled
 
   return (
@@ -69,12 +71,14 @@ export function ForgotPasswordPage() {
           onSubmit={async (e) => {
             e.preventDefault()
             setError(null)
+            setLimited(null)
             setBusy(true)
             try {
               await usersApi.requestPasswordReset(email.trim())
               setSent(true)
             } catch (err) {
-              setError(errorMessage(err, "Impossible d'envoyer le lien pour le moment."))
+              if (isRateLimited(err)) setLimited(errorMessage(err))
+              else setError(errorMessage(err, "Impossible d'envoyer le lien pour le moment."))
             } finally {
               setBusy(false)
             }
@@ -83,6 +87,7 @@ export function ForgotPasswordPage() {
           <Field label="E-mail du compte" error={error}>
             {(p) => <Input {...p} type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="prenom@entreprise.be" />}
           </Field>
+          {limited && <RateLimitNotice message={limited} />}
           <Button type="submit" block size="lg" loading={busy}>
             Recevoir le lien
           </Button>

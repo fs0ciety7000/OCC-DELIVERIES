@@ -7,6 +7,7 @@ import { errorMessage } from '@/lib/errors'
 import { plural } from '@/lib/format'
 import { qk } from '@/lib/queryKeys'
 import { AdminHeader } from './AdminLayout'
+import { BackupsSection } from './BackupsCard'
 import { BarChart } from './BarChart'
 import { dayLabels, STATUS_LABEL, STATUS_VARIANT, STATUSES } from './labels'
 
@@ -98,6 +99,8 @@ export function DashboardPage() {
           </CardBody>
         </Card>
       </div>
+
+      <BackupsSection />
 
       <Card>
         <CardBody>

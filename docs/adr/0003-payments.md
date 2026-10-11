@@ -231,3 +231,40 @@ pouvaient le rembourser qu'en espèces.
 * Un payeur qui a commandé seul n'a besoin de rien (personne ne lui doit rien).
 * Les invité·es n'ont pas de profil : en `transfer` ils ne peuvent pas être
   payeurs (sauf commande seule) ; en `cash`, si.
+
+## Mise à jour 5 — 2026-10-11 : coordonnées bancaires chiffrées au repos
+
+### Contexte
+`payout_profiles` contient des IBAN, noms de titulaires et BIC en clair dans
+`data.db` — donc dans chaque sauvegarde (volume Coolify, S3 / R2). Une fuite de
+sauvegarde ou de disque suffisait à les lire.
+
+### Décision
+* `holder_name`, `iban`, `bic` sont scellés en **AES-256-GCM** (bibliothèque
+  standard Go, `internal/secretbox`) sous la clé `OCC_DATA_KEY` (32 octets
+  aléatoires, base64), nonce aléatoire de 96 bits, enveloppe versionnée
+  `enc:v1:<kid>:<base64url>` ; les données associées lient chaque valeur à sa
+  colonne et à son ou sa titulaire (un chiffré déplacé ne s'ouvre pas).
+* `revolut_tag`, `paypal_me`, `payment_link` restent en clair : identifiants
+  publics par nature (ils sont donnés à quiconque doit payer), sans numéro de
+  compte ; la garde du payeur continue de les lire sans clé.
+* Validation sur le clair, chiffrement juste avant l'écriture SQL, déchiffrement
+  seulement où il le faut : formulaire du ou de la titulaire, QR EPC
+  (`PaymentQR`, `CollectQR`), garde du payeur. Les superusers voient l'enveloppe.
+* **Rotation** : `kid` dans l'enveloppe ; `OCC_DATA_KEY_OLD` déchiffre seulement ;
+  rechiffrement à la lecture serveur, à l'écriture, au démarrage et par
+  `occ payouts-reencrypt`.
+* **Sans clé** : clair (historique) et avertissement bruyant en production, pas
+  d'arrêt — ne jamais bloquer les remboursements pour une variable oubliée. Clé
+  **invalide** : démarrage refusé (une faute de frappe ne doit pas passer
+  silencieusement en clair).
+
+### Conséquences
+* La clé est **indispensable pour restaurer** une sauvegarde : elle vit dans
+  Coolify *et* dans le gestionnaire de mots de passe, jamais à côté des sauvegardes.
+  Perdue = IBAN illisibles (chacun·e les ressaisit ; les liens Revolut / PayPal
+  restent utilisables).
+* Aucune recherche ni filtre par IBAN n'existe ni ne pourra exister sans index
+  dédié (HMAC) : non requis.
+* Le chiffrement protège les copies de la base, pas un serveur compromis en
+  fonctionnement (la clé est dans son environnement).

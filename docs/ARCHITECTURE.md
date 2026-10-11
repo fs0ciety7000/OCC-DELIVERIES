@@ -54,6 +54,8 @@ backend/
   internal/menusync/         lecture des flux restaurants + menus (Deliveroo, weloveat, sites), normalisation, fusion + tests
   internal/feedsync/         synchronisation : lecture des sources + réconciliation pure avec la base + tests
   internal/enrich/           enrichissement OpenStreetMap (Nominatim) : téléphone / adresse / position manquants + tests
+  internal/secretbox/        chiffrement au repos AES-256-GCM (enveloppe `enc:v1:<kid>:…`, trousseau de clés, rotation) + tests
+  internal/payoutvault/      application de secretbox aux colonnes bancaires de `payout_profiles` (balayage, rechiffrement)
   internal/search/           recherche globale : index SQLite FTS5 (restos, plats), pliage des accents, fautes de frappe, collègues + tests / benchmark
   cmd/menusync/              outil CLI `menusync` (binaire séparé, /pb/menusync dans l'image)
   cmd/vapid/                 `go run ./cmd/vapid` : génère une paire de clés VAPID (Web Push)
@@ -186,9 +188,9 @@ ou `OCC_ADMINS` passent `admin` ; un compte créé plus tard avec un de ces e-ma
 | champ | type | notes |
 |---|---|---|
 | user | R(users) unique, requis | |
-| holder_name | text | bénéficiaire du virement |
-| iban | text | validé mod-97, stocké sans espaces, majuscules |
-| bic | text | optionnel |
+| holder_name | text | bénéficiaire du virement — **chiffré au repos** |
+| iban | text | validé mod-97, stocké sans espaces, majuscules — **chiffré au repos** |
+| bic | text | optionnel — **chiffré au repos** |
 | revolut_tag | text (≤ 32) | revtag Revolut, minuscules sans `@` (saisie `@jdoe`, `revolut.me/jdoe`… acceptée) |
 | paypal_me | text (≤ 40) | nom PayPal.me (saisie `jdoe`, `paypal.me/jdoe`, `paypal.com/paypalme/jdoe` acceptée) |
 | payment_link | url | autre lien de paiement (Lydia/Sumeria, Wise Business…), `https://` ajouté si absent |
@@ -209,6 +211,36 @@ le titulaire ni les identifiants.
 Les anciens champs Wero / Bancontact Pay (`wero_id`, `bancontact_phone`, `wero_qr`, `bancontact_qr`)
 ont été **supprimés** par la migration `1760000021` (fichiers QR effacés du stockage) : un client qui
 les envoie encore les voit ignorés (ADR 0003, mise à jour 3).
+
+**Chiffrement au repos** (ADR 0003, mise à jour 5 ; `internal/secretbox`, `internal/payoutvault`,
+`app/payoutcrypto.go`, migration `1760000024`) — `holder_name`, `iban` et `bic` sont stockés sous la forme
+`enc:v1:<kid>:<base64url(nonce ‖ chiffré ‖ tag)>` : AES-256-GCM, nonce aléatoire de 96 bits, `kid` = 8 chiffres
+hexadécimaux de SHA-256 de la clé (identifie la clé, pas secret), données associées
+`payout_profiles.<champ>:<id utilisateur>` (un chiffré recopié dans une autre ligne ou colonne ne s'ouvre pas).
+`revolut_tag`, `paypal_me` et `payment_link` restent **en clair** : ce sont des identifiants faits pour être
+partagés (pages revolut.me / paypal.me publiques), sans numéro de compte, et la garde du payeur les lit sans clé.
+* **Écriture** (collection ou Go) : les valeurs chiffrées relues sont d'abord déchiffrées (hooks de requête et de
+  modèle, priorité −100), la validation / normalisation (mod-97, BIC, longueurs 70 / 34 / 11) porte sur le clair,
+  le chiffrement a lieu juste avant l'écriture SQL (`OnRecordCreateExecute` / `OnRecordUpdateExecute`), puis le
+  clair est remis en mémoire. Une valeur `enc:` envoyée par un client et illisible → **422** « Tes coordonnées
+  bancaires enregistrées sont illisibles… ».
+* **Lecture** : réponses de la collection (liste, vue, création, mise à jour, temps réel) déchiffrées
+  (`OnRecordEnrich`) **pour le ou la titulaire seulement** ; un superuser (`/_/`) voit l'enveloppe ; les autres
+  membres n'y ont pas accès (rules). Côté serveur, `openPayout` déchiffre une copie pour le QR EPC (`PaymentQR`,
+  `CollectQR`) et la garde du payeur (`payout-readiness`, `POST /payer`) ; aucun filtre ni recherche ne porte sur
+  ces colonnes.
+* **Clés** : `OCC_DATA_KEY` (base64 de 32 octets, `openssl rand -base64 32`) chiffre ; `OCC_DATA_KEY_OLD`
+  (liste séparée par des virgules) ne sert qu'à déchiffrer pendant une rotation. Une valeur scellée par une
+  ancienne clé (ou restée en clair) est rechiffrée avec la clé courante à la lecture serveur, à toute écriture,
+  au démarrage (balayage idempotent) et par `occ payouts-reencrypt` (commande ponctuelle ; `--decrypt` remet
+  tout en clair). Clé invalide → démarrage refusé (message sans la valeur).
+* **Sans clé** : stockage en clair (comportement historique) ; en production (`OCC_PUBLIC_URL` en `https`)
+  avertissement bruyant au démarrage, jamais d'arrêt. Lignes scellées par une clé absente : journal d'erreur au
+  démarrage, champs vidés pour le ou la titulaire (à ressaisir ; une mise à jour partielle → 422), IBAN compté
+  absent par la garde du payeur — personne n'est bloqué hors de l'app.
+* **Migration `1760000024`** : chiffre les lignes existantes si `OCC_DATA_KEY` est défini (idempotente, valeurs
+  `enc:` ignorées ; *down* = déchiffrement si les clés sont là). Sans clé elle ne fait rien : le balayage du
+  démarrage chiffrera dès que la clé apparaîtra.
 
 ### `restaurants` (lecture publique)
 | champ | type | notes |
@@ -349,6 +381,48 @@ seed (`1760000006`) : « Uber Eats (instantané connecteur) » (`ubereats-snapsh
 
 Rules : list/view `@request.auth.role = "admin"` ; écriture **serveur uniquement** (rules `nil`).
 Une exécution `running` trouvée au démarrage passe `failed` (« interrompue »).
+
+### `backup_checks` — journal des sauvegardes (migration `1760000026`, `app/backup.go`)
+| champ | type | notes |
+|---|---|---|
+| kind | select req | `backup` (une tentative de sauvegarde), `verify` (une vérification de restauration), `alert` (un e-mail « aucune sauvegarde depuis 36 h ») |
+| trigger | select | `cron` (planifiée / veille horaire), `manual` (bouton admin, ou sauvegarde faite dans `/_/`), `backup` (vérification lancée juste après une sauvegarde) |
+| ok | bool | |
+| backup_key | text | nom de l'archive (`@auto_pb_backup_occ_deliveries_20261011001500.zip`) |
+| backup_size | number int | octets (vérification) |
+| backup_modified | date | date de l'archive dans le stockage |
+| duration_ms | number int | |
+| integrity | text | `integrity_check: ok\nquick_check: ok` |
+| error | text | erreurs en français, une par ligne |
+| warnings | json | `string[]` (ex. « La sauvegarde contient 100 commandes contre 20 dans la base actuelle… ») |
+| counts | json | `BackupTableCount[]` : `{ name, label, backup, live }` pour `users`, `parties`, `restaurants`, `menu_items`, `order_items`, `payments` (`-1` = comptage impossible) |
+
+Rules : **toutes `nil`** (serveur seul, superusers dans `/_/`) ; les admins lisent par `GET /api/occ/admin/backups`.
+300 lignes gardées au plus.
+
+### Sauvegardes automatiques et vérification de restauration (`app/backup.go`, `domain/backup.go`)
+* **Planification** : sauvegardes intégrées de PocketBase (`Settings.Backups` : `cron`, `cronMaxKeep`, S3). Si
+  `OCC_BACKUP_S3_ENDPOINT`, `_BUCKET`, `_ACCESS_KEY` et `_SECRET` sont tous définis, ces réglages sont écrits au
+  démarrage (S3 = Cloudflare R2 en production, `forcePathStyle` par défaut) ; sinon rien n'est touché (réglages `/_/`).
+  Le cron des sauvegardes PocketBase est évalué en **UTC** (`15 0 * * *` = 02:15 à Bruxelles en été, 01:15 en hiver).
+  Archive = zip de `pb_data` (`data.db` copié par `VACUUM INTO`, `auxiliary.db`, `storage/`), sans `backups/` ni temporaires.
+* **Rétention** : PocketBase supprime les `@auto_pb_backup_*` au-delà de `cronMaxKeep` ; « Sauvegarder maintenant » utilise
+  le même préfixe et applique la même rétention (`domain.BackupsToPrune`) ; les archives d'un autre nom (faites à la main
+  dans `/_/`) ne sont jamais supprimées.
+* **Vérification de restauration** (après chaque sauvegarde, sur demande, et chaque heure si la dernière archive n'a jamais
+  été vérifiée) : la **dernière** archive (`domain.LatestBackup`) est téléchargée dans `pb_data/.pb_temp_to_delete/`,
+  seul `data.db` est extrait (aucun autre chemin écrit), ouvert en lecture seule (`mode=ro`) : `PRAGMA integrity_check` et
+  `PRAGMA quick_check` = `ok`, tables attendues présentes (`_collections`, `_params`, `_migrations`, `_superusers`, `users`,
+  `parties`, `restaurants`, `menu_items`, `order_items`, `payments`, `app_settings`), comptages plausibles face à la base
+  vivante (`domain.CheckBackupCounts` : **erreur** si la sauvegarde est vide alors que la base ne l'est pas, ou si la base a
+  ≥ 20 lignes et la sauvegarde moins de la moitié ; **avertissement** si la sauvegarde en a plus du double + 10). Taille
+  reçue = taille annoncée. Dossier temporaire supprimé à la fin. Résultat dans `backup_checks`.
+* **Alerte** : aucune archive de moins de 36 h (`domain.CheckBackupHealth`, « en attente » pendant les 36 premières heures
+  du processus s'il n'y en a aucune) → badge danger dans `/admin` et, si SMTP est configuré, e-mail aux admins actifs
+  (rôle `admin`, ni suspendus ni supprimés) **une fois par 24 h** au plus (`domain.ShouldSendBackupAlert`, ligne `alert`).
+  PocketBase prévient en plus les superusers de tout échec de sauvegarde planifiée.
+* Une restauration exige la **même `OCC_DATA_KEY`** que la base sauvegardée (coordonnées de remboursement chiffrées) :
+  voir `DEPLOYMENT.md` § « Restaurer une sauvegarde ».
 
 ### Synchronisation automatique (`internal/feedsync` + `internal/app/sync.go`)
 1. Sources activées triées par priorité, lues **une par une** par un seul `menusync.Fetcher`
@@ -857,6 +931,9 @@ PocketBase `{ "status": 400, "message": "…", "data": {} }`, messages en franç
 | `PATCH /api/occ/admin/settings` | admin | `{ "minMenuItems": 0–100 }` (entier ; 0 = tout afficher) | `AdminSettings` à jour ; 400 si absent, décimal ou hors bornes |
 | `POST /api/occ/admin/sync/run` | admin | facultatif : `{ "sourceId": id }` | **202** `{ "run": SyncRun }` (status `running`, exécution en arrière-plan) ; sans corps : toutes les sources activées ; avec `sourceId` : **cette source seule** (même désactivée, exécution « ciblée », voir §3) ; **404** source inconnue ; **409** si une exécution tourne (ciblée ou non) ; 400 si `OCC_SYNC_ENABLED=false` |
 | `POST /api/occ/admin/sync/discover` | admin | `{ "query": string }` (≤ 300 car.) : lien takeaway.com / just-eat (`…/menu/<slug>`), nom libre, ou adresse directe d'un site | `SyncDiscoverResult` (ci-dessous) — 10 à 20 s ; **400** requête vide / illisible / lien Takeaway sans `/menu/` ou `OCC_SYNC_ENABLED=false` ; **409** si une découverte tourne déjà (une à la fois) |
+| `GET /api/occ/admin/backups` | admin | | `BackupStatus` (ci-dessous) — liste les archives du stockage (≤ 30, plus récentes d'abord), dernière vérification, santé ; jamais d'identifiant S3 |
+| `POST /api/occ/admin/backups/run` | admin | | **202** `{ "started": true, "running": "backup" }` — « Sauvegarder maintenant » en arrière-plan (nom `@auto_pb_backup_…`, rétention appliquée), puis vérification de la nouvelle archive ; **409** si une sauvegarde / restauration / vérification est en cours |
+| `POST /api/occ/admin/backups/verify` | admin | | **202** `{ "started": true, "running": "verify" }` — « Vérifier la restauration » de la dernière archive, en arrière-plan ; **409** si occupé |
 | `POST /api/occ/admin/sync/sources` | admin | `{ "url": "https://www.site.be/", "label"?: string }` | **201** `{ "source": SyncSource, "created": true }` ; **200** `{ source, created: false }` si une source `takeaway-site` / `jsonld` lit déjà ce site (même hôte sans `www.`, même chemin : idempotent) ; 400 URL invalide ou takeaway.com. Crée `takeaway-site`, activée, ville `mons`, priorité = première libre entre 10 et 39 (39 si tout est pris), libellé = `label` ou l'hôte |
 
 « admin » = utilisateur `role = "admin"` **ou** superuser (401 sans auth, 403 sinon).
@@ -1172,6 +1249,21 @@ déjà liée au restaurant n'est prioritaire (priorité calculée sur toutes les
 ```
 `hiddenRestaurants` = restaurants **actifs** masqués des listes publiques par le seuil (0 si désactivé).
 
+### `BackupStatus` (`/admin/backups`)
+```json
+{ "configured": true, "fromEnv": true, "storage": "s3", "bucket": "occ-deliveries-backups",
+  "cron": "15 0 * * *", "timezone": "UTC", "keep": 14, "nextBackupAt": "2026-10-12T00:15:00Z",
+  "running": null, "health": "ok", "maxAgeHours": 36,
+  "lastBackup": { "key": "@auto_pb_backup_occ_deliveries_20261011001500.zip", "size": 101564, "modified": "2026-10-11T00:15:00Z" },
+  "backups": [ BackupFile ], "totalBackups": 14, "listError": "",
+  "lastVerification": BackupCheck | null, "lastBackupRun": BackupCheck | null, "lastAlertAt": "" }
+```
+`running` : `"backup"` \| `"verify"` \| `null` (sondé toutes les 3 s par l'UI pendant une opération) ; `health` :
+`ok`, `stale` (aucune archive de moins de `maxAgeHours`), `pending`, `disabled` (aucune planification) ; `storage` :
+`s3` ou `local` (`pb_data/backups`). `BackupCheck` = une ligne de `backup_checks` en camelCase
+(`{ id, kind, trigger, ok, backupKey, backupSize, backupModified, durationMs, integrity, error, warnings, counts, created }`).
+Dates ISO UTC.
+
 ### `AdminStats`
 ```json
 { "users": 42, "admins": 2, "restaurants": { "total": 13, "active": 12 }, "menuItems": 183,
@@ -1275,3 +1367,13 @@ proche à la même adresse. Voir `docs/DEPLOYMENT.md`.
 | `OCC_VAPID_SUBJECT` | `mailto:OCC_MAIL_FROM` | contact de l'expéditeur des notifications (`mailto:` ou `https://`) |
 | `OCC_WEBAUTHN_RP_ID` | hôte d'`OCC_PUBLIC_URL` | identifiant de la relying party des passkeys (domaine, sans schéma ni port ; prod : `eat.fs0ciety.org`). **Le changer rend inutilisables les passkeys déjà créées** |
 | `OCC_WEBAUTHN_ORIGINS` | origine d'`OCC_PUBLIC_URL` (+ ports localhost en dev) | origines exactes acceptées, séparées par des virgules (`https://…`, dans le domaine du RP) |
+| `OCC_DATA_KEY` | — | clé de chiffrement au repos des coordonnées bancaires (`payout_profiles` : `holder_name`, `iban`, `bic`) : base64 de 32 octets (`openssl rand -base64 32`). **Secret** ; absente = stockage en clair (avertissement en `https`) ; invalide = démarrage refusé. **Indispensable pour relire une sauvegarde** : à garder hors du serveur (gestionnaire de mots de passe) |
+| `OCC_DATA_KEY_OLD` | — | anciennes clés (virgules), **déchiffrement seulement**, le temps d'une rotation : nouvelle clé dans `OCC_DATA_KEY`, ancienne ici, redémarrer (ou `occ payouts-reencrypt`), puis retirer |
+| `OCC_SUPERUSER_MFA` | `true` | connexion à `/_/` = mot de passe **et** code à 6 chiffres reçu par e-mail (MFA + OTP PocketBase sur `_superusers`, code valable 5 min) ; appliqué au démarrage **seulement si le SMTP est configuré** (sinon rien ne change) ; `false` = désactivé |
+| `OCC_BACKUP_S3_ENDPOINT` | — | point d'accès S3 des sauvegardes (prod : `https://<CLOUDFLARE_ACCOUNT_ID>.r2.cloudflarestorage.com` ; `https://` ajouté s'il manque). Avec `_BUCKET`, `_ACCESS_KEY`, `_SECRET` (les quatre requis) : sauvegardes automatiques configurées au démarrage ; absentes = réglages `/_/` inchangés |
+| `OCC_BACKUP_S3_BUCKET` | — | bucket (prod : `occ-deliveries-backups`, R2 WEUR) |
+| `OCC_BACKUP_S3_REGION` | `auto` | région S3 (`auto` pour R2) |
+| `OCC_BACKUP_S3_ACCESS_KEY` / `OCC_BACKUP_S3_SECRET` | — | clé S3 limitée au bucket (jamais journalisée ni renvoyée par l'API ; stockée dans les réglages PocketBase de `pb_data`, donc **dans chaque sauvegarde**) |
+| `OCC_BACKUP_S3_FORCE_PATH_STYLE` | `true` | adresses `endpoint/bucket/clé` (requis par R2) |
+| `OCC_BACKUP_CRON` | `15 0 * * *` | planification des sauvegardes, cron 5 champs en **UTC** (00:15 UTC = 02:15 Bruxelles en été, 01:15 en hiver) ; invalide = défaut |
+| `OCC_BACKUP_KEEP` | `14` | nombre de sauvegardes automatiques gardées (1–1000) |

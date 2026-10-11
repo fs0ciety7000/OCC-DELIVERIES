@@ -870,8 +870,8 @@ func (h *handlers) partyTeam(e *core.RequestEvent) error {
 // link (party: 6 characters, team: 8) for the « Continuer en invité » page.
 // Rate limited per IP like the guest creation.
 func (h *handlers) invitePreview(e *core.RequestEvent) error {
-	if !h.guests.preview.Allow(e.RealIP(), time.Now()) {
-		return errTooManyRequests()
+	if err := limitIP(e, h.guests.preview, time.Now()); err != nil {
+		return err
 	}
 	code := domain.NormalizeCode(e.Request.PathValue("code"))
 	switch {

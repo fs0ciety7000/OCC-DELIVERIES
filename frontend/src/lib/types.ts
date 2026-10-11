@@ -1081,3 +1081,73 @@ export interface GuestAuthResponse {
   party: { id: string; title: string } | null
   team: { id: string; name: string } | null
 }
+
+/* --- sauvegardes automatiques (`/api/occ/admin/backups`) --- */
+
+/** Archive du stockage des sauvegardes (bucket R2 / S3 ou `pb_data/backups`). */
+export interface BackupFile {
+  key: string
+  /** Octets. */
+  size: number
+  modified: ISODate
+}
+
+/** Comptage d'une table : sauvegarde restaurée vs base actuelle. */
+export interface BackupTableCount {
+  name: string
+  /** Libellé français au pluriel (« utilisateurs »). */
+  label: string
+  /** `-1` = comptage impossible. */
+  backup: number
+  live: number
+}
+
+/** Ligne du journal `backup_checks` : sauvegarde, vérification de restauration ou alerte. */
+export interface BackupCheck {
+  id: string
+  kind: 'backup' | 'verify' | 'alert'
+  /** `backup` = vérification lancée juste après une sauvegarde. */
+  trigger: 'cron' | 'manual' | 'backup'
+  ok: boolean
+  backupKey: string
+  backupSize: number
+  backupModified: ISODate | ''
+  durationMs: number
+  /** « integrity_check: ok\nquick_check: ok » */
+  integrity: string
+  /** Erreurs (une par ligne), `''` si aucune. */
+  error: string
+  warnings: string[]
+  counts: BackupTableCount[]
+  created: ISODate
+}
+
+export type BackupHealth = 'ok' | 'stale' | 'pending' | 'disabled'
+
+/** `GET /api/occ/admin/backups` — jamais d'identifiant ni de secret. */
+export interface BackupStatus {
+  /** Planification définie (OCC_BACKUP_* ou admin PocketBase). */
+  configured: boolean
+  /** Configuration lue dans OCC_BACKUP_S3_*. */
+  fromEnv: boolean
+  storage: 's3' | 'local'
+  bucket: string
+  /** Cron 5 champs, évalué en **UTC**. */
+  cron: string
+  timezone: 'UTC'
+  keep: number
+  nextBackupAt: ISODate | null
+  running: 'backup' | 'verify' | null
+  /** `stale` : aucune sauvegarde depuis `maxAgeHours` (badge danger, e-mail aux admins 1×/jour). */
+  health: BackupHealth
+  maxAgeHours: number
+  lastBackup: BackupFile | null
+  /** Plus récentes d'abord (30 au plus). */
+  backups: BackupFile[]
+  totalBackups: number
+  /** Stockage injoignable (`''` sinon). */
+  listError: string
+  lastVerification: BackupCheck | null
+  lastBackupRun: BackupCheck | null
+  lastAlertAt: ISODate | ''
+}

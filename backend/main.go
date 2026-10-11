@@ -29,6 +29,8 @@ func main() {
 
 	cfg := app.ConfigFromEnv(version)
 	app.Register(pb, cfg)
+	// one-shot: seal payout data with OCC_DATA_KEY (rotation from OCC_DATA_KEY_OLD)
+	pb.RootCmd.AddCommand(app.NewPayoutsReencryptCommand(pb, os.Getenv))
 
 	pb.OnServe().BindFunc(func(se *core.ServeEvent) error {
 		if err := applySettings(se.App, cfg); err != nil {

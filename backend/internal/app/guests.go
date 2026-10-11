@@ -41,14 +41,14 @@ const (
 )
 
 type guestState struct {
-	create  *domain.RateLimiter
-	preview *domain.RateLimiter
+	create  rateLimiter
+	preview rateLimiter
 }
 
 func newGuestState() *guestState {
 	return &guestState{
-		create:  domain.NewRateLimiter(guestCreatePerHour, time.Hour),
-		preview: domain.NewRateLimiter(invitePreviewPerMin, time.Minute),
+		create:  newRateLimiter("guest-create", guestCreatePerHour, time.Hour),
+		preview: newRateLimiter("invite-preview", invitePreviewPerMin, time.Minute),
 	}
 }
 
@@ -56,7 +56,13 @@ func isGuestRecord(r *core.Record) bool {
 	return r != nil && r.Collection().Name == colUsers && r.GetBool(fieldIsGuest)
 }
 
-func errTooManyRequests() error { return apis.NewTooManyRequestsError(msgTooMany, nil) }
+// limitIP applies a per-IP rate limit; refused → 429 msgTooMany + Retry-After.
+func limitIP(e *core.RequestEvent, l rateLimiter, now time.Time) error {
+	if ok, retry := l.allow(e.App, clientIP(e), now); !ok {
+		return tooManyRequests(e, retry, msgTooMany)
+	}
+	return nil
+}
 
 type hookHandler = hook.Handler[*core.RequestEvent]
 
@@ -185,8 +191,8 @@ func (h *handlers) createGuest(e *core.RequestEvent) error {
 	if e.Auth != nil {
 		return badRequest("Tu es déjà connecté·e : rejoins directement avec le lien.")
 	}
-	if !h.guests.create.Allow(e.RealIP(), time.Now()) {
-		return errTooManyRequests()
+	if err := limitIP(e, h.guests.create, time.Now()); err != nil {
+		return err
 	}
 	var body struct {
 		Name      string `json:"name"`

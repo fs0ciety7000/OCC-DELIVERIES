@@ -125,4 +125,17 @@ describe('Connexion avec une passkey', () => {
     expect(beginSpy).not.toHaveBeenCalled()
     expect(screen.getByLabelText('E-mail')).toHaveAttribute('autocomplete', 'email')
   })
+
+  it('mot de passe : trop de tentatives (429) → délai du serveur, champ non invalidé', async () => {
+    stubWebAuthn(false)
+    vi.spyOn(occ, 'config').mockResolvedValue(config(false))
+    const message = 'Trop de tentatives, réessaie dans 2 minutes.'
+    vi.spyOn(usersApi, 'login').mockRejectedValue(new ClientResponseError({ status: 429, response: { status: 429, message, data: {} } }))
+    renderLogin()
+    await userEvent.type(screen.getByLabelText('E-mail'), 'ana@occ.be')
+    await userEvent.type(screen.getByLabelText('Mot de passe'), 'secret')
+    await userEvent.click(screen.getByRole('button', { name: 'Se connecter' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(message)
+    expect(screen.getByLabelText('Mot de passe')).not.toHaveAttribute('aria-invalid')
+  })
 })

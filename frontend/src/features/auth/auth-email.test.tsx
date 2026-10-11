@@ -108,6 +108,14 @@ describe('ForgotPasswordPage', () => {
     expect(await screen.findByRole('heading', { name: 'Regarde ta boîte mail' })).toBeInTheDocument()
   })
 
+  it('affiche le délai quand il y a trop de demandes (429)', async () => {
+    vi.spyOn(usersApi, 'requestPasswordReset').mockRejectedValue(pbError(429, {}, 'Trop de tentatives, réessaie dans 4 minutes.'))
+    renderAt('/auth/mot-de-passe-oublie?email=ana%40occ.be', '/auth/mot-de-passe-oublie', <ForgotPasswordPage />)
+    await userEvent.click(screen.getByRole('button', { name: 'Recevoir le lien' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Trop de tentatives, réessaie dans 4 minutes.')
+    expect(screen.getByLabelText('E-mail du compte')).not.toHaveAttribute('aria-invalid')
+  })
+
   it('prévient quand les e-mails sont désactivés', async () => {
     vi.spyOn(occ, 'config').mockResolvedValue(config(false))
     renderAt('/auth/mot-de-passe-oublie', '/auth/mot-de-passe-oublie', <ForgotPasswordPage />)

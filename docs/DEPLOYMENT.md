@@ -37,6 +37,8 @@ Enregistrement `A` (ou `CNAME`) `eat.fs0ciety.org` → IP du serveur Coolify.
 | `OCC_SMTP_HOST` / `OCC_SMTP_PORT` / `OCC_SMTP_USERNAME` / `OCC_SMTP_PASSWORD` | *(facultatif, secrets : e-mails, voir § 3 ter)* |
 | `OCC_MAIL_FROM` / `OCC_MAIL_FROM_NAME` | `noreply@fs0ciety.org` / `OCC Deliveries` |
 | `OCC_WEBAUTHN_RP_ID` / `OCC_WEBAUTHN_ORIGINS` | *(facultatif : passkeys, déduits d'`OCC_PUBLIC_URL` → `eat.fs0ciety.org`, voir § 3 sexies)* |
+| `OCC_DATA_KEY` | *(secret : `openssl rand -base64 32` — chiffre les IBAN au repos, **à garder aussi dans le gestionnaire de mots de passe**, voir § 3 septies)* |
+| `OCC_SUPERUSER_MFA` | `true` (défaut) — code par e-mail en plus du mot de passe pour `/_/` (voir § 3 octies) |
 
 7. *Deploy*. Activer *Auto deploy* (webhook GitHub) pour déployer à chaque push sur `main`.
 
@@ -235,6 +237,59 @@ e-mail.
   de réessayer. Une seule instance du conteneur (comme pour le reste de l'app).
 * En local, `http://localhost:8090` et `http://localhost:5173` fonctionnent sans configuration (RP `localhost`) ;
   `127.0.0.1` ne fonctionne pas (les navigateurs refusent une adresse IP comme RP ID).
+
+## 3 septies. Chiffrement des coordonnées bancaires (`OCC_DATA_KEY`)
+
+Les IBAN, noms de titulaires et BIC des profils de remboursement sont chiffrés dans la base (AES-256-GCM) avec
+`OCC_DATA_KEY`. Les identifiants Revolut / PayPal.me et les liens de paiement restent en clair (publics par nature).
+
+1. **Générer la clé** (une fois, sur un poste de confiance — ne pas la coller dans un ticket ou un chat) :
+   ```bash
+   openssl rand -base64 32
+   ```
+2. **La ranger d'abord dans le gestionnaire de mots de passe** (entrée « OCC Deliveries — OCC_DATA_KEY », avec la
+   date) : **sans elle, les IBAN d'une sauvegarde sont illisibles**. Elle n'est jamais dans `pb_data` ni dans les
+   archives R2 : ne pas la stocker à côté des sauvegardes.
+3. Coolify → *Environment Variables* → `OCC_DATA_KEY` (cocher *Is secret* / *Is literal*), puis *Redeploy*.
+4. Vérifier les journaux du démarrage : `1760000024: payout profiles sealed` (premier déploiement) ou
+   `payout profiles sealed with the current OCC_DATA_KEY` ; aucun `!!!`. Ouvrir son profil : l'IBAN s'affiche.
+
+Journaux à surveiller :
+* `!!! OCC_DATA_KEY is not set … IN PLAINTEXT` — variable absente : rien ne casse, mais les IBAN restent en clair ;
+* `!!! payout profiles sealed with an unknown key cannot be read` — mauvaise clé (ou ancienne clé retirée trop tôt) :
+  remettre la bonne. En attendant, les IBAN concernés apparaissent vides (Revolut / PayPal restent utilisables) ;
+* `invalid payout encryption key` — valeur mal copiée : le serveur **refuse de démarrer** (le message nomme la
+  variable, jamais sa valeur).
+
+**Rotation** (fuite supposée, départ d'une personne qui y avait accès) :
+1. nouvelle clé (`openssl rand -base64 32`) → gestionnaire de mots de passe ;
+2. Coolify : `OCC_DATA_KEY` = nouvelle clé, `OCC_DATA_KEY_OLD` = ancienne → *Redeploy* (le démarrage rechiffre tout ;
+   `/pb/occ payouts-reencrypt --dir=/pb/pb_data` dans le terminal du conteneur le refait à la demande et
+   affiche `0 unreadable`) ;
+3. retirer `OCC_DATA_KEY_OLD` → *Redeploy*. Garder l'ancienne clé dans le gestionnaire tant que des sauvegardes
+   antérieures à la rotation existent (14 jours).
+
+Désactiver le chiffrement (rarement utile) : `/pb/occ payouts-reencrypt --decrypt --dir=/pb/pb_data` avec les
+clés en place, puis retirer `OCC_DATA_KEY`.
+
+## 3 octies. Administration `/_/` : mot de passe + code par e-mail
+
+Dès que le SMTP est configuré (§ 3 ter), le serveur active au démarrage la **double authentification PocketBase** sur
+les superusers : après le mot de passe, `/_/` demande un **code à 6 chiffres** envoyé à l'adresse du superuser
+(e-mail « Code de connexion à l'administration », valable 5 minutes). Sans SMTP, rien ne change (pas de verrouillage).
+`OCC_SUPERUSER_MFA=false` désactive la double authentification.
+
+* Le compte `OCC_ADMIN_EMAIL` / `OCC_ADMIN_PASSWORD` continue d'être créé / mis à jour au démarrage ; son adresse doit
+  être une **vraie boîte** (le code y arrive).
+* **Récupération** (boîte inaccessible, SMTP en panne, mot de passe perdu) — Coolify → application → *Terminal* :
+  ```bash
+  /pb/occ superuser otp admin@fs0ciety.org --dir=/pb/pb_data      # affiche un code à usage unique
+  /pb/occ superuser upsert admin@fs0ciety.org '<nouveau mot de passe>' --dir=/pb/pb_data
+  ```
+  (`otp` donne le code à saisir après le mot de passe ; `upsert` remplace le mot de passe — penser à mettre
+  `OCC_ADMIN_PASSWORD` à jour dans Coolify, sinon il est remis au prochain démarrage.) En dernier recours :
+  `OCC_SUPERUSER_MFA=false` → *Redeploy*, se connecter, corriger, remettre `true`.
+* Scripts qui demandent un jeton superuser (import `menusync`, § 8) : voir le flux en trois appels au § 8.
 
 ## 4. Gérer les restaurants
 
@@ -436,9 +491,100 @@ ignorées. Admin : interrupteurs « Carte partielle » et « Position approximat
 formulaire du restaurant (ils ne verrouillent pas la fiche à eux seuls).
 
 ## 5. Sauvegardes
-* PocketBase : *Settings → Backups* → sauvegardes automatiques planifiées
-  (option S3 compatible). Recommandé : quotidien, rétention 14.
-* Ou sauvegarde du volume Coolify (*Scheduled backups* du serveur).
+
+Sauvegarde quotidienne de tout `pb_data` vers **Cloudflare R2** (API S3), vérifiée par une restauration
+automatique. Détails techniques : `ARCHITECTURE.md` § *Sauvegardes automatiques*.
+
+### Configuration (Coolify → *Environment Variables*)
+| variable | valeur production |
+|---|---|
+| `OCC_BACKUP_S3_ENDPOINT` | `https://<CLOUDFLARE_ACCOUNT_ID>.r2.cloudflarestorage.com` |
+| `OCC_BACKUP_S3_BUCKET` | `occ-deliveries-backups` (R2, WEUR) |
+| `OCC_BACKUP_S3_ACCESS_KEY` / `OCC_BACKUP_S3_SECRET` | clé API R2 « Object Read & Write » **limitée à ce bucket** (Cloudflare → R2 → *Manage API tokens*) — secrets, jamais dans le dépôt |
+| `OCC_BACKUP_S3_REGION` | `auto` (défaut) |
+| `OCC_BACKUP_S3_FORCE_PATH_STYLE` | `true` (défaut) |
+| `OCC_BACKUP_CRON` | `15 0 * * *` (défaut) — **UTC** : 02:15 à Bruxelles en été, 01:15 en hiver, avant la synchronisation de 03:30 |
+| `OCC_BACKUP_KEEP` | `14` (défaut) — 14 sauvegardes automatiques gardées |
+
+Les quatre premières variables sont requises ensemble ; au démarrage elles sont copiées dans les réglages PocketBase
+(*Settings → Backups*). Sans elles, ce qui a été réglé dans `/_/` reste tel quel. Retirer les variables **ne
+désactive pas** les sauvegardes (les réglages restent dans `pb_data`) : vider le cron dans `/_/` pour les arrêter.
+
+### Suivi (*Admin → Tableau de bord → Sauvegardes*)
+* dernière sauvegarde (date, âge, taille), stockage, prochaine sauvegarde, nombre d'archives ;
+* **dernière vérification de restauration** ✓ / ✗ : après chaque sauvegarde (et chaque heure si la dernière archive n'a
+  pas été vérifiée), le serveur télécharge la dernière archive, en extrait `data.db`, l'ouvre en lecture seule,
+  lance `PRAGMA integrity_check` et `quick_check`, contrôle les tables et compare les nombres d'utilisateurs, commandes,
+  restaurants, plats, lignes et paiements avec la base actuelle, puis efface les fichiers temporaires ;
+* boutons **Sauvegarder maintenant** et **Vérifier la restauration** ;
+* badge **« En retard »** (danger) si aucune sauvegarde de moins de 36 h, et e-mail aux admins (une fois par jour au
+  plus, si SMTP est configuré). Les superusers reçoivent en plus l'alerte PocketBase en cas d'échec d'une sauvegarde
+  planifiée.
+
+Une archive contient `data.db` (toutes les données, y compris les réglages : identifiants SMTP, clé R2, secrets
+OAuth), `auxiliary.db` (journaux) et `storage/` (fichiers envoyés). Le bucket est donc **aussi sensible que le
+serveur** : clés limitées au bucket, pas d'accès public.
+
+### Restaurer une sauvegarde
+> Prérequis : la **même `OCC_DATA_KEY`** que celle du serveur au moment de la sauvegarde (et `OCC_DATA_KEY_OLD` si une
+> rotation était en cours). Elle n'est **pas** dans l'archive : la garder hors du serveur (gestionnaire de mots de
+> passe). Sans elle, tout se restaure sauf les coordonnées de remboursement chiffrées (IBAN, titulaire, BIC), illisibles.
+> Garder aussi le même `OCC_PUBLIC_URL` / `OCC_WEBAUTHN_RP_ID` (sinon les passkeys ne fonctionnent plus) et, si elles
+> sont fixées par variables, les mêmes `OCC_VAPID_*` (sinon les abonnements push sont perdus).
+
+**A. Le serveur tourne** (mauvaise manipulation, migration ratée) — le plus simple :
+1. `https://eat.fs0ciety.org/_/` → *Settings → Backups* : la liste montre les archives du bucket R2.
+2. Optionnel : *Backup now* d'abord (état actuel conservé).
+3. Sur l'archive voulue → *Restore* et confirmer. PocketBase remplace `pb_data` et redémarre le processus (si l'app ne
+   revient pas, *Restart* dans Coolify).
+4. Vérifier (voir étape 8 ci-dessous).
+
+**B. Depuis R2 vers le volume Coolify** (serveur en panne, nouveau serveur, volume perdu) :
+1. **Choisir l'archive** : Cloudflare → R2 → `occ-deliveries-backups` (télécharger depuis le tableau de bord), ou avec la
+   CLI AWS et la clé du bucket :
+   ```bash
+   export AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=…   # clé R2 du bucket
+   R2=https://<CLOUDFLARE_ACCOUNT_ID>.r2.cloudflarestorage.com
+   aws s3 ls s3://occ-deliveries-backups/ --endpoint-url $R2 --region auto
+   aws s3 cp "s3://occ-deliveries-backups/@auto_pb_backup_occ_deliveries_20261011001500.zip" ./backup.zip \
+     --endpoint-url $R2 --region auto
+   ```
+   (avec `curl --aws-sigv4 "aws:amz:auto:s3"`, encoder le `@` du nom en `%40`, sinon R2 répond
+   `SignatureDoesNotMatch`.)
+2. **Contrôler l'archive** dans un dossier vide :
+   ```bash
+   mkdir restore && cd restore && unzip ../backup.zip     # data.db, auxiliary.db, storage/
+   sqlite3 -readonly data.db 'PRAGMA integrity_check; SELECT COUNT(*) FROM users; SELECT COUNT(*) FROM parties;'
+   ```
+3. **Arrêter l'application** dans Coolify (*Stop*).
+4. **Trouver le volume** : Coolify → application → *Persistent Storage* (volume monté sur `/pb/pb_data`), puis sur le
+   serveur : `docker volume inspect <volume> --format '{{ .Mountpoint }}'` → `MP`.
+5. **Mettre l'existant de côté** puis vider le volume :
+   ```bash
+   sudo tar -C "$MP" -czf /root/pb_data-avant-restauration-$(date +%F-%H%M).tgz .
+   sudo find "$MP" -mindepth 1 -delete
+   ```
+6. **Copier la sauvegarde** et rendre les fichiers à l'utilisateur du conteneur (`occ`) :
+   ```bash
+   sudo cp -a restore/. "$MP"/
+   docker run --rm --user root --entrypoint chown -v <volume>:/pb/pb_data <image> -R occ:occ /pb/pb_data
+   ```
+   (`<image>` : l'image de l'application, visible dans Coolify ou `docker ps -a`.)
+   Ne pas copier de `data.db-wal` / `data.db-shm` d'un autre serveur : l'archive n'en contient pas.
+7. **Variables** : vérifier dans Coolify `OCC_DATA_KEY` (la même qu'à la sauvegarde), `OCC_PUBLIC_URL`, `OCC_BACKUP_*`,
+   puis *Start* / *Redeploy*. Les migrations plus récentes que l'archive s'appliquent au démarrage.
+8. **Vérifier** : `curl https://eat.fs0ciety.org/api/occ/health` ; se connecter avec un compte connu ; ouvrir une
+   commande récente et un profil de remboursement (IBAN lisible = bonne `OCC_DATA_KEY`) ; *Admin → Sauvegardes →
+   Vérifier la restauration*, puis *Sauvegarder maintenant*.
+
+**Exercice de restauration ailleurs (copie de test, préproduction)** : l'archive contient les réglages de sauvegarde
+(cron + bucket R2). Une copie démarrée ailleurs **enverrait ses propres sauvegardes dans le bucket de production** et sa
+rétention pourrait y supprimer des archives : dans `/_/` → *Settings → Backups*, **vider le cron et désactiver S3**
+immédiatement après le premier démarrage (ou couper l'accès réseau de la copie).
+
+Exercice réalisé le 2026-10-11 : sauvegarde réelle vers R2 (archive de 99 Ko), vérification automatique ✓,
+téléchargement depuis R2, nouveau serveur sur le `pb_data` restauré, connexion d'un utilisateur et commande
+retrouvée ; archives de test supprimées du bucket.
 
 ## 6. Exploitation
 * Logs : Coolify → *Logs*, et *Logs* dans l'admin PocketBase (requêtes API).
@@ -484,9 +630,15 @@ docker exec -it <conteneur> /pb/menusync merge \
   -in /pb/pb_data/mons-sites.json,/pb/pb_data/mons-deliveroo.json,/pb/pb_data/mons-weloveat.json \
   -out /pb/pb_data/mons-merged.json   # -priority takeaway-site,deliveroo,weloveat,jsonld,existing
 
-# importer (vérifier d'abord avec -dry-run) ; jeton superuser :
-#   curl -s -X POST https://eat.fs0ciety.org/api/collections/_superusers/auth-with-password \
-#     -H 'Content-Type: application/json' -d '{"identity":"<OCC_ADMIN_EMAIL>","password":"…"}'  → "token"
+# importer (vérifier d'abord avec -dry-run) ; jeton superuser (double authentification, § 3 octies) :
+#   B=https://eat.fs0ciety.org/api/collections/_superusers
+#   curl -s -X POST $B/auth-with-password -H 'Content-Type: application/json' \
+#     -d '{"identity":"<OCC_ADMIN_EMAIL>","password":"…"}'                    → 401 { "mfaId" }
+#   curl -s -X POST $B/request-otp -H 'Content-Type: application/json' \
+#     -d '{"email":"<OCC_ADMIN_EMAIL>"}'                                      → { "otpId" } + code par e-mail
+#   curl -s -X POST "$B/auth-with-otp?mfaId=<mfaId>" -H 'Content-Type: application/json' \
+#     -d '{"otpId":"<otpId>","password":"<code à 6 chiffres>"}'               → "token"
+#   (sans SMTP / MFA désactivée : le premier appel renvoie directement "token")
 docker exec -it -e OCC_IMPORT_TOKEN=<jeton> <conteneur> /pb/menusync \
   -in /pb/pb_data/mons-merged.json -import http://127.0.0.1:8090 -dry-run
 ```
