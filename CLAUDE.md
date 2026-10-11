@@ -100,6 +100,22 @@ ci-dessous, du plus récent au plus ancien.
   - **MFA superuser** (`app/superusermfa.go`) : OTP e-mail activé au démarrage si SMTP ; PocketBase force MFA dès qu'OTP
     est actif. `/_/` et `/api/collections/_superusers` derrière Cloudflare Access. Binaire de l'image : `/pb/occ`.
   - E2E : requêtes `GET /api/occ/*` et `POST /api/realtime` annulées par une navigation ajoutées au bruit légitime.
+* 2026-10-10 — **SEO & aperçus de liens** (`backend/seo.go`, `backend/spa.go`, `frontend/index.html`,
+  `frontend/scripts/og/`). Seule l'accueil `/` est indexable : `X-Robots-Tag` posé par un middleware global (couvre
+  `/api/*` et `/_/`) en **refus par défaut** — `noindex, nofollow` pour `api`, `_`, `admin`, `party`, `equipes`,
+  `profile`, `auth`, `j`, `e` ; `noindex` pour toute autre route SPA (connexion, restaurants, 404 « douces ») ; rien sur
+  `/` et les fichiers statiques. `/robots.txt` servi par le binaire (avant le repli SPA) ; **`/j/` et `/e/` ne sont pas
+  en `Disallow`** : Twitterbot / LinkedInBot / Slackbot respectent robots.txt et n'afficheraient aucune carte — le
+  `noindex` passe par l'en-tête. Pas de sitemap (une seule URL indexable) : `/sitemap.xml`, `favicon.ico`… → 404 au lieu
+  de la SPA. Invitations : `index.html` réécrit à la volée (titre / description génériques, **jamais** le nom de la party
+  ou de l'équipe ; `og:url` = lien partagé car Facebook relit `og:url` ; canonical retiré). `index.html` : canonical,
+  OG complet (`fr_BE`, image 1200×630 + alt), `summary_large_image`, JSON-LD `WebSite` + `WebApplication` (gratuit,
+  CM Interactive › CARDOR Media). Image `public/og/og-image.jpg` (≈ 85 Ko) rendue depuis les illustrations
+  `components/food` et les tokens Ember : `cd frontend && NODE_PATH=<dossier avec playwright> node scripts/og/render.mjs`
+  (Playwright hors dépendances ; gabarit servi par Vite dev, absent du build). Pièges : un jeton d'e-mail (JWT) contient
+  des points → la détection « fichier statique » par extension ne doit jamais précéder les préfixes privés ;
+  `regexp.ReplaceAll` interprète `$` dans le remplacement → échapper en `$$`. Les URL absolues de `index.html`
+  supposent `https://eat.fs0ciety.org` (à changer avec `OCC_PUBLIC_URL`).
 * 2026-10-10 — **E-mails par le serveur Stalwart** (`mail.fs0ciety.org`, compte `nicolas@fs0ciety.org`, Resend abandonné ;
   `docs/DEPLOYMENT.md` § 3 ter). Code SMTP inchangé : port `465` = TLS implicite, sinon STARTTLS (mailyak/net/smtp,
   `PLAIN` refusé sans TLS). Expéditeur `noreply@eat.fs0ciety.org` ; adresse de contact publique `contact@eat.fs0ciety.org`

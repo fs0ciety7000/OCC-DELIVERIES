@@ -3,17 +3,74 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>OCC Deliveries — commandes groupées</title>
-    <meta name="description" content="Commandez à manger entre collègues : on vote pour le resto, chacun compose son panier, on rembourse en un scan." />
+    <title>OCC Deliveries — commandes de repas groupées entre collègues</title>
+    <meta name="description" content="Commandez à manger entre collègues : on vote pour le resto, chacun compose son panier, un·e seul·e paie et chacun rembourse en un scan." />
+    <link rel="canonical" href="https://eat.fs0ciety.org/" />
     <meta name="theme-color" content="#0A0A0D" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#FAF8F4" media="(prefers-color-scheme: light)" />
     <meta name="color-scheme" content="dark light" />
+    <meta name="application-name" content="OCC Deliveries" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="OCC" />
-    <meta property="og:title" content="OCC Deliveries" />
-    <meta property="og:description" content="Qu'est-ce qu'on mange ? Commandes groupées entre collègues." />
+    <!-- Open Graph / Twitter : textes remplacés pour /j/ et /e/ par le serveur (backend/seo.go) -->
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="OCC Deliveries" />
+    <meta property="og:locale" content="fr_BE" />
+    <meta property="og:url" content="https://eat.fs0ciety.org/" />
+    <meta property="og:title" content="OCC Deliveries — Qu'est-ce qu'on mange ?" />
+    <meta property="og:description" content="Commandes groupées entre collègues : on vote pour le resto, chacun compose son panier, et on se rembourse en un scan." />
+    <meta property="og:image" content="https://eat.fs0ciety.org/og/og-image.jpg" />
+    <meta property="og:image:secure_url" content="https://eat.fs0ciety.org/og/og-image.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="OCC Deliveries : « Qu'est-ce qu'on mange ? », pizza, burger, ramen, sushi et frites autour d'une assiette, sur fond sombre braise." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="OCC Deliveries — Qu'est-ce qu'on mange ?" />
+    <meta name="twitter:description" content="Commandes groupées entre collègues : on vote pour le resto, chacun compose son panier, et on se rembourse en un scan." />
+    <meta name="twitter:image" content="https://eat.fs0ciety.org/og/og-image.jpg" />
+    <meta name="twitter:image:alt" content="OCC Deliveries : « Qu'est-ce qu'on mange ? », pizza, burger, ramen, sushi et frites autour d'une assiette, sur fond sombre braise." />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://eat.fs0ciety.org/#website",
+            "url": "https://eat.fs0ciety.org/",
+            "name": "OCC Deliveries",
+            "alternateName": "OCC",
+            "inLanguage": "fr-BE",
+            "publisher": { "@id": "https://interactive.cardormedia.com/#organization" }
+          },
+          {
+            "@type": "WebApplication",
+            "@id": "https://eat.fs0ciety.org/#app",
+            "name": "OCC Deliveries",
+            "url": "https://eat.fs0ciety.org/",
+            "description": "Commandes de repas groupées entre collègues : vote pour le restaurant, paniers individuels, envoi vers Uber Eats ou Takeaway et remboursement du payeur par QR virement SEPA, Revolut ou PayPal.",
+            "applicationCategory": "LifestyleApplication",
+            "applicationSubCategory": "Commandes de repas groupées",
+            "operatingSystem": "Navigateur web (application installable, PWA)",
+            "browserRequirements": "Requiert JavaScript",
+            "inLanguage": "fr-BE",
+            "image": "https://eat.fs0ciety.org/og/og-image.jpg",
+            "isAccessibleForFree": true,
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+            "author": { "@id": "https://interactive.cardormedia.com/#organization" },
+            "publisher": { "@id": "https://interactive.cardormedia.com/#organization" }
+          },
+          {
+            "@type": "Organization",
+            "@id": "https://interactive.cardormedia.com/#organization",
+            "name": "CM Interactive",
+            "url": "https://interactive.cardormedia.com/",
+            "parentOrganization": { "@type": "Organization", "@id": "https://cardormedia.com/#organization", "name": "CARDOR Media", "url": "https://cardormedia.com/" }
+          }
+        ]
+      }
+    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
