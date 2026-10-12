@@ -16,13 +16,27 @@ const FLOATERS = [
   { C: Basil, cls: 'hidden lg:block lg:left-[120%] lg:top-[240%] lg:size-10 rotate-90', depth: 1.8 },
 ] as const
 
-/** Héros d'accueil : ingrédients flottants en parallaxe + titre révélé lettre par lettre. */
-export function FoodHero({ title, children, className }: { title: string; children?: ReactNode; className?: string }) {
+/**
+ * Héros d'accueil : ingrédients flottants en parallaxe + titre révélé lettre par lettre.
+ * `kicker` (sur-titre) fait partie du h1 : c'est lui qui décrit le service aux moteurs, qui
+ * indexent la page rendue (le texte de présentation d'index.html est remplacé par React).
+ */
+export function FoodHero({
+  title,
+  kicker,
+  children,
+  className,
+}: {
+  title: string
+  kicker?: ReactNode
+  children?: ReactNode
+  className?: string
+}) {
   const scope = useRef<HTMLDivElement>(null)
   useGSAP(
     () =>
       withMotion(() => {
-        const split = SplitText.create('[data-hero-title]', { type: 'chars,words', aria: 'auto' })
+        const split = SplitText.create('[data-hero-title]', { type: 'chars,words', aria: 'none' })
         gsap.from(split.chars, { yPercent: 60, opacity: 0, rotate: 6, duration: 0.5, ease: 'back.out(1.8)', stagger: 0.025 })
         const floaters = gsap.utils.toArray<HTMLElement>('[data-floater]')
         floaters.forEach((el, i) => {
@@ -51,15 +65,23 @@ export function FoodHero({ title, children, className }: { title: string; childr
   )
   return (
     <div ref={scope} className={cn('relative isolate', className)}>
-      <div aria-hidden className="pointer-events-none absolute -inset-x-2 -inset-y-6 -z-10">
-        {FLOATERS.map(({ C, cls, depth }, i) => (
-          <div key={i} data-floater data-depth={depth} className={cn('absolute opacity-90 drop-shadow-lg', cls)}>
-            <C className="size-full" />
-          </div>
-        ))}
-      </div>
-      <h1 data-hero-title className="font-display text-[40px] leading-[44px] font-bold tracking-tight sm:text-[56px] sm:leading-[60px]">
-        {title}
+      <h1>
+        {kicker && <span className="mb-6 block text-sm font-semibold tracking-wide text-brand uppercase">{kicker}</span>}
+        {/* Les ingrédients se placent par rapport au titre seul, pas au sur-titre. */}
+        <span className="relative block">
+          <span aria-hidden className="pointer-events-none absolute -inset-x-2 -inset-y-6 -z-10">
+            {FLOATERS.map(({ C, cls, depth }, i) => (
+              <span key={i} data-floater data-depth={depth} className={cn('absolute opacity-90 drop-shadow-lg', cls)}>
+                <C className="size-full" />
+              </span>
+            ))}
+          </span>
+          {/* Lettres animées masquées aux lecteurs d'écran, qui lisent la copie sr-only d'un seul tenant. */}
+          <span className="sr-only">{title}</span>
+          <span aria-hidden data-hero-title className="block font-display text-[40px] leading-[44px] font-bold tracking-tight sm:text-[56px] sm:leading-[60px]">
+            {title}
+          </span>
+        </span>
       </h1>
       {children}
     </div>

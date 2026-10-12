@@ -31,6 +31,8 @@ export function HomePage() {
   const isGuest = !!user?.is_guest
   // Une seule commande en cours (ex. retour après connexion) : on la met en avant tout en haut.
   const only = parties.data?.length === 1 ? parties.data[0]! : null
+  // Sur-titre, dans le h1 : décrit le service aux visiteurs (et aux moteurs), salue un membre connecté.
+  const kicker = user ? `Salut ${user.name?.split(' ')[0] || ''} 👋` : 'Commandes groupées entre collègues'
 
   return (
     <div className="space-y-10">
@@ -40,9 +42,15 @@ export function HomePage() {
         </section>
       )}
       <section className="relative space-y-6 pt-4 sm:pt-10">
-        <p className="text-sm font-semibold tracking-wide text-brand uppercase">{user ? `Salut ${user.name?.split(' ')[0] || ''} 👋` : 'Commandes groupées entre collègues'}</p>
-        <Suspense fallback={<h1 className="font-display text-[40px] leading-[44px] font-bold sm:text-[56px] sm:leading-[60px]">{TITLE}</h1>}>
-          <FoodHero title={TITLE} className="max-w-2xl" />
+        <Suspense
+          fallback={
+            <h1>
+              <span className="mb-6 block text-sm font-semibold tracking-wide text-brand uppercase">{kicker}</span>
+              <span className="block font-display text-[40px] leading-[44px] font-bold sm:text-[56px] sm:leading-[60px]">{TITLE}</span>
+            </h1>
+          }
+        >
+          <FoodHero title={TITLE} kicker={kicker} className="max-w-2xl" />
         </Suspense>
         <p className="max-w-xl text-lg text-muted">On vote pour le resto, chacun compose son panier, et on se rembourse en un scan. Fini les tableurs du midi.</p>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">

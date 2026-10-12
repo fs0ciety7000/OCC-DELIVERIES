@@ -73,6 +73,10 @@ docker compose up --build         # http://localhost:8090
 Les apprentissages importants (pièges PocketBase, décisions d'UX) sont ajoutés
 ci-dessous, du plus récent au plus ancien.
 
+* 2026-10-12 — **h1 descriptif après rendu** (`FoodHero.tsx`, `HomePage.tsx`). Google indexe la page rendue : le texte
+  `sr-only` d'`index.html` disparaît au montage de React. Le sur-titre « Commandes groupées entre collègues » est désormais
+  dans le h1 (« Salut … » une fois connecté) ; titre animé en `aria-hidden` + copie `sr-only`, SplitText `aria: 'none'` ;
+  ingrédients ancrés au titre seul (rendu inchangé à 360 et 1280 px).
 * 2026-10-11 — **Restauration par l'API admin** (`POST /api/occ/admin/backups/restore`, ARCHITECTURE § routes) pour le hub
   `services.fs0ciety.org` et les scripts `scripts/backups` du dépôt coolify : les superusers ont la MFA, l'automatisation passe
   donc par un compte `admin`. Restauration en arrière-plan (`restoreFn` = `app.RestoreBackup`, remplacé dans les tests car le
