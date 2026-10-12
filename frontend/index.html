@@ -78,7 +78,21 @@
   </head>
   <body>
     <noscript>OCC Deliveries a besoin de JavaScript pour fonctionner.</noscript>
-    <div id="root"></div>
+    <!-- Présentation lue par les robots sans JavaScript (moteurs, IA) et les lecteurs d'écran avant le
+         démarrage ; React remplace ce contenu dès son rendu. -->
+    <div id="root">
+      <div class="sr-only">
+        <h1>OCC Deliveries — commandes groupées entre collègues</h1>
+        <p>
+          Ouvrez une commande, invitez vos collègues par un lien et votez pour le restaurant. Chacun
+          compose son panier, la commande part vers Uber Eats ou Takeaway, puis un·e seul·e paie.
+        </p>
+        <p>
+          Chacun rembourse sa part en un scan : QR de virement SEPA lu par l'app bancaire, lien Revolut
+          ou PayPal.me avec le montant, ou en espèces. Gratuit, conçu à Mons par CM Interactive.
+        </p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
